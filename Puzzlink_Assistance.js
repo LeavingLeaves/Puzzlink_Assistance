@@ -23,7 +23,7 @@
 
     function assist() {
         if (/slither/.test(document.URL)) { SlitherlinkAssist(); }
-        if (/yajirin/.test(document.URL)) { YajirinAssist(); }
+        if (/yaji[lr]in/.test(document.URL)) { YajilinAssist(); }
         console.log('Assisted.');
     }
 
@@ -41,7 +41,7 @@
         a(b.right, c.right);
     };
 
-    function YajirinAssist() {
+    function YajilinAssist() {
         let board = ui.puzzle.board;
         let cell = board.cell;
         let flg = true;
