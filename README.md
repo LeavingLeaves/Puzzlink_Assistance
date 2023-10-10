@@ -1,5 +1,5 @@
 # Puzz.link Assistance
-Help do some trivial deduction for some puzzle genre in puzz.link
+Help do some trivial deduction for some puzzle genre in puzz.link (https://github.com/robx/pzprjs/)
 
 Press "Assist" at the bottom right or Press Q to automatically deduce.
 
@@ -8,3 +8,4 @@ https://greasyfork.org/en/scripts/477117-puzz-link-assistance
 
 Currently support:
 * Slither Link
+* Yajirin
