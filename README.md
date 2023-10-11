@@ -7,5 +7,6 @@ Greasyfork link:
 https://greasyfork.org/en/scripts/477117-puzz-link-assistance
 
 Currently support:
+* Simple Loop
 * Slither Link
 * Yajilin
