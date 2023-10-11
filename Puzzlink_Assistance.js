@@ -3,8 +3,8 @@
 // @version      1.0
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
-// @match        https://puzz.link/p?*/*/*/*
-// @match        https://pzplus.tck.mn/p?*/*/*/*
+// @match        https://puzz.link/p*/*/*/*
+// @match        https://pzplus.tck.mn/p*/*/*/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=github.com
 // @grant        none
 // ==/UserScript==
@@ -28,6 +28,7 @@
         if (/slither/.test(document.URL)) { SlitherlinkAssist(); }
         if (/yaji[lr]in/.test(document.URL)) { YajilinAssist(); }
         if (/simpleloop/.test(document.URL)) { SimpleloopAssist(); }
+        if (/mas[yh]u/.test(document.URL)) { MasyuAssist(); }
         console.log('Assisted.');
     }
     let fourside = function (a, b) {
@@ -118,6 +119,78 @@
         }
     };
 
+    function MasyuAssist() {
+        let board = ui.puzzle.board;
+        let cell = board.cell;
+        let dir = function (c, ndir) {
+            ndir = ndir % 4;
+            if (ndir === 1) return c.top;
+            if (ndir === 2) return c.right;
+            if (ndir === 3) return c.bottom;
+            if (ndir === 0) return c.left;
+        }
+        for (let loop = 0; loop < maxLoop; loop++) {
+            if (!flg) { break; }
+            flg = false;
+            for (let i = 0; i < cell.length; i++) {
+                let adjcell = cell[i].adjacent;
+                let adjline = cell[i].adjborder;
+                if (cell[i].qnum === 1) {//white
+                    for (let d = 0; d < 4; d++) {
+                        //go straight
+                        if (dir(adjline, d).line === 1 || dir(adjline, d + 1).qsub === 2 || dir(adjline, d + 1).isnull) {
+                            add_line(dir(adjline, d));
+                            add_line(dir(adjline, d + 2));
+                            add_cross(dir(adjline, d + 1));
+                            add_cross(dir(adjline, d + 3));
+                        }
+                        //3 in a row
+                        if (dir(adjcell, d).qnum === 2 && dir(adjcell, d + 2).qnum === 2) {
+                            add_line(dir(adjline, d + 1));
+                            add_line(dir(adjline, d + 3));
+                            add_cross(dir(adjline, d));
+                            add_cross(dir(adjline, d + 2));
+                        }
+                        //turn at one side
+                        if (dir(adjline, d).line === 1 && dir(dir(adjcell, d).adjborder, d).line === 1) {
+                            add_cross(dir(dir(adjcell, d + 2).adjborder, d + 2));
+                        }
+                        //no turn on both side
+                        if (!dir(adjcell, d).isnull && dir(dir(adjcell, d).adjborder, d).line === 1 &&
+                            !dir(adjcell, d + 2).isnull && dir(dir(adjcell, d + 2).adjborder, d + 2).line === 1) {
+                            add_line(dir(adjline, d + 1));
+                            add_line(dir(adjline, d + 3));
+                            add_cross(dir(adjline, d));
+                            add_cross(dir(adjline, d + 2));
+                        }
+                    }
+                }
+                if (cell[i].qnum === 2) {//black
+                    for (let d = 0; d < 4; d++) {
+                        //can't go straight this way
+                        if (dir(adjcell, d).isnull || dir(adjline, d).qsub === 2 ||
+                            dir(dir(adjcell, d).adjacent, d).isnull || dir(dir(adjcell, d).adjborder, d).qsub === 2 ||
+                            dir(adjcell, d).qnum === 2) {
+                            add_cross(dir(adjline, d));
+                            add_line(dir(adjline, d + 2));
+                        }
+                        //going straight this way will branch
+                        if (dir(adjcell, d).isnull || dir(dir(adjcell, d).adjborder, d + 1).line === 1 ||
+                            dir(dir(adjcell, d).adjborder, d + 3).line === 1) {
+                            add_cross(dir(adjline, d));
+                            add_line(dir(adjline, d + 2));
+                        }
+                        //go straight
+                        if (dir(adjline, d).line === 1) {
+                            add_line(dir(dir(adjcell, d).adjborder, d));
+                        }
+                    }
+                }
+            }
+            SingleLoopInCell(0);
+        }
+    }
+
     function SimpleloopAssist() {
         let board = ui.puzzle.board;
         let cell = board.cell;
@@ -126,11 +199,11 @@
             flg = false;
             for (let i = 0; i < cell.length; i++) {
                 let adjline = cell[i].adjborder;
-                if (cell[i].ques === 7) {
+                if (cell[i].ques === 7) {//7 for black block
                     fourside(add_cross, adjline);
                 }
-                SingleLoopInCell(1);
             }
+            SingleLoopInCell(1);
         }
     }
 
@@ -139,7 +212,7 @@
         let cell = board.cell;
         let border = board.border;
         let isPathable = function (c) { return !c.isnull && c.qnum === -1 && c.qans === 0; };
-        let isEmpty = function (c) { return !c.isnull && c.qnum === -1 && c.qans === 0 && c.qsub === 0; };
+        let isEmpty = function (c) { return !c.isnull && c.qnum === -1 && c.qans === 0 && c.qsub === 0 && c.lcnt === 0; };
         for (let loop = 0; loop < maxLoop; loop++) {
             if (!flg) { break; }
             flg = false;
@@ -160,6 +233,10 @@
                     let blocknum = 0;
                     let lastcell = i;
                     while (x >= 0 && y >= 0 && x < rows && y < cols) {
+                        if (x * cols + y !== i && cell[x * cols + y].qdir === cell[i].qdir && cell[x * cols + y].qnum >= 0) {
+                            qnum -= cell[x * cols + y].qnum;
+                            break;
+                        }
                         emptynum += isEmpty(cell[x * cols + y]);
                         blocknum += cell[x * cols + y].qans === 1;
                         if (isEmpty(cell[lastcell]) && isEmpty(cell[x * cols + y])) {
@@ -177,6 +254,9 @@
                         y = i % cols;
                         lastcell = i;
                         while (x >= 0 && y >= 0 && x < rows && y < cols) {
+                            if (x * cols + y !== i && cell[x * cols + y].qdir === cell[i].qdir && cell[x * cols + y].qnum >= 0) {
+                                break;
+                            }
                             if (!isEmpty(cell[x * cols + y]) && isEmpty(cell[lastcell])) {
                                 add_block(cell[lastcell]);
                             }
@@ -197,6 +277,9 @@
                         x = Math.floor(i / cols);
                         y = i % cols;
                         while (x >= 0 && y >= 0 && x < rows && y < cols) {
+                            if (x * cols + y !== i && cell[x * cols + y].qdir === cell[i].qdir && cell[x * cols + y].qnum >= 0) {
+                                break;
+                            }
                             if (isEmpty(cell[x * cols + y])) {
                                 add_dot(cell[x * cols + y]);
                             }
@@ -204,10 +287,10 @@
                             y += dirs[qdir][1];
                         }
                     }
-                    //add cross
-                    fourside(add_cross, adjline);
                 }
+                //add cross
                 if (cell[i].qnum !== -1) {
+                    fourside(add_cross, adjline);
                     continue;
                 }
                 //add dot around block
