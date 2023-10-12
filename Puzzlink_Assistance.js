@@ -29,6 +29,7 @@
         if (/yaji[lr]in/.test(document.URL)) { YajilinAssist(); }
         if (/simpleloop/.test(document.URL)) { SimpleloopAssist(); }
         if (/mas[yh]u/.test(document.URL)) { MasyuAssist(); }
+        if (/lightup|akari/.test(document.URL)) { AkariAssist(); }
         console.log('Assisted.');
     }
     let fourside = function (a, b) {
@@ -80,6 +81,14 @@
         add_bg_color(c, 2);
     }
 
+    let dir = function (c, ndir) {
+        ndir = ndir % 4;
+        if (ndir === 1) return c.top;
+        if (ndir === 2) return c.right;
+        if (ndir === 3) return c.bottom;
+        if (ndir === 0) return c.left;
+    }
+
     let SingleLoopInCell = function (inPath) {
         let board = ui.puzzle.board;
         let cell = board.cell;
@@ -91,7 +100,7 @@
             let adjline = cell[i].adjborder;
             let fn = function (c, d) {
                 if (!c.isnull && d.qsub !== 2) { emptynum++; }
-                linenum += d.line == 1;
+                linenum += d.line === 1;
             };
             fourside2(fn, adjcell, adjline);
             //no branch
@@ -119,16 +128,93 @@
         }
     };
 
+    function AkariAssist() {
+        let board = ui.puzzle.board;
+        let cell = board.cell;
+        let isEmpty = function (c) { return !c.isnull && c.qnum === -1 && c.qans === 0 && c.qsub === 0; };
+        for (let loop = 0; loop < maxLoop; loop++) {
+            if (!flg) { break; }
+            flg = false;
+            for (let i = 0; i < cell.length; i++) {
+                let adjcell = cell[i].adjacent;
+                let emptynum = 0;
+                let lightnum = 0;
+                //add dot where lighted
+                if (cell[i].qlight === 1 && cell[i].qans !== 1) {
+                    add_dot(cell[i]);
+                }
+                //only one place can light
+                if (cell[i].qnum === -1 && cell[i].qlight === 0) {
+                    let dirs = [[], [-1, 0], [1, 0], [0, -1], [0, 1]];//Top Bottom Left Right
+                    let rows = board.rows, cols = board.cols;
+                    let emptynum = (cell[i].qsub === 0 ? 1 : 0);
+                    for (let d = 1; d <= 4; d++) {
+                        let x = Math.floor(i / cols);
+                        let y = i % cols;
+                        x += dirs[d][0];
+                        y += dirs[d][1];
+                        while (x >= 0 && y >= 0 && x < rows && y < cols) {
+                            if (!cell[x * cols + y].isnull && cell[x * cols + y].qnum !== -1) {
+                                break;
+                            }
+                            emptynum += cell[x * cols + y].qsub === 0;
+                            x += dirs[d][0];
+                            y += dirs[d][1];
+                        }
+                    }
+                    if (emptynum === 1) {
+                        if (cell[i].qsub === 0) {
+                            add_block(cell[i]);
+                        } else {
+                            for (let d = 1; d <= 4; d++) {
+                                let x = Math.floor(i / cols);
+                                let y = i % cols;
+                                x += dirs[d][0];
+                                y += dirs[d][1];
+                                while (x >= 0 && y >= 0 && x < rows && y < cols) {
+                                    if (!cell[x * cols + y].isnull && cell[x * cols + y].qnum !== -1) {
+                                        break;
+                                    }
+                                    if (cell[x * cols + y].qsub === 0) {
+                                        add_block(cell[x * cols + y]);
+                                    }
+                                    x += dirs[d][0];
+                                    y += dirs[d][1];
+                                }
+                            }
+                        }
+                    }
+                }
+                let fn = function (c) {
+                    if (!c.isnull && c.qnum === -1 && c.qsub === 0 && c.qans !== 1) { emptynum++; }
+                    lightnum += (c.qans === 1);
+                };
+                fourside(fn, adjcell);
+                if (cell[i].qnum >= 0) {
+                    //finished clue
+                    if (cell[i].qnum === lightnum) {
+                        fourside(add_dot, adjcell);
+                    }
+                    //finish clue
+                    if (cell[i].qnum === emptynum + lightnum) {
+                        fourside(add_block, adjcell);
+                    }
+                    //dot at corner
+                    if (cell[i].qnum - lightnum + 1 === emptynum) {
+                        for (let d = 0; d < 4; d++) {
+                            if (isEmpty(dir(adjcell, d)) && isEmpty(dir(adjcell, d + 1)) && isEmpty(dir(dir(adjcell, d).adjacent, d + 1))) {
+                                add_dot(dir(dir(adjcell, d).adjacent, d + 1));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     function MasyuAssist() {
         let board = ui.puzzle.board;
         let cell = board.cell;
-        let dir = function (c, ndir) {
-            ndir = ndir % 4;
-            if (ndir === 1) return c.top;
-            if (ndir === 2) return c.right;
-            if (ndir === 3) return c.bottom;
-            if (ndir === 0) return c.left;
-        }
         for (let loop = 0; loop < maxLoop; loop++) {
             if (!flg) { break; }
             flg = false;
@@ -203,7 +289,6 @@
     function YajilinAssist() {
         let board = ui.puzzle.board;
         let cell = board.cell;
-        let border = board.border;
         let isPathable = function (c) { return !c.isnull && c.qnum === -1 && c.qans === 0; };
         let isEmpty = function (c) { return !c.isnull && c.qnum === -1 && c.qans === 0 && c.qsub === 0 && c.lcnt === 0; };
         for (let loop = 0; loop < maxLoop; loop++) {
@@ -294,7 +379,7 @@
                 }
                 let fn = function (c, d) {
                     if (isPathable(c) && d.qsub !== 2) { emptynum++; }
-                    linenum += d.line == 1;
+                    linenum += d.line === 1;
                 };
                 fourside2(fn, adjcell, adjline);
                 //no branch
@@ -340,7 +425,7 @@
                 }
                 let fn = function (d) {
                     if (d.qsub === 0) { emptynum++; }
-                    linenum += (d.line == 1);
+                    linenum += (d.line === 1);
                 };
                 fourside(fn, adjline);
                 //finish number
@@ -391,7 +476,7 @@
                 let linenum = 0;
                 let fn = function (d) {
                     if (d !== undefined && !d.isnull && d.qsub === 0) { emptynum++; }
-                    linenum += (d.line == 1);
+                    linenum += (d.line === 1);
                 };
                 fourside(fn, crsline);
                 //no deadend or branch
@@ -439,6 +524,30 @@
                             add_cross(c2);
                             add_line(c5);
                             add_line(c6);
+                        }
+                        //line exit 1
+                        if ((c2.isnull || c2.qsub === 2) && c34.qnum === 1 && c5.qsub === 2 && c6.qsub === 2) {
+                            add_line(c1);
+                        }
+                        //line exit 2
+                        if ((c2.isnull || c2.qsub === 2) && c34.qnum === 2 && (c5.qsub === 2 && c6.line === 1 || c6.qsub === 2 && c5.line === 1)) {
+                            add_line(c1);
+                        }
+                        //line exit 3
+                        if ((c2.isnull || c2.qsub === 2) && c34.qnum === 3 && c5.line === 1 && c6.line === 1) {
+                            add_line(c1);
+                        }
+                        //line should enter 1
+                        if (c1.line === 1 && c34.qnum === 1 && c5.qsub === 2 && c6.qsub === 2) {
+                            add_cross(c2);
+                        }
+                        //line should enter 2
+                        if (c1.line === 1 && c34.qnum === 2 && (c5.qsub === 2 || c6.qsub === 2)) {
+                            add_cross(c2);
+                        }
+                        //line should enter 3
+                        if (c1.line === 1 && c34.qnum === 3 && c5.line === 1 && c6.line === 1) {
+                            add_cross(c2);
                         }
                     };
                     if (!crsline.bottom.isnull) {
