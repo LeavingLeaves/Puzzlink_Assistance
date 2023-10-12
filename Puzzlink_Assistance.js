@@ -578,6 +578,18 @@
             for (let i = 0; i < cell.length; i++) {
                 let adjline = cell[i].adjborder;
                 let adjcell = cell[i].adjacent;
+                //same neighbor color
+                {
+                    let fn = function (c, d) {
+                        if (!c.isnull && cell[i].qsub !== 0 && cell[i].qsub === c.qsub) {
+                            add_cross(d);
+                        }
+                        if (cell[i].qsub === 2 && c.isnull) {
+                            add_cross(d);
+                        }
+                    };
+                    fourside2(fn, adjcell, adjline);
+                }
                 //deduce neighbor color
                 {
                     let fn = function (cn, dn) {
@@ -611,7 +623,7 @@
                     if (outernum === 4) {
                         add_bg_outer_color(cell[i]);
                     }
-                    if (cell[i].qnum === -1) {
+                    if (cell[i].qnum < 0) {
                         continue;
                     }
                     if (cell[i].qnum < innernum || 4 - cell[i].qnum < outernum) {
