@@ -386,34 +386,34 @@
             }
             //deduce cross
             for (let i = 0; i < cross.length; i++) {
-                let adjline = cross[i].adjborder;
+                let crsline = cross[i].adjborder;
                 let emptynum = 0;
                 let linenum = 0;
                 let fn = function (d) {
                     if (d !== undefined && !d.isnull && d.qsub === 0) { emptynum++; }
                     linenum += (d.line == 1);
                 };
-                fourside(fn, adjline);
+                fourside(fn, crsline);
                 //no deadend or branch
                 if (emptynum === 1 || linenum === 2) {
-                    fourside(add_cross, adjline);
+                    fourside(add_cross, crsline);
                 }
                 //extend deadend
                 if (emptynum === 2 && linenum === 1) {
-                    fourside(add_line, adjline);
+                    fourside(add_line, crsline);
                 }
                 //empty turn with 1 or 3
                 if (emptynum === 2 && linenum === 0) {
                     let fn = function (c) { return c !== undefined && !c.isnull && c.qsub === 0; }
-                    if (fn(adjline.top) && fn(adjline.left) && adjline.top.sidecell[0].qnum === 3) { fourside(add_line, adjline); }
-                    if (fn(adjline.top) && fn(adjline.right) && adjline.top.sidecell[1].qnum === 3) { fourside(add_line, adjline); }
-                    if (fn(adjline.bottom) && fn(adjline.left) && adjline.bottom.sidecell[0].qnum === 3) { fourside(add_line, adjline); }
-                    if (fn(adjline.bottom) && fn(adjline.right) && adjline.bottom.sidecell[1].qnum === 3) { fourside(add_line, adjline); }
+                    if (fn(crsline.top) && fn(crsline.left) && crsline.top.sidecell[0].qnum === 3) { fourside(add_line, crsline); }
+                    if (fn(crsline.top) && fn(crsline.right) && crsline.top.sidecell[1].qnum === 3) { fourside(add_line, crsline); }
+                    if (fn(crsline.bottom) && fn(crsline.left) && crsline.bottom.sidecell[0].qnum === 3) { fourside(add_line, crsline); }
+                    if (fn(crsline.bottom) && fn(crsline.right) && crsline.bottom.sidecell[1].qnum === 3) { fourside(add_line, crsline); }
 
-                    if (fn(adjline.top) && fn(adjline.left) && adjline.top.sidecell[0].qnum === 1) { fourside(add_cross, adjline); }
-                    if (fn(adjline.top) && fn(adjline.right) && adjline.top.sidecell[1].qnum === 1) { fourside(add_cross, adjline); }
-                    if (fn(adjline.bottom) && fn(adjline.left) && adjline.bottom.sidecell[0].qnum === 1) { fourside(add_cross, adjline); }
-                    if (fn(adjline.bottom) && fn(adjline.right) && adjline.bottom.sidecell[1].qnum === 1) { fourside(add_cross, adjline); }
+                    if (fn(crsline.top) && fn(crsline.left) && crsline.top.sidecell[0].qnum === 1) { fourside(add_cross, crsline); }
+                    if (fn(crsline.top) && fn(crsline.right) && crsline.top.sidecell[1].qnum === 1) { fourside(add_cross, crsline); }
+                    if (fn(crsline.bottom) && fn(crsline.left) && crsline.bottom.sidecell[0].qnum === 1) { fourside(add_cross, crsline); }
+                    if (fn(crsline.bottom) && fn(crsline.right) && crsline.bottom.sidecell[1].qnum === 1) { fourside(add_cross, crsline); }
                 }
                 //2 degree turn or line enter
                 {
