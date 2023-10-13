@@ -8,6 +8,7 @@ https://greasyfork.org/en/scripts/477117-puzz-link-assistance
 
 Currently support:
 * Akari
+* Heyawake
 * Masyu
 * Simple Loop
 * Slither Link
