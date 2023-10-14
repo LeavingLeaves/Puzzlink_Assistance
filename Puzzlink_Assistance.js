@@ -36,6 +36,8 @@
             if (/mas[yh]u/.test(document.URL)) { MasyuAssist(); }
             if (/lightup|akari/.test(document.URL)) { AkariAssist(); }
             if (/heyawake/.test(document.URL)) { HeyawakeAssist(); }
+            if (/shakashaka/.test(document.URL)) { ShakashakaAssist(); }
+            if (/ayeheya/.test(document.URL)) { EkawayehAssist(); }
         }
         console.log('Assisted.');
     }
@@ -109,7 +111,7 @@
         if (ndir === 0) return c.left;
     }
 
-    let SingleLoopInCell = function (inPath) {
+    function SingleLoopInCell(inPath) {
         for (let i = 0; i < board.cell.length; i++) {
             let cell = board.cell[i];
             let emptynum = 0;
@@ -145,7 +147,367 @@
                 add_cross(border);
             }
         }
-    };
+    }
+
+    function GreenConnectedInCell() {
+        let greennum = 0;
+        let greencellidList = [];
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            greennum += cell.qsub === 1;
+        }
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (cell.qsub !== 1) { continue; }
+            if (greencellidList.indexOf(cell.id) !== -1) { continue; }
+            let lastempty = null;
+            let fn = function (c) {
+                if (greencellidList.indexOf(c.id) !== -1) { return; }
+                if (c.isnull || c.qans === 1) { return; }
+                if (c.qsub !== 1) {
+                    if (lastempty !== null && lastempty !== c) {
+                        lastempty = undefined;
+                    }
+                    if (lastempty === null) {
+                        lastempty = c;
+                    }
+                    return;
+                }
+                greencellidList.push(c.id);
+                fourside(fn, c.adjacent);
+            }
+            fn(cell);
+            if (lastempty !== null && lastempty !== undefined) {
+                add_green(lastempty);
+                return;
+            }
+        }
+    }
+
+    function EkawayehAssist() {
+        HeyawakeAssist();
+        for (let i = 0; i < board.roommgr.components.length; i++) {
+            let room = board.roommgr.components[i];
+            let qnum = room.top.qnum;
+            let rows = room.clist.getRectSize().rows;
+            let cols = room.clist.getRectSize().cols;
+            let tx = room.clist.getRectSize().x1 + room.clist.getRectSize().x2;
+            let ty = room.clist.getRectSize().y1 + room.clist.getRectSize().y2;
+            if (rows % 2 === 1 && cols % 2 === 0) {
+                add_green(board.getc(tx / 2 - 1, ty / 2));
+                add_green(board.getc(tx / 2 + 1, ty / 2));
+            }
+            if (rows % 2 === 0 && cols % 2 === 1) {
+                add_green(board.getc(tx / 2, ty / 2 - 1));
+                add_green(board.getc(tx / 2, ty / 2 + 1));
+            }
+            if (rows % 2 === 1 && cols % 2 === 1) {
+                if (qnum >= 0 && qnum % 2 === 0) {
+                    add_green(board.getc(tx / 2, ty / 2));
+                }
+                if (qnum >= 0 && qnum % 2 === 1) {
+                    add_block2(board.getc(tx / 2, ty / 2));
+                }
+            }
+            for (let j = 0; j < room.clist.length; j++) {
+                let cell = room.clist[j];
+                if (cell.qsub === 1) {
+                    add_green(board.getc(tx - cell.bx, ty - cell.by));
+                }
+                if (cell.qans === 1) {
+                    add_block2(board.getc(tx - cell.bx, ty - cell.by));
+                }
+            }
+        }
+    }
+
+    function ShakashakaAssist() {
+        let isEmpty = function (c) { return !c.isnull && c.qnum === -1 && c.qsub === 0 && c.qans === 0; };
+        //draw triangle
+        let add_triangle = function (c, ans) {
+            if (c === undefined || c.isnull || !isEmpty(c)) { return; }
+            flg = 1;
+            c.setQans(ans);
+            c.draw();
+        };
+        //check blocking edge
+        let isTopEdge = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 4 || c.qans === 5; };
+        let isBottomEdge = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2 || c.qans === 3; };
+        let isLeftEdge = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2 || c.qans === 5; };
+        let isRightEdge = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 3 || c.qans === 4; };
+        //check blocking corner
+        let isBLCorner = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2; };
+        let isBRCorner = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 3; };
+        let isTRCorner = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 4; };
+        let isTLCorner = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 5; };
+        //check blocking sharp
+        let isBLSharp = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2 || c.qans === 3 || c.qans === 5; };
+        let isBRSharp = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2 || c.qans === 3 || c.qans === 4; };
+        let isTRSharp = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 3 || c.qans === 4 || c.qans === 5; };
+        let isTLSharp = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2 || c.qans === 4 || c.qans === 5; };
+        //check if stick edge
+        let isStickEdge = function (c) { return isBottomEdge(c.adjacent.top) || isTopEdge(c.adjacent.bottom) || isRightEdge(c.adjacent.left) || isLeftEdge(c.adjacent.right); }
+        //if can place triangle of specific direction
+        let isntBLTri = function (c) {
+            let adj = c.adjacent;
+            if (!isEmpty(c) || isBottomEdge(adj.top) || isLeftEdge(adj.right)) { return true; }
+            if ((adj.top.qsub === 1 && isStickEdge(adj.top)) || (adj.right.qsub === 1 && isStickEdge(adj.right))) { return true; }
+            if ((!adj.top.isnull && adj.top.qans === 4) || (!adj.right.isnull && adj.right.qans === 4)) { return true; }
+            if ((!adj.bottom.isnull && (adj.bottom.qans === 2 || adj.bottom.qans === 3))) { return true; }
+            if ((!adj.left.isnull && (adj.left.qans === 2 || adj.left.qans === 5))) { return true; }
+            if (adj.top.adjacent.right !== undefined && (isBLSharp(adj.top.adjacent.right) || (adj.top.adjacent.right.qsub === 1 && isStickEdge(adj.top.adjacent.right)))) { return true; }
+            if (adj.top.adjacent.left !== undefined && !adj.top.adjacent.left.isnull && adj.top.adjacent.left.qans === 5) { return true; }
+            if (adj.bottom.adjacent.right !== undefined && !adj.bottom.adjacent.right.isnull && adj.bottom.adjacent.right.qans === 3) { return true; }
+            if (adj.bottom.adjacent.left !== undefined && !adj.bottom.adjacent.left.isnull && adj.bottom.adjacent.left.qans === 2) { return true; }
+            if (adj.top.adjacent.top !== undefined && !adj.top.adjacent.top.isnull && adj.top.adjacent.top.qans === 5) { return true; }
+            if (adj.right.adjacent.right !== undefined && !adj.right.adjacent.right.isnull && adj.right.adjacent.right.qans === 3) { return true; }
+            if (adj.top.adjacent.right !== undefined && !adj.top.adjacent.right.isnull) {
+                if (!adj.top.adjacent.right.adjacent.top.isnull && adj.top.adjacent.right.adjacent.top.qans === 4) { return true; }
+                if (!adj.top.adjacent.right.adjacent.right.isnull && adj.top.adjacent.right.adjacent.right.qans === 4) { return true; }
+            }
+            return false;
+        };
+        let isntBRTri = function (c) {
+            let adj = c.adjacent;
+            if (!isEmpty(c) || isBottomEdge(adj.top) || isRightEdge(adj.left)) { return true; }
+            if ((adj.top.qsub === 1 && isStickEdge(adj.top)) || (adj.left.qsub === 1 && isStickEdge(adj.left))) { return true; }
+            if ((!adj.top.isnull && adj.top.qans === 5) || (!adj.left.isnull && adj.left.qans === 5)) { return true; }
+            if ((!adj.bottom.isnull && (adj.bottom.qans === 2 || adj.bottom.qans === 3))) { return true; }
+            if ((!adj.right.isnull && (adj.right.qans === 3 || adj.right.qans === 4))) { return true; }
+            if (adj.top.adjacent.left !== undefined && (isBRSharp(adj.top.adjacent.left) || (adj.top.adjacent.left.qsub === 1 && isStickEdge(adj.top.adjacent.left)))) { return true; }
+            if (adj.top.adjacent.right !== undefined && !adj.top.adjacent.right.isnull && adj.top.adjacent.right.qans === 4) { return true; }
+            if (adj.bottom.adjacent.left !== undefined && !adj.bottom.adjacent.left.isnull && adj.bottom.adjacent.left.qans === 2) { return true; }
+            if (adj.bottom.adjacent.right !== undefined && !adj.bottom.adjacent.right.isnull && adj.bottom.adjacent.right.qans === 3) { return true; }
+            if (adj.top.adjacent.top !== undefined && !adj.top.adjacent.top.isnull && adj.top.adjacent.top.qans === 4) { return true; }
+            if (adj.left.adjacent.left !== undefined && !adj.left.adjacent.left.isnull && adj.left.adjacent.left.qans === 2) { return true; }
+            if (adj.top.adjacent.left !== undefined && !adj.top.adjacent.left.isnull) {
+                if (!adj.top.adjacent.left.adjacent.top.isnull && adj.top.adjacent.left.adjacent.top.qans === 5) { return true; }
+                if (!adj.top.adjacent.left.adjacent.left.isnull && adj.top.adjacent.left.adjacent.left.qans === 5) { return true; }
+            }
+            return false;
+        };
+        let isntTRTri = function (c) {
+            let adj = c.adjacent;
+            if (!isEmpty(c) || isTopEdge(adj.bottom) || isRightEdge(adj.left)) { return true; }
+            if ((adj.bottom.qsub === 1 && isStickEdge(adj.bottom)) || (adj.left.qsub === 1 && isStickEdge(adj.left))) { return true; }
+            if ((!adj.bottom.isnull && adj.bottom.qans === 2) || (!adj.left.isnull && adj.left.qans === 2)) { return true; }
+            if ((!adj.top.isnull && (adj.top.qans === 4 || adj.top.qans === 5))) { return true; }
+            if ((!adj.right.isnull && (adj.right.qans === 3 || adj.right.qans === 4))) { return true; }
+            if (adj.bottom.adjacent.left !== undefined && (isTRSharp(adj.bottom.adjacent.left) || (adj.bottom.adjacent.left.qsub === 1 && isStickEdge(adj.bottom.adjacent.left)))) { return true; }
+            if (adj.bottom.adjacent.right !== undefined && !adj.bottom.adjacent.right.isnull && adj.bottom.adjacent.right.qans === 3) { return true; }
+            if (adj.top.adjacent.left !== undefined && !adj.top.adjacent.left.isnull && adj.top.adjacent.left.qans === 5) { return true; }
+            if (adj.top.adjacent.right !== undefined && !adj.top.adjacent.right.isnull && adj.top.adjacent.right.qans === 4) { return true; }
+            if (adj.bottom.adjacent.bottom !== undefined && !adj.bottom.adjacent.bottom.isnull && adj.bottom.adjacent.bottom.qans === 3) { return true; }
+            if (adj.left.adjacent.left !== undefined && !adj.left.adjacent.left.isnull && adj.left.adjacent.left.qans === 5) { return true; }
+            if (adj.bottom.adjacent.left !== undefined && !adj.bottom.adjacent.left.isnull) {
+                if (!adj.bottom.adjacent.left.adjacent.bottom.isnull && adj.bottom.adjacent.left.adjacent.bottom.qans === 2) { return true; }
+                if (!adj.bottom.adjacent.left.adjacent.left.isnull && adj.bottom.adjacent.left.adjacent.left.qans === 2) { return true; }
+            }
+            return false;
+        };
+        let isntTLTri = function (c) {
+            let adj = c.adjacent;
+            if (!isEmpty(c) || isTopEdge(adj.bottom) || isLeftEdge(adj.right)) { return true; }
+            if ((adj.bottom.qsub === 1 && isStickEdge(adj.bottom)) || (adj.right.qsub === 1 && isStickEdge(adj.right))) { return true; }
+            if ((!adj.bottom.isnull && adj.bottom.qans === 3) || (!adj.right.isnull && adj.right.qans === 3)) { return true; }
+            if ((!adj.top.isnull && (adj.top.qans === 4 || adj.top.qans === 5))) { return true; }
+            if ((!adj.left.isnull && (adj.left.qans === 2 || adj.left.qans === 5))) { return true; }
+            if (adj.bottom.adjacent.right !== undefined && (isTLSharp(adj.bottom.adjacent.right) || (adj.bottom.adjacent.right.qsub === 1 && isStickEdge(adj.bottom.adjacent.right)))) { return true; }
+            if (adj.bottom.adjacent.left !== undefined && !adj.bottom.adjacent.left.isnull && adj.bottom.adjacent.left.qans === 2) { return true; }
+            if (adj.top.adjacent.right !== undefined && !adj.top.adjacent.right.isnull && adj.top.adjacent.right.qans === 4) { return true; }
+            if (adj.top.adjacent.left !== undefined && !adj.top.adjacent.left.isnull && adj.top.adjacent.left.qans === 5) { return true; }
+            if (adj.bottom.adjacent.bottom !== undefined && !adj.bottom.adjacent.bottom.isnull && adj.bottom.adjacent.bottom.qans === 2) { return true; }
+            if (adj.right.adjacent.right !== undefined && !adj.right.adjacent.right.isnull && adj.right.adjacent.right.qans === 4) { return true; }
+            if (adj.bottom.adjacent.right !== undefined && !adj.bottom.adjacent.right.isnull) {
+                if (!adj.bottom.adjacent.right.adjacent.bottom.isnull && adj.bottom.adjacent.right.adjacent.bottom.qans === 3) { return true; }
+                if (!adj.bottom.adjacent.right.adjacent.right.isnull && adj.bottom.adjacent.right.adjacent.right.qans === 3) { return true; }
+            }
+            return false;
+        };
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            let adjcell = cell.adjacent;
+            let trinum = 0;
+            let emptynum = 0;
+            let fn = function (c) {
+                if (!c.isnull && c.qans >= 2) { trinum++; }
+                if (isEmpty(c)) { emptynum++; }
+            };
+            fourside(fn, adjcell);
+
+            //add dot
+
+            //cannot place any triangle
+            if (isntBLTri(cell) && isntBRTri(cell) && isntTRTri(cell) && isntTLTri(cell)) {
+                add_dot(cell);
+            }
+            //fill rectangle
+            {
+                let fn = function (c, c1, c2, c12) {
+                    if (!c1.isnull && c1.qsub === 1 && !c2.isnull && c2.qsub === 1 && !c12.isnull && c12.qsub === 1) {
+                        add_dot(c);
+                    }
+                };
+                if (!adjcell.bottom.isnull) {
+                    fn(cell, adjcell.bottom, adjcell.left, adjcell.bottom.adjacent.left);
+                    fn(cell, adjcell.bottom, adjcell.right, adjcell.bottom.adjacent.right);
+                }
+                if (!adjcell.top.isnull) {
+                    fn(cell, adjcell.top, adjcell.right, adjcell.top.adjacent.right);
+                    fn(cell, adjcell.top, adjcell.left, adjcell.top.adjacent.left);
+                }
+            }
+            //dot by clue
+            if (trinum === cell.qnum) {
+                fourside(add_dot, adjcell);
+            }
+            //pattern with clue 1
+            if (cell.qnum === 1) {
+                if (!adjcell.top.isnull && (isEmpty(adjcell.top) || adjcell.top.qsub === 1)) {
+                    let temp = !adjcell.left.isnull && (isEmpty(adjcell.left) || adjcell.left.qsub === 1);
+                    if (temp && adjcell.top.adjacent.left.qnum === -1 && adjcell.top.adjacent.left.qans !== 3 && isntBRTri(adjcell.top.adjacent.left)) {
+                        add_dot(adjcell.bottom); add_dot(adjcell.right);
+                    }
+                    temp = !adjcell.right.isnull && (isEmpty(adjcell.right) || adjcell.right.qsub === 1);
+                    if (temp && adjcell.top.adjacent.right.qnum === -1 && adjcell.top.adjacent.right.qans !== 2 && isntBLTri(adjcell.top.adjacent.right)) {
+                        add_dot(adjcell.bottom); add_dot(adjcell.left);
+                    }
+                }
+                if (!adjcell.bottom.isnull && (isEmpty(adjcell.bottom) || adjcell.bottom.qsub === 1)) {
+                    let temp = !adjcell.left.isnull && (isEmpty(adjcell.left) || adjcell.left.qsub === 1);
+                    if (temp && adjcell.bottom.adjacent.left.qnum === -1 && adjcell.bottom.adjacent.left.qans !== 4 && isntTRTri(adjcell.bottom.adjacent.left)) {
+                        add_dot(adjcell.top); add_dot(adjcell.right);
+                    }
+                    temp = !adjcell.right.isnull && (isEmpty(adjcell.right) || adjcell.right.qsub === 1);
+                    if (temp && adjcell.bottom.adjacent.right.qnum === -1 && adjcell.bottom.adjacent.right.qans !== 5 && isntTLTri(adjcell.bottom.adjacent.right)) {
+                        add_dot(adjcell.top); add_dot(adjcell.left);
+                    }
+                }
+            }
+
+            //add triangle
+
+            //cannot form non-rectangle
+            {
+                let fn_list1 = [isTRCorner, isTLCorner, isBLCorner, isBRCorner];
+                let fn_list2 = [[isBRCorner, isTLCorner], [isBLCorner, isTRCorner], [isTLCorner, isBRCorner], [isTRCorner, isBLCorner]];
+                let fn = function (c, c1, c2, c12, dir) {
+                    if (!c1.isnull && c1.qsub === 1 && !c2.isnull && c2.qsub === 1 && fn_list1[dir - 2](c12)) {
+                        add_triangle(c, dir);
+                    }
+                    else if (((!c1.isnull && c1.qsub === 1 && fn_list2[dir - 2][0](c2)) || (fn_list2[dir - 2][1](c1) && !c2.isnull && c2.qsub === 1)) && !c12.isnull && c12.qsub === 1) {
+                        add_triangle(c, dir);
+                    }
+                };
+                if (!adjcell.bottom.isnull) {
+                    fn(cell, adjcell.bottom, adjcell.left, adjcell.bottom.adjacent.left, 2);
+                    fn(cell, adjcell.bottom, adjcell.right, adjcell.bottom.adjacent.right, 3);
+                }
+                if (!adjcell.top.isnull) {
+                    fn(cell, adjcell.top, adjcell.right, adjcell.top.adjacent.right, 4);
+                    fn(cell, adjcell.top, adjcell.left, adjcell.top.adjacent.left, 5);
+                }
+            }
+            //triangle by clue
+            if (emptynum === cell.qnum - trinum) {
+                let fn_list = [[isntBLTri, isntBRTri], [isntTLTri, isntTRTri], [isntBRTri, isntTRTri], [isntBLTri, isntTLTri]];
+                let dir_list = [[3, 2], [4, 5], [4, 3], [5, 2]];
+                let fn = function (c, dir) {
+                    if (fn_list[dir][0](c)) { add_triangle(c, dir_list[dir][0]); }
+                    else if (fn_list[dir][1](c)) { add_triangle(c, dir_list[dir][1]); }
+                };
+                fn(adjcell.top, 0);
+                fn(adjcell.bottom, 1);
+                fn(adjcell.left, 2);
+                fn(adjcell.right, 3);
+            }
+            if (cell.qans >= 2) {
+                //rectangle needs turn
+                {
+                    let fn_list = [isntBLTri, isntBRTri, isntTRTri, isntTLTri];
+                    let ans_list = [[5, 3], [4, 2], [5, 3], [4, 2]];
+                    let dir_list1 = [[adjcell.top.adjacent.left, adjcell.right.adjacent.bottom], [adjcell.top.adjacent.right, adjcell.left.adjacent.bottom],
+                    [adjcell.left.adjacent.top, adjcell.bottom.adjacent.right], [adjcell.right.adjacent.top, adjcell.bottom.adjacent.left]];
+                    let dir_list2 = [[adjcell.top, adjcell.right], [adjcell.top, adjcell.left], [adjcell.left, adjcell.bottom], [adjcell.right, adjcell.bottom]];
+                    for (let j = 0; j < 2; j++) {
+                        if (dir_list1[cell.qans - 2][j].qans !== cell.qans && fn_list[cell.qans - 2](dir_list1[cell.qans - 2][j])) {
+                            add_triangle(dir_list2[cell.qans - 2][j], ans_list[cell.qans - 2][j]);
+                        }
+                    }
+                }
+                //rectangle cannot turn
+                {
+                    let fn_list = [[isntTLTri, isntBRTri], [isntTRTri, isntBLTri], [isntTLTri, isntBRTri], [isntTRTri, isntBLTri]];
+                    let ans_list = [[5, 3], [4, 2], [5, 3], [4, 2]];
+                    let dir_list1 = [[adjcell.top, adjcell.right], [adjcell.top, adjcell.left], [adjcell.left, adjcell.bottom], [adjcell.right, adjcell.bottom]];
+                    let dir_list2 = [[adjcell.top.adjacent.left, adjcell.right.adjacent.bottom], [adjcell.top.adjacent.right, adjcell.left.adjacent.bottom],
+                    [adjcell.left.adjacent.top, adjcell.bottom.adjacent.right], [adjcell.right.adjacent.top, adjcell.bottom.adjacent.left]];
+                    for (let j = 0; j < 2; j++) {
+                        if (dir_list1[cell.qans - 2][j].qans !== ans_list[cell.qans - 2][j] && fn_list[cell.qans - 2][j](dir_list1[cell.qans - 2][j])) {
+                            add_triangle(dir_list2[cell.qans - 2][j], cell.qans);
+                        }
+                    }
+                }
+                //opposite side of rectangle
+                {
+                    let ans_list = [4, 5, 2, 3];
+                    let fn_list = [[isBottomEdge, isLeftEdge, isBLSharp], [isBottomEdge, isRightEdge, isBRSharp],
+                    [isTopEdge, isRightEdge, isTRSharp], [isTopEdge, isLeftEdge, isTLSharp]];
+                    let fn = function (c, c1, c2, c12, dir) {
+                        let temp = (fn_list[dir][0](c1) || (c1.qsub === 1 && isStickEdge(c1)));
+                        temp |= (fn_list[dir][1](c2) || (c2.qsub === 1 && isStickEdge(c2)));
+                        if (temp || c12 === undefined || fn_list[dir][2](c12) || (c12.qsub === 1 && isStickEdge(c12))) {
+                            add_triangle(c, ans_list[dir]);
+                        }
+                    };
+                    let temp = adjcell.top.adjacent.right;
+                    if (cell.qans === 2 && temp !== undefined && isEmpty(temp)) {
+                        fn(temp, temp.adjacent.top, temp.adjacent.right, temp.adjacent.top.adjacent.right, 0);
+                    }
+                    temp = adjcell.top.adjacent.left;
+                    if (cell.qans === 3 && temp !== undefined && isEmpty(temp)) {
+                        fn(temp, temp.adjacent.top, temp.adjacent.left, temp.adjacent.top.adjacent.left, 1);
+                    }
+                    temp = adjcell.bottom.adjacent.left;
+                    if (cell.qans === 4 && temp !== undefined && isEmpty(temp)) {
+                        fn(temp, temp.adjacent.bottom, temp.adjacent.left, temp.adjacent.bottom.adjacent.left, 2);
+                    }
+                    temp = adjcell.bottom.adjacent.right;
+                    if (cell.qans === 5 && temp !== undefined && isEmpty(temp)) {
+                        fn(temp, temp.adjacent.bottom, temp.adjacent.right, temp.adjacent.bottom.adjacent.right, 3);
+                    }
+                }
+            }
+            //2x2 pattern
+            {
+                let ans_list = [2, 2, 3, 3, 4, 4, 5, 5];
+                let fn_list = [[isTopEdge, isBottomEdge], [isRightEdge, isLeftEdge], [isLeftEdge, isRightEdge], [isTopEdge, isBottomEdge],
+                [isBottomEdge, isTopEdge], [isLeftEdge, isRightEdge], [isRightEdge, isLeftEdge], [isBottomEdge, isTopEdge]];
+                let fn = function (c, c1, c2, c3, c12, c22, dir) {
+                    let temp = (!c1.isnull && c1.qsub === 1 && !c2.isnull && isEmpty(c2) && fn_list[dir][0](c3));
+                    if (temp && fn_list[dir][1](c12) && (fn_list[dir][1](c22) || (c22.qsub == 1 && isStickEdge(c22)))) {
+                        add_triangle(c, ans_list[dir]);
+                    }
+                };
+                if (!adjcell.top.isnull) {
+                    fn(cell, adjcell.left, adjcell.top, adjcell.bottom, adjcell.top.adjacent.left, adjcell.top.adjacent.top, 0);
+                    fn(cell, adjcell.right, adjcell.top, adjcell.bottom, adjcell.top.adjacent.right, adjcell.top.adjacent.top, 3);
+                }
+                if (!adjcell.bottom.isnull) {
+                    fn(cell, adjcell.left, adjcell.bottom, adjcell.top, adjcell.bottom.adjacent.left, adjcell.bottom.adjacent.bottom, 7);
+                    fn(cell, adjcell.right, adjcell.bottom, adjcell.top, adjcell.bottom.adjacent.right, adjcell.bottom.adjacent.bottom, 4);
+                }
+                if (!adjcell.left.isnull) {
+                    fn(cell, adjcell.bottom, adjcell.left, adjcell.right, adjcell.left.adjacent.bottom, adjcell.left.adjacent.left, 2);
+                    fn(cell, adjcell.top, adjcell.left, adjcell.right, adjcell.left.adjacent.top, adjcell.left.adjacent.left, 5);
+                }
+                if (!adjcell.right.isnull) {
+                    fn(cell, adjcell.bottom, adjcell.right, adjcell.left, adjcell.right.adjacent.bottom, adjcell.right.adjacent.right, 1);
+                    fn(cell, adjcell.top, adjcell.right, adjcell.left, adjcell.right.adjacent.top, adjcell.right.adjacent.right, 6);
+                }
+            }
+        }
+    }
 
     function HeyawakeAssist() {
         for (let i = 0; i < board.cell.length; i++) {
@@ -196,17 +558,20 @@
                 blocknum += room.clist[j].qans === 1;
                 emptynum += room.clist[j].qans !== 1 && room.clist[j].qsub !== 1;
             }
+            //finished room
             if (blocknum === room.top.qnum) {
                 for (let j = 0; j < room.clist.length; j++) {
                     add_green(room.clist[j]);
                 }
             }
+            //finish room
             if (blocknum + emptynum === room.top.qnum) {
                 for (let j = 0; j < room.clist.length; j++) {
                     add_block2(room.clist[j]);
                 }
             }
         }
+        GreenConnectedInCell();
     }
 
     function AkariAssist() {
@@ -349,7 +714,7 @@
             let adjcell = cell.adjacent;
             let adjline = cell.adjborder;
             //check clue
-            if (cell.qnum !== -1 && cell.qdir !== 0) {
+            if (cell.qnum >= 0 && cell.qdir !== 0) {
                 let d = [-1, 1, 3, 0, 2][cell.qdir];
                 let emptynum = 0;
                 let blocknum = 0;
@@ -357,7 +722,7 @@
                 let pcell = dir(cell.adjacent, d);
                 let emptycellList = [];
                 let addcellList = [];
-                while (!pcell.isnull && pcell.qdir !== cell.qdir) {
+                while (!pcell.isnull && (pcell.qdir !== cell.qdir || pcell.qnum < 0)) {
                     if (isEmpty(pcell)) {
                         emptynum++;
                         emptycellList.push(pcell);
