@@ -1142,6 +1142,15 @@
                         fourside2(fn, adjcell, adjline);
                     }
                 }
+                //same diagonal color as 3
+                if (cell.qnum === 3 && cell.qsub !== 0) {
+                    for (let d = 0; d < 4; d++) {
+                        if (!dir(adjcell, d).isnull && !dir(adjcell, d + 1).isnull && dir(dir(adjcell, d).adjacent, d + 1).qsub === cell.qsub) {
+                            add_line(dir(adjline, d + 2));
+                            add_line(dir(adjline, d + 3));
+                        }
+                    }
+                }
             }
         }
     }
