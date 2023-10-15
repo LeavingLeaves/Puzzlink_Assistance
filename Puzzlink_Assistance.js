@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.10.15.1
+// @version      23.10.15.2
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -40,6 +40,9 @@
             if (/ayeheya/.test(document.URL)) { EkawayehAssist(); }
         }
         console.log('Assisted.');
+    }
+    let offset = function (c, dx, dy) {
+        return board.getc(c.bx + dx * 2, c.by + dy * 2);
     }
     let fourside = function (a, b) {
         a(b.top);
@@ -150,38 +153,39 @@
     }
 
     function GreenConnectedInCell() {
-        let greennum = 0;
-        let greencellidList = [];
         for (let i = 0; i < board.cell.length; i++) {
             let cell = board.cell[i];
-            greennum += cell.qsub === 1;
-        }
-        for (let i = 0; i < board.cell.length; i++) {
-            let cell = board.cell[i];
-            if (cell.qsub !== 1) { continue; }
-            if (greencellidList.indexOf(cell.id) !== -1) { continue; }
-            let lastempty = null;
-            let fn = function (c) {
-                if (greencellidList.indexOf(c.id) !== -1) { return; }
-                if (c.isnull || c.qans === 1) { return; }
-                if (c.qsub !== 1) {
-                    if (lastempty !== null && lastempty !== c) {
-                        lastempty = undefined;
-                    }
-                    if (lastempty === null) {
-                        lastempty = c;
+            if (cell.qans === 1 || cell.qsub === 1) { continue; }
+            let fn = function (c, list) {
+                if (c.isnull) {
+                    if (list.indexOf(-1) === -1) {
+                        list.push(-1);
                     }
                     return;
                 }
-                greennum--;
-                greencellidList.push(c.id);
-                fourside(fn, c.adjacent);
+                if (c.qans !== 1) { return; }
+                if (list.indexOf(c.id) !== -1) { return; }
+                list.push(c.id);
+                fn(offset(c, -1, -1), list);
+                fn(offset(c, -1, +1), list);
+                fn(offset(c, +1, -1), list);
+                fn(offset(c, +1, +1), list);
             }
-            fn(cell);
-            if (greennum > 0) { greennum = board.cell.length; }
-            if (lastempty !== null && lastempty !== undefined && greennum > 0) {
-                add_green(lastempty);
-                return;
+            let list1 = [], list2 = [], list3 = [], list4 = [];
+            if (!offset(cell, -1, -1).isnull) { fn(offset(cell, -1, -1), list1); }
+            if (!offset(cell, -1, +1).isnull) { fn(offset(cell, -1, +1), list2); }
+            if (!offset(cell, +1, -1).isnull) { fn(offset(cell, +1, -1), list3); }
+            if (!offset(cell, +1, +1).isnull) { fn(offset(cell, +1, +1), list4); }
+            let templist = [-1, offset(cell, -1, -1).id, offset(cell, -1, +1).id, offset(cell, +1, -1).id, offset(cell, +1, +1).id]
+            let list = [].concat(list1, list2, list3, list4);
+            if (cell.bx - 1 === board.minbx || cell.bx + 1 === board.maxbx || cell.by - 1 === board.minby || cell.by + 1 === board.maxby) {
+                list.push(-1);
+            }
+            for (let j = 0; j < templist.length; j++) {
+                if (list.filter(id => id === templist[j]).length > 1) {
+                    add_green(cell);
+                    break;
+                }
             }
         }
     }
@@ -556,10 +560,30 @@
             if (room.top.qnum === -1) { continue; }
             let blocknum = 0;
             let emptynum = 0;
+            let oddcellList = [];
+            let evencellList = [];
+            let minx = room.clist.getRectSize().x2;
+            let maxx = room.clist.getRectSize().x1;
+            let miny = room.clist.getRectSize().y2;
+            let maxy = room.clist.getRectSize().y1;
             for (let j = 0; j < room.clist.length; j++) {
-                blocknum += room.clist[j].qans === 1;
-                emptynum += room.clist[j].qans !== 1 && room.clist[j].qsub !== 1;
+                let cell = room.clist[j];
+                blocknum += cell.qans === 1;
+                emptynum += cell.qans !== 1 && cell.qsub !== 1;
+                if (cell.qans !== 1 && cell.qsub !== 1 && (cell.bx + cell.by) % 4 === 2) {
+                    oddcellList.push(cell);
+                }
+                if (cell.qans !== 1 && cell.qsub !== 1 && (cell.bx + cell.by) % 4 === 0) {
+                    evencellList.push(cell);
+                }
+                if (cell.qans !== 1 && cell.qsub !== 1) {
+                    minx = Math.min(minx, cell.bx);
+                    maxx = Math.max(maxx, cell.bx);
+                    miny = Math.min(miny, cell.by);
+                    maxy = Math.max(maxy, cell.by);
+                }
             }
+            if (emptynum === 0) { continue; }
             //finished room
             if (blocknum === room.top.qnum) {
                 for (let j = 0; j < room.clist.length; j++) {
@@ -570,6 +594,64 @@
             if (blocknum + emptynum === room.top.qnum) {
                 for (let j = 0; j < room.clist.length; j++) {
                     add_block2(room.clist[j]);
+                }
+            }
+            //4 in 3*3
+            if (maxx - minx === 4 && maxy - miny === 4 && blocknum + 4 === room.top.qnum) {
+                let ccell = board.getc(minx + 2, miny + 2)
+                add_green(offset(ccell, 0, -1));
+                add_green(offset(ccell, 0, +1));
+                add_green(offset(ccell, -1, 0));
+                add_green(offset(ccell, +1, 0));
+                let fn = function (c) { return c.isnull || c.qans === 1; }
+                if (fn(offset(ccell, +2, 0)) || fn(offset(ccell, 0, +2))) { add_block2(offset(ccell, -1, -1)); }
+                if (fn(offset(ccell, +2, 0)) || fn(offset(ccell, 0, -2))) { add_block2(offset(ccell, -1, +1)); }
+                if (fn(offset(ccell, -2, 0)) || fn(offset(ccell, 0, +2))) { add_block2(offset(ccell, +1, -1)); }
+                if (fn(offset(ccell, -2, 0)) || fn(offset(ccell, 0, -2))) { add_block2(offset(ccell, +1, +1)); }
+            }
+            //2 in 2*2 at corner
+            if (maxx - minx === 2 && maxy - miny === 2 && blocknum + 2 === room.top.qnum) {
+                if (minx - 1 === board.minbx && miny - 1 === board.minby || maxx + 1 === board.maxbx && maxy + 1 === board.maxby) {
+                    add_block2(board.getc(minx, miny));
+                    add_block2(board.getc(maxx, maxy));
+                }
+                if (minx - 1 === board.minbx && maxy + 1 === board.maxby || maxx + 1 === board.maxbx && miny - 1 === board.minby) {
+                    add_block2(board.getc(minx + 2, miny));
+                    add_block2(board.getc(minx, miny + 2));
+                }
+            }
+            //3 in 2*3 at side
+            if ((maxx - minx === 4 && maxy - miny === 2 || maxx - minx === 2 && maxy - miny === 4) && blocknum + 3 === room.top.qnum) {
+                if (maxx - 3 === board.minbx || maxy - 3 === board.minby) {
+                    add_block2(board.getc(minx, miny + 2));
+                    add_block2(board.getc(minx + 2, miny));
+                }
+                if (minx + 3 === board.maxbx || miny + 3 == board.maxby) {
+                    add_block2(board.getc(maxx, maxy - 2));
+                    add_block2(board.getc(maxx - 2, maxy));
+                }
+            }
+            let connectedcellList = [];
+            let fn = function (c) {
+                if (connectedcellList.indexOf(c.id) !== -1) { return; }
+                if (c.isnull || c.qans === 1 || c.qsub === 1) { return; }
+                if (c.room !== room) { return; }
+                connectedcellList.push(c.id);
+                fourside(fn, c.adjacent);
+            }
+            fn(oddcellList.length > 0 ? oddcellList[0] : evencellList[0]);
+            if (connectedcellList.length < emptynum) { continue; }
+            if (!(maxx - minx <= 2 || maxy - miny <= 2 || (maxx - minx === 4 && maxy - miny === 4))) { continue; }
+            //add at odd
+            if (blocknum + oddcellList.length === room.top.qnum && oddcellList.length > evencellList.length) {
+                for (let j = 0; j < oddcellList.length; j++) {
+                    add_block2(oddcellList[j]);
+                }
+            }
+            //add at even
+            if (blocknum + evencellList.length === room.top.qnum && evencellList.length > oddcellList.length) {
+                for (let j = 0; j < evencellList.length; j++) {
+                    add_block2(evencellList[j]);
                 }
             }
         }
@@ -1001,8 +1083,22 @@
                 };
                 fourside2(fn, adjcell, adjline);
             }
+            //checker pattern
+            if (cell.qsub === 0) {
+                let fn = function (c, c1, c2, c12) {
+                    if (c1.isnull || c2.isnull || c12.isnull) { return; }
+                    if (c1.qsub === 0 || c2.qsub === 0 || c12.qsub === 0) { return; }
+                    if (c1.qsub === c2.qsub && c1.qsub !== c12.qsub) {
+                        add_bg_color(c, c1.qsub);
+                    }
+                };
+                fn(cell, adjcell.top, adjcell.left, adjcell.top.adjacent.left);
+                fn(cell, adjcell.top, adjcell.right, adjcell.top.adjacent.right);
+                fn(cell, adjcell.bottom, adjcell.left, adjcell.bottom.adjacent.left);
+                fn(cell, adjcell.bottom, adjcell.right, adjcell.bottom.adjacent.right);
+            }
             //number and color deduce
-            {
+            if (cell.qnum >= 0) {
                 let innernum = 0;
                 let outernum = 0;
                 let fn = function (c) {
@@ -1010,9 +1106,6 @@
                     if (c.isnull || c.qsub === 2) { outernum++; }
                 };
                 fourside(fn, adjcell);
-                if (cell.qnum < 0) {
-                    continue;
-                }
                 if (cell.qnum < innernum || 4 - cell.qnum < outernum) {
                     add_bg_inner_color(cell);
                 }
@@ -1049,20 +1142,6 @@
                         fourside2(fn, adjcell, adjline);
                     }
                 }
-            }
-            //checker pattern
-            if (cell.qsub === 0) {
-                let fn = function (c, c1, c2, c12) {
-                    if (c1.isnull || c2.isnull || c12.isnull) { return; }
-                    if (c1.qsub === 0 || c2.qsub === 0 || c12.qsub === 0) { return; }
-                    if (c1.qsub === c2.qsub && c1.qsub !== c12.qsub) {
-                        add_bg_color(c, c1.qsub);
-                    }
-                };
-                fn(cell, adjcell.top, adjcell.left, adjcell.top.adjacent.left);
-                fn(cell, adjcell.top, adjcell.right, adjcell.top.adjacent.right);
-                fn(cell, adjcell.bottom, adjcell.left, adjcell.bottom.adjacent.left);
-                fn(cell, adjcell.bottom, adjcell.right, adjcell.bottom.adjacent.right);
             }
         }
     }
