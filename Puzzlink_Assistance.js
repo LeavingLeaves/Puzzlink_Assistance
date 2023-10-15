@@ -173,11 +173,13 @@
                     }
                     return;
                 }
+                greennum--;
                 greencellidList.push(c.id);
                 fourside(fn, c.adjacent);
             }
             fn(cell);
-            if (lastempty !== null && lastempty !== undefined) {
+            if (greennum > 0) { greennum = board.cell.length; }
+            if (lastempty !== null && lastempty !== undefined && greennum > 0) {
                 add_green(lastempty);
                 return;
             }
@@ -793,9 +795,11 @@
     }
 
     function SlitherlinkAssist() {
+        ui.toolarea.outlineshaded();
         // deduce cell
         for (let i = 0; i < board.cell.length; i++) {
             let cell = board.cell[i];
+            let adjcell = cell.adjacent;
             let adjline = cell.adjborder;
             let emptynum = 0;
             let linenum = 0;
@@ -817,32 +821,32 @@
                 fourside(add_cross, adjline);
             }
             // vertical 3s
-            if (cell.qnum === 3 && cell.adjacent.bottom !== undefined && cell.adjacent.bottom.qnum === 3) {
+            if (cell.qnum === 3 && !adjcell.bottom.isnull && adjcell.bottom.qnum === 3 && ui.puzzle.board.linegraph.components.length > 0) {
                 add_line(cell.adjborder.top);
                 add_line(cell.adjborder.bottom);
-                add_line(cell.adjacent.bottom.adjborder.bottom);
-                if (cell.adjacent.left !== undefined) { add_cross(cell.adjacent.left.adjborder.bottom); }
-                if (cell.adjacent.right !== undefined) { add_cross(cell.adjacent.right.adjborder.bottom); }
+                add_line(adjcell.bottom.adjborder.bottom);
+                if (!adjcell.left.isnull) { add_cross(adjcell.left.adjborder.bottom); }
+                if (!adjcell.right.isnull) { add_cross(adjcell.right.adjborder.bottom); }
             }
             // horizontal 3s
-            if (cell.qnum === 3 && cell.adjacent.right !== undefined && cell.adjacent.right.qnum === 3) {
+            if (cell.qnum === 3 && !adjcell.right.isnull && adjcell.right.qnum === 3 && ui.puzzle.board.linegraph.components.length > 0) {
                 add_line(cell.adjborder.left);
                 add_line(cell.adjborder.right);
-                add_line(cell.adjacent.right.adjborder.right);
-                if (cell.adjacent.top !== undefined) { add_cross(cell.adjacent.top.adjborder.right); }
-                if (cell.adjacent.bottom !== undefined) { add_cross(cell.adjacent.bottom.adjborder.right); }
+                add_line(adjcell.right.adjborder.right);
+                if (!adjcell.top.isnull) { add_cross(adjcell.top.adjborder.right); }
+                if (!adjcell.bottom.isnull) { add_cross(adjcell.bottom.adjborder.right); }
             }
             //sub diagonal 3s
-            if (cell.qnum === 3 && cell.adjacent.bottom !== undefined && cell.adjacent.bottom.adjacent.left !== undefined && cell.adjacent.bottom.adjacent.left.qnum === 3) {
-                let cell2 = cell.adjacent.bottom.adjacent.left;
+            if (cell.qnum === 3 && !adjcell.bottom.isnull && !adjcell.bottom.adjacent.left.isnull && adjcell.bottom.adjacent.left.qnum === 3) {
+                let cell2 = adjcell.bottom.adjacent.left;
                 add_line(cell.adjborder.top);
                 add_line(cell.adjborder.right);
                 add_line(cell2.adjborder.bottom);
                 add_line(cell2.adjborder.left);
             }
             //main diagonal 3s
-            if (cell.qnum === 3 && cell.adjacent.bottom !== undefined && cell.adjacent.bottom.adjacent.right !== undefined && cell.adjacent.bottom.adjacent.right.qnum === 3) {
-                let cell2 = cell.adjacent.bottom.adjacent.right;
+            if (cell.qnum === 3 && !adjcell.bottom.isnull && !adjcell.bottom.adjacent.right.isnull && adjcell.bottom.adjacent.right.qnum === 3) {
+                let cell2 = adjcell.bottom.adjacent.right;
                 add_line(cell.adjborder.top);
                 add_line(cell.adjborder.left);
                 add_line(cell2.adjborder.bottom);
@@ -901,6 +905,12 @@
                         add_line(c4);
                         add_cross(c5);
                         add_cross(c6);
+                    }
+                    if ((c1.isnull || c1.qsub === 2) && (c2.isnull || c2.qsub === 2) && (c5.line === 1 || c6.line === 1) && c34.qnum === 2) {
+                        add_cross(c3);
+                        add_cross(c4);
+                        add_line(c5);
+                        add_line(c6);
                     }
                     //line enters 3
                     if (!c1.isnull && c1.line === 1 && c34.qnum === 3) {
@@ -974,7 +984,7 @@
                 fourside2(fn, adjcell, adjline);
             }
             //deduce neighbor color
-            {
+            if (cell.qsub === 0) {
                 let fn = function (cn, dn) {
                     if (dn.line === 1 && cn.isnull) {
                         add_bg_inner_color(cell);
@@ -1000,12 +1010,6 @@
                     if (c.isnull || c.qsub === 2) { outernum++; }
                 };
                 fourside(fn, adjcell);
-                if (innernum === 4) {
-                    add_bg_inner_color(cell);
-                }
-                if (outernum === 4) {
-                    add_bg_outer_color(cell);
-                }
                 if (cell.qnum < 0) {
                     continue;
                 }
@@ -1047,7 +1051,7 @@
                 }
             }
             //checker pattern
-            {
+            if (cell.qsub === 0) {
                 let fn = function (c, c1, c2, c12) {
                     if (c1.isnull || c2.isnull || c12.isnull) { return; }
                     if (c1.qsub === 0 || c2.qsub === 0 || c12.qsub === 0) { return; }
