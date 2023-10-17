@@ -10,6 +10,7 @@ Currently support:
 * Akari
 * Ekawayeh
 * Heyawake
+* Icebarn
 * Lits
 * Masyu
 * No Three
