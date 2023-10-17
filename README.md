@@ -12,6 +12,7 @@ Currently support:
 * Heyawake
 * Lits
 * Masyu
+* No Three
 * Shakashaka
 * Simple Loop
 * Slither Link
