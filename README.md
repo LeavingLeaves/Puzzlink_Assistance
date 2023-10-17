@@ -10,6 +10,7 @@ Currently support:
 * Akari
 * Ekawayeh
 * Heyawake
+* Lits
 * Masyu
 * Shakashaka
 * Simple Loop
