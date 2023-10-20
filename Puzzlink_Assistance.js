@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.10.18.1
+// @version      23.10.20.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
 // @match        https://pzplus.tck.mn/p*/*
+// @match        http://pzv.jp/p*/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=github.com
 // @grant        none
+// @namespace    https://greasyfork.org/users/1192854
 // ==/UserScript==
 
 (function () {
@@ -36,6 +38,13 @@
         none: 0,
         block: 1,
         light: 1,
+        //shakashaka triangle
+        bl: 2,
+        br: 3,
+        tr: 4,
+        tl: 5,
+        rslash: 31,
+        lslash: 32,
     };
 
     const cques = {
@@ -75,7 +84,7 @@
         [/yaji[lr]in/, YajilinAssist],
         [/simpleloop/, SimpleloopAssist],
         [/mas[yh]u/, MasyuAssist],
-        [/lightup|akari/, AkariAssist],
+        [/(lightup|akari)/, AkariAssist],
         [/heyawake/, HeyawakeAssist],
         [/shakashaka/, ShakashakaAssist],
         [/ayeheya/, EkawayehAssist],
@@ -84,7 +93,10 @@
         [/icebarn/, IcebarnAssist],
         [/aquapelago/, AquapelagoAssist],
         [/nurimaze/, NurimazeAssist],
-        [/yinyang/, YinyangAssist]
+        [/yinyang/, YinyangAssist],
+        [/guidearrow/, GuideArrowAssist],
+        [/nurikabe/, NurikabeAssist],
+        [/gokigen/, SlantAssist]
     ];
 
     if (genrelist.filter(g => g[0].test(document.URL)).length === 1) {
@@ -112,7 +124,7 @@
         for (let loop = 0; loop < (step ? 1 : maxLoop); loop++) {
             if (!flg) { break; }
             flg = false;
-            genrelist.filter(g => g[0].test(document.URL))[0][1]();
+            genrelist.filter(g => RegExp('\\\?' + g[0].source + '\\\/').test(document.URL))[0][1]();
         }
         ui.puzzle.redraw();
         console.log('Assisted.');
@@ -120,10 +132,10 @@
 
     let offset = function (c, dx, dy, dir = 0) {
         dir = (dir % 4 + 4) % 4;
-        if (dir === 0) { return board.getc(c.bx + dx * 2, c.by + dy * 2); }
-        if (dir === 1) { return board.getc(c.bx + dy * 2, c.by - dx * 2); }
-        if (dir === 2) { return board.getc(c.bx - dx * 2, c.by - dy * 2); }
-        if (dir === 3) { return board.getc(c.bx - dy * 2, c.by + dx * 2); }
+        if (dir === 0) { return board.getobj(c.bx + dx * 2, c.by + dy * 2); }
+        if (dir === 1) { return board.getobj(c.bx + dy * 2, c.by - dx * 2); }
+        if (dir === 2) { return board.getobj(c.bx - dx * 2, c.by - dy * 2); }
+        if (dir === 3) { return board.getobj(c.bx - dy * 2, c.by + dx * 2); }
     }
     let fourside = function (a, b) {
         a(b.top);
@@ -143,6 +155,9 @@
         if (ndir === 1) return c.right;
         if (ndir === 2) return c.bottom;
         if (ndir === 3) return c.left;
+    }
+    let qdirremap = function (qdir) {
+        return [-1, 0, 2, 3, 1][qdir];
     }
 
     //set val
@@ -253,7 +268,7 @@
         }
     }
 
-    function CellNoLoop(isBlock, isGreen, setBlock, setGreen) {
+    function CellNoLoop(isBlock, isGreen, setGreen) {
         for (let i = 0; i < board.cell.length; i++) {
             let cell = board.cell[i];
             if (isBlock(cell) || isGreen(cell)) { continue; }
@@ -297,7 +312,6 @@
         CellNoLoop(
             function (c) { return c.qsub === cqsub.green; },
             function (c) { return c.qans === cqans.block; },
-            add_green,
             add_block
         );
     }
@@ -349,7 +363,232 @@
         }
     }
 
+    function NumberRegion(isBlock, isGreen, setBlock, setGreen, OneNumPerRegion = true) {
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            //don't block region exit
+            let blocknum = 0;
+            let templist = [offset(cell, -1, -1), offset(cell, -1, 0), offset(cell, -1, 1), offset(cell, 0, -1),
+            offset(cell, 0, 1), offset(cell, 1, -1), offset(cell, 1, 0), offset(cell, 1, 1)];
+            if (!isBlock(cell) && !isGreen(cell) && templist.filter(c => isGreen(c) || c.isnull).length >= 2) {
+                for (let d = 0; d < 4; d++) {
+                    let ncell = dir(cell.adjacent, d);
+                    if (isGreen(ncell)) { continue; }
+                    let cellList = [];
+                    let dfs = function (c) {
+                        if (c.isnull || isGreen(c) || c === cell || cellList.indexOf(c) !== -1) { return; }
+                        cellList.push(c);
+                        fourside(dfs, c.adjacent);
+                    }
+                    dfs(ncell);
+                    let templist = cellList.filter(c => c.qnum !== cqnum.none);
+                    if (templist.length === 0 && cellList.filter(c => isBlock(c)).length > 0) {
+                        setBlock(cell);
+                    }
+                    if (templist.length === 1 && templist[0].qnum !== cqnum.quesmark && templist[0].qnum > cellList.length) {
+                        setBlock(cell);
+                    }
+                }
+            }
+            //finished region
+            if (cell.qnum > 0) {
+                let cellList = [];
+                let dfs = function (c) {
+                    if (cellList.length > cell.qnum) { return; }
+                    if (c.isnull || !isBlock(c) || cellList.indexOf(c) !== -1) { return; }
+                    cellList.push(c);
+                    fourside(dfs, c.adjacent);
+                }
+                dfs(cell);
+                if (cellList.length === cell.qnum) {
+                    cellList.forEach(c => fourside(setGreen, c.adjacent));
+                }
+            }
+            //finished surrounded region
+            if (cell.qnum > 0) {
+                let cellList = [];
+                let dfs = function (c) {
+                    if (cellList.length > cell.qnum) { return; }
+                    if (c.isnull || isGreen(c) || cellList.indexOf(c) !== -1) { return; }
+                    cellList.push(c);
+                    fourside(dfs, c.adjacent);
+                }
+                dfs(cell);
+                let templist = cellList.filter(c => c.qnum !== cqnum.none);
+                if (templist.length === 1 && cell.qnum !== cqnum.quesmark && cell.qnum === cellList.length) {
+                    cellList.forEach(c => setBlock(c));
+                }
+            }
+            //not connect two region
+            for (let d1 = 0; d1 < 4; d1++) {
+                for (let d2 = d1 + 1; d2 < 4; d2++) {
+                    if (isBlock(cell) || isGreen(cell)) { continue; }
+                    let cell1 = dir(cell.adjacent, d1);
+                    let cell2 = dir(cell.adjacent, d2);
+                    if (cell1.isnull || cell2.isnull || !isBlock(cell1) || !isBlock(cell2)) { continue; }
+                    let cellList1 = [];
+                    let cellList2 = [];
+                    let dfs = function (c, list) {
+                        if (c.isnull || !isBlock(c) || list.indexOf(c) !== -1) { return; }
+                        list.push(c);
+                        dfs(c.adjacent.top, list);
+                        dfs(c.adjacent.bottom, list);
+                        dfs(c.adjacent.left, list);
+                        dfs(c.adjacent.right, list);
+                    }
+                    dfs(cell1, cellList1);
+                    dfs(cell2, cellList2);
+                    if (cellList1.indexOf(cell2) !== -1) { continue; }
+                    let templist1 = cellList1.filter(c => c.qnum !== cqnum.none);
+                    let templist2 = cellList2.filter(c => c.qnum !== cqnum.none);
+                    if (templist1.length === 1 && templist2.length === 1) {
+                        if (templist1[0].qnum !== cqnum.quesmark && templist2[0].qnum !== cqnum.quesmark && templist1[0].qnum !== templist2[0].qnum || OneNumPerRegion) {
+                            setGreen(cell);
+                        }
+                    }
+                    if (templist1.length + templist2.length === 1) {
+                        let qnum = (templist1.length === 1 ? templist1[0] : templist2[0]).qnum;
+                        if (qnum !== cqnum.quesmark && cellList1.length + cellList2.length + 1 > qnum) {
+                            setGreen(cell);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     //assist for certain genre
+    function SlantAssist() {
+        let add_slash = function (c, qans) {
+            if (c === undefined || c.isnull || c.qans !== cqans.none) { return; }
+            if (step && flg) { return; }
+            flg = true;
+            c.setQans(qans % 2 === 0 ? cqans.lslash : cqans.rslash);
+            c.draw();
+        };
+        let isNotSide = function (c) {
+            return c.bx > board.minbx && c.bx < board.maxbx && c.by > board.minby && c.by < board.maxby;
+        }
+        for (let i = 0; i < board.cross.length; i++) {
+            let cross = board.cross[i];
+            let adjcellList = [[board.getc(cross.bx - 1, cross.by - 1), cqans.rslash, cqans.lslash],
+            [board.getc(cross.bx - 1, cross.by + 1), cqans.lslash, cqans.rslash],
+            [board.getc(cross.bx + 1, cross.by - 1), cqans.lslash, cqans.rslash],
+            [board.getc(cross.bx + 1, cross.by + 1), cqans.rslash, cqans.lslash]];
+            adjcellList = adjcellList.filter(c => !c[0].isnull);
+            //finish clue
+            if (cross.qnum >= 0) {
+                if (adjcellList.filter(c => c[0].qans === c[1]).length === cross.qnum) {
+                    adjcellList.forEach(c => add_slash(c[0], c[2]));
+                }
+                if (adjcellList.filter(c => c[0].qans !== c[2]).length === cross.qnum) {
+                    adjcellList.forEach(c => add_slash(c[0], c[1]));
+                }
+            }
+            //diagonal 1 & 1
+            if (cross.qnum === 1 && isNotSide(cross)) {
+                for (let d = 0; d < 4; d++) {
+                    let cross2 = offset(cross, 1, 1, d);
+                    if (cross2.qnum === 1 && isNotSide(cross2)) {
+                        add_slash(offset(cross, .5, .5, d), cqans.lslash + d);
+                    }
+                }
+            }
+            //1 & 1
+            if (cross.qnum === 1) {
+                for (let d = 0; d < 4; d++) {
+                    if (offset(cross, 0, 1, d).isnull || offset(cross, 0, -1, d).isnull) { continue; }
+                    if (!offset(cross, 1, 0, d).isnull && offset(cross, 1, 0, d).qnum === 1) {
+                        add_slash(offset(cross, -0.5, -.5, d), cqans.lslash + d);
+                        add_slash(offset(cross, -0.5, +.5, d), cqans.rslash + d);
+                        add_slash(offset(cross, +1.5, -.5, d), cqans.rslash + d);
+                        add_slash(offset(cross, +1.5, +.5, d), cqans.lslash + d);
+                    }
+                }
+            }
+            //3 & 3
+            if (cross.qnum === 3) {
+                for (let d = 0; d < 4; d++) {
+                    if (!offset(cross, 1, 0, d).isnull && offset(cross, 1, 0, d).qnum === 3 && isNotSide(offset(cross, 1, 0, d))) {
+                        add_slash(offset(cross, -0.5, -.5, d), cqans.rslash + d);
+                        add_slash(offset(cross, -0.5, +.5, d), cqans.lslash + d);
+                        add_slash(offset(cross, +1.5, -.5, d), cqans.lslash + d);
+                        add_slash(offset(cross, +1.5, +.5, d), cqans.rslash + d);
+                    }
+                }
+            }
+        }
+        //no loop
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (cell.qans !== cqans.none) { continue; }
+            let cross1, cross2;
+            cross1 = board.getobj(cell.bx - 1, cell.by - 1);
+            cross2 = board.getobj(cell.bx + 1, cell.by + 1);
+            if (cross1.path !== null && cross1.path === cross2.path) {
+                add_slash(cell, cqans.lslash);
+            }
+            cross1 = board.getobj(cell.bx - 1, cell.by + 1);
+            cross2 = board.getobj(cell.bx + 1, cell.by - 1);
+            if (cross1.path !== null && cross1.path === cross2.path) {
+                add_slash(cell, cqans.rslash);
+            }
+        }
+    }
+
+    function NurikabeAssist() {
+        //add dot on num
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (cell.qnum !== cqnum.none) {
+                add_green(cell);
+            }
+            let templist = [offset(cell, 1, 0, 0), offset(cell, 1, 0, 1), offset(cell, 1, 0, 2), offset(cell, 1, 0, 3)];
+            if (cell.qnum === cqnum.none && templist.filter(c => c.isnull || c.qans === cqans.block).length === 4) {
+                add_block(cell);
+            }
+        }
+        BlockConnectedInCell();
+        No2x2Block();
+        NumberRegion(
+            function (c) { return c.qsub === cqsub.dot; },
+            function (c) { return c.qans === cqans.block; },
+            add_green,
+            add_block
+        );
+        //remove the dot on num because it looks weird
+        if (!step) {
+            for (let i = 0; i < board.cell.length; i++) {
+                let cell = board.cell[i];
+                if (cell.qnum !== cqnum.none) {
+                    cell.setQsub(cqsub.none);
+                    cell.draw();
+                }
+            }
+        }
+    }
+
+    function GuideArrowAssist() {
+        BlockNotAdjacent();
+        GreenConnectedInCell();
+        GreenNoLoopInCell();
+        let goalcell = board.getc(board.goalpos.bx, board.goalpos.by);
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (cell === goalcell) {
+                add_green(cell);
+                continue;
+            }
+            if (cell.qnum !== cqnum.none) {
+                add_green(cell);
+                if (cell.qnum !== cqnum.quesmark) {
+                    let d = qdirremap(cell.qnum);
+                    add_green(dir(cell.adjacent, d));
+                }
+                continue;
+            }
+        }
+    }
 
     function YinyangAssist() {
         let add_color = function (c, color) {
@@ -477,19 +716,25 @@
                     templist.forEach(c => add_green(c));
                 }
             }
-            //no 2*2
-            let templist = [cell, offset(cell, 1, 0), offset(cell, 0, 1), offset(cell, 1, 1)];
-            if (templist.filter(c => c.isnull).length > 0) { continue; }
-            if (templist.filter(c => c.qsub === cqsub.green).length === 0) {
-                let templist2 = templist.filter(c => !c.qans);
-                if (templist2.length > 0 && templist2.filter(c => c.room !== templist2[0].room).length === 0) {
-                    add_green(templist2[0]);
-                }
+            let templist = [offset(cell, 1, 0, 0), offset(cell, 1, 0, 1), offset(cell, 1, 0, 2), offset(cell, 1, 0, 3)];
+            if (templist.filter(c => c.isnull || c.qans === cqans.block).length === 4) {
+                add_block(cell);
             }
-            if (templist.filter(c => c.qans).length === 0) {
-                let templist2 = templist.filter(c => c.qsub !== cqsub.green);
-                if (templist2.length > 0 && templist2.filter(c => c.room !== templist2[0].room).length === 0) {
-                    add_block(templist2[0]);
+            //no 2*2
+            {
+                let templist = [cell, offset(cell, 1, 0), offset(cell, 0, 1), offset(cell, 1, 1)];
+                if (templist.filter(c => c.isnull).length > 0) { continue; }
+                if (templist.filter(c => c.qsub === cqsub.green).length === 0) {
+                    let templist2 = templist.filter(c => !c.qans);
+                    if (templist2.length > 0 && templist2.filter(c => c.room !== templist2[0].room).length === 0) {
+                        add_green(templist2[0]);
+                    }
+                }
+                if (templist.filter(c => c.qans).length === 0) {
+                    let templist2 = templist.filter(c => c.qsub !== cqsub.green);
+                    if (templist2.length > 0 && templist2.filter(c => c.room !== templist2[0].room).length === 0) {
+                        add_block(templist2[0]);
+                    }
                 }
             }
         }
@@ -813,108 +1058,103 @@
     }
 
     function ShakashakaAssist() {
-        let isEmpty = function (c) { return !c.isnull && c.qnum === -1 && c.qsub === 0 && c.qans === 0; };
+        let isEmpty = function (c) {
+            return !c.isnull && c.qnum === cqnum.none && c.qsub === cqsub.none && c.qans === cqans.none;
+        };
         //draw triangle
-        let add_triangle = function (c, ans) {
+        let add_triangle = function (c, ndir) { //0 = bl, 1 = br, 2 = tr, 3 = tl
             if (c === undefined || c.isnull || !isEmpty(c)) { return; }
             if (step && flg) { return; }
             flg = true;
-            c.setQans(ans);
+            ndir = (ndir % 4 + 4) % 4;
+            c.setQans(ndir + 2);
+            c.draw();
         };
         //check blocking edge
-        let isTopEdge = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 4 || c.qans === 5; };
-        let isBottomEdge = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2 || c.qans === 3; };
-        let isLeftEdge = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2 || c.qans === 5; };
-        let isRightEdge = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 3 || c.qans === 4; };
-        //check blocking corner
-        let isBLCorner = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2; };
-        let isBRCorner = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 3; };
-        let isTRCorner = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 4; };
-        let isTLCorner = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 5; };
-        //check blocking sharp
-        let isBLSharp = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2 || c.qans === 3 || c.qans === 5; };
-        let isBRSharp = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2 || c.qans === 3 || c.qans === 4; };
-        let isTRSharp = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 3 || c.qans === 4 || c.qans === 5; };
-        let isTLSharp = function (c) { return c.isnull || c.qnum !== -1 || c.qans === 2 || c.qans === 4 || c.qans === 5; };
-        //check if stick edge
-        let isStickEdge = function (c) { return isBottomEdge(c.adjacent.top) || isTopEdge(c.adjacent.bottom) || isRightEdge(c.adjacent.left) || isLeftEdge(c.adjacent.right); }
+        let isEdge = function (c, ndir) { //0 = left, 1 = bottom, 2 = right, 3 = top
+            ndir = (ndir % 4 + 4) % 4;
+            let tdir = (ndir + 3) % 4;
+            return c.isnull || c.qnum !== cqnum.none || c.qans === tdir + 2 || c.qans === ndir + 2;
+        };
+        //check dot area if stick edge
+        let isDotEdge = function (c) {
+            if (c.qsub !== cqsub.dot ) { return false; }
+            let temp = false;
+            let dfslist = [c];
+            let dfs = function (c, ndir) {
+                if (isEmpty(c) || dfslist.indexOf(c) !== -1) { return; }
+                if (isEdge(c, ndir + 2)) { temp = true; return; }
+                if (c.qsub === cqsub.dot) {
+                    dfslist.push(c);
+                    dfs(offset(c, -1, 0), 0);
+                    dfs(offset(c, 0, 1), 1);
+                    dfs(offset(c, 1, 0), 2);
+                    dfs(offset(c, 0, -1), 3);
+                }
+            };
+            for (let d = 0; d < 4; d++) {
+                dfs(dir(c.adjacent, 3 - d), d);
+            }
+            return temp;
+        };
+        //check blocking edge including dot
+        let isEdgeEx = function (c, ndir) { //0 = left, 1 = bottom, 2 = right, 3 = top
+            return isEdge(c, ndir) || isDotEdge(c);
+        };
+        //check blocking corner including dot
+        let isCorner = function (c, ndir) { //0 = bl, 1 = br, 2 = tr, 3 = tl
+            ndir = (ndir % 4 + 4) % 4;
+            return c.isnull || c.qnum !== cqnum.none || c.qans === ndir + 2 || isDotEdge(c);
+        };
+        //check blocking sharp including dot
+        let isSharp = function (c, ndir) { //0 = bl, 1 = br, 2 = tr, 3 = tl
+            ndir = (ndir % 4 + 4) % 4;
+            return isEdgeEx(c, ndir) || c.qans === (ndir + 1) % 4 + 2;
+        };
         //if can place triangle of specific direction
-        let isntBLTri = function (c) {
-            let adj = c.adjacent;
-            if (!isEmpty(c) || isBottomEdge(adj.top) || isLeftEdge(adj.right)) { return true; }
-            if ((adj.top.qsub === 1 && isStickEdge(adj.top)) || (adj.right.qsub === 1 && isStickEdge(adj.right))) { return true; }
-            if ((!adj.top.isnull && adj.top.qans === 4) || (!adj.right.isnull && adj.right.qans === 4)) { return true; }
-            if ((!adj.bottom.isnull && (adj.bottom.qans === 2 || adj.bottom.qans === 3))) { return true; }
-            if ((!adj.left.isnull && (adj.left.qans === 2 || adj.left.qans === 5))) { return true; }
-            if (adj.top.adjacent.right !== undefined && (isBLSharp(adj.top.adjacent.right) || (adj.top.adjacent.right.qsub === 1 && isStickEdge(adj.top.adjacent.right)))) { return true; }
-            if (adj.top.adjacent.left !== undefined && !adj.top.adjacent.left.isnull && adj.top.adjacent.left.qans === 5) { return true; }
-            if (adj.bottom.adjacent.right !== undefined && !adj.bottom.adjacent.right.isnull && adj.bottom.adjacent.right.qans === 3) { return true; }
-            if (adj.bottom.adjacent.left !== undefined && !adj.bottom.adjacent.left.isnull && adj.bottom.adjacent.left.qans === 2) { return true; }
-            if (adj.top.adjacent.top !== undefined && !adj.top.adjacent.top.isnull && adj.top.adjacent.top.qans === 5) { return true; }
-            if (adj.right.adjacent.right !== undefined && !adj.right.adjacent.right.isnull && adj.right.adjacent.right.qans === 3) { return true; }
-            if (adj.top.adjacent.right !== undefined && !adj.top.adjacent.right.isnull) {
-                if (!adj.top.adjacent.right.adjacent.top.isnull && adj.top.adjacent.right.adjacent.top.qans === 4) { return true; }
-                if (!adj.top.adjacent.right.adjacent.right.isnull && adj.top.adjacent.right.adjacent.right.qans === 4) { return true; }
-            }
+        let isntTri = function (c, ndir) { //0 = bl, 1 = br, 2 = tr, 3 = tl
+            ndir = (ndir % 4 + 4) % 4;
+            if (!isEmpty(c) && c.qans !== ndir + 2) { return true; }
+            if (c.qans === ndir + 2) { return false; }
+            let temp = offset(c, 1, 0, ndir);
+            if (isEdgeEx(temp, ndir) || temp.qans === (ndir + 2) % 4 + 2) { return true; }
+            temp = offset(c, 0, -1, ndir);
+            if (isEdgeEx(temp, ndir + 1) || temp.qans === (ndir + 2) % 4 + 2) { return true; }
+            temp = offset(c, -1, 0, ndir);
+            if (!temp.isnull && (temp.qans === (ndir + 3) % 4 + 2 || temp.qans === ndir + 2)) { return true; }
+            temp = offset(c, 0, 1, ndir);
+            if (!temp.isnull && (temp.qans === ndir + 2 || temp.qans === (ndir + 1) % 4 + 2)) { return true; }
+            temp = offset(c, 1, -1, ndir);
+            if (!temp.isnull && isSharp(temp, ndir)) { return true; }
+            temp = offset(c, -1, -1, ndir);
+            if (!temp.isnull && temp.qans === (ndir + 3) % 4 + 2) { return true; }
+            temp = offset(c, -1, 1, ndir);
+            if (!temp.isnull && temp.qans === ndir + 2) { return true; }
+            temp = offset(c, 1, 1, ndir);
+            if (!temp.isnull && temp.qans === (ndir + 1) % 4 + 2) { return true; }
+            temp = offset(c, 2, 0, ndir);
+            if (!temp.isnull && temp.qans === (ndir + 1) % 4 + 2) { return true; }
+            temp = offset(c, 0, -2, ndir);
+            if (!temp.isnull && temp.qans === (ndir + 3) % 4 + 2) { return true; }
+            temp = offset(c, 2, -1, ndir);
+            if (!temp.isnull && temp.qans === (ndir + 2) % 4 + 2) { return true; }
+            temp = offset(c, 1, -2, ndir);
+            if (!temp.isnull && temp.qans === (ndir + 2) % 4 + 2) { return true; }
             return false;
         };
-        let isntBRTri = function (c) {
-            let adj = c.adjacent;
-            if (!isEmpty(c) || isBottomEdge(adj.top) || isRightEdge(adj.left)) { return true; }
-            if ((adj.top.qsub === 1 && isStickEdge(adj.top)) || (adj.left.qsub === 1 && isStickEdge(adj.left))) { return true; }
-            if ((!adj.top.isnull && adj.top.qans === 5) || (!adj.left.isnull && adj.left.qans === 5)) { return true; }
-            if ((!adj.bottom.isnull && (adj.bottom.qans === 2 || adj.bottom.qans === 3))) { return true; }
-            if ((!adj.right.isnull && (adj.right.qans === 3 || adj.right.qans === 4))) { return true; }
-            if (adj.top.adjacent.left !== undefined && (isBRSharp(adj.top.adjacent.left) || (adj.top.adjacent.left.qsub === 1 && isStickEdge(adj.top.adjacent.left)))) { return true; }
-            if (adj.top.adjacent.right !== undefined && !adj.top.adjacent.right.isnull && adj.top.adjacent.right.qans === 4) { return true; }
-            if (adj.bottom.adjacent.left !== undefined && !adj.bottom.adjacent.left.isnull && adj.bottom.adjacent.left.qans === 2) { return true; }
-            if (adj.bottom.adjacent.right !== undefined && !adj.bottom.adjacent.right.isnull && adj.bottom.adjacent.right.qans === 3) { return true; }
-            if (adj.top.adjacent.top !== undefined && !adj.top.adjacent.top.isnull && adj.top.adjacent.top.qans === 4) { return true; }
-            if (adj.left.adjacent.left !== undefined && !adj.left.adjacent.left.isnull && adj.left.adjacent.left.qans === 2) { return true; }
-            if (adj.top.adjacent.left !== undefined && !adj.top.adjacent.left.isnull) {
-                if (!adj.top.adjacent.left.adjacent.top.isnull && adj.top.adjacent.left.adjacent.top.qans === 5) { return true; }
-                if (!adj.top.adjacent.left.adjacent.left.isnull && adj.top.adjacent.left.adjacent.left.qans === 5) { return true; }
+        //extend of isntTri including some complex logic
+        let isntTriEx = function (c, ndir) { //0 = bl, 1 = br, 2 = tr, 3 = tl
+            if (isntTri(c, ndir)) { return true; }
+            let templist = [offset(c, -1, 0, ndir), offset(c, 0, 1, ndir), offset(c, -2, 0, ndir),
+                            offset(c, 0, 2, ndir), offset(c, -1, 1, ndir)];
+            if (isEmpty(templist[0]) && isEmpty(templist[1]) && isEdgeEx(templist[2], ndir + 2) &&
+                isEdgeEx(templist[3], ndir + 3) && isEmpty(templist[4]) && isntTri(templist[4], ndir + 2)) {
+                return true;
             }
             return false;
-        };
-        let isntTRTri = function (c) {
-            let adj = c.adjacent;
-            if (!isEmpty(c) || isTopEdge(adj.bottom) || isRightEdge(adj.left)) { return true; }
-            if ((adj.bottom.qsub === 1 && isStickEdge(adj.bottom)) || (adj.left.qsub === 1 && isStickEdge(adj.left))) { return true; }
-            if ((!adj.bottom.isnull && adj.bottom.qans === 2) || (!adj.left.isnull && adj.left.qans === 2)) { return true; }
-            if ((!adj.top.isnull && (adj.top.qans === 4 || adj.top.qans === 5))) { return true; }
-            if ((!adj.right.isnull && (adj.right.qans === 3 || adj.right.qans === 4))) { return true; }
-            if (adj.bottom.adjacent.left !== undefined && (isTRSharp(adj.bottom.adjacent.left) || (adj.bottom.adjacent.left.qsub === 1 && isStickEdge(adj.bottom.adjacent.left)))) { return true; }
-            if (adj.bottom.adjacent.right !== undefined && !adj.bottom.adjacent.right.isnull && adj.bottom.adjacent.right.qans === 3) { return true; }
-            if (adj.top.adjacent.left !== undefined && !adj.top.adjacent.left.isnull && adj.top.adjacent.left.qans === 5) { return true; }
-            if (adj.top.adjacent.right !== undefined && !adj.top.adjacent.right.isnull && adj.top.adjacent.right.qans === 4) { return true; }
-            if (adj.bottom.adjacent.bottom !== undefined && !adj.bottom.adjacent.bottom.isnull && adj.bottom.adjacent.bottom.qans === 3) { return true; }
-            if (adj.left.adjacent.left !== undefined && !adj.left.adjacent.left.isnull && adj.left.adjacent.left.qans === 5) { return true; }
-            if (adj.bottom.adjacent.left !== undefined && !adj.bottom.adjacent.left.isnull) {
-                if (!adj.bottom.adjacent.left.adjacent.bottom.isnull && adj.bottom.adjacent.left.adjacent.bottom.qans === 2) { return true; }
-                if (!adj.bottom.adjacent.left.adjacent.left.isnull && adj.bottom.adjacent.left.adjacent.left.qans === 2) { return true; }
-            }
-            return false;
-        };
-        let isntTLTri = function (c) {
-            let adj = c.adjacent;
-            if (!isEmpty(c) || isTopEdge(adj.bottom) || isLeftEdge(adj.right)) { return true; }
-            if ((adj.bottom.qsub === 1 && isStickEdge(adj.bottom)) || (adj.right.qsub === 1 && isStickEdge(adj.right))) { return true; }
-            if ((!adj.bottom.isnull && adj.bottom.qans === 3) || (!adj.right.isnull && adj.right.qans === 3)) { return true; }
-            if ((!adj.top.isnull && (adj.top.qans === 4 || adj.top.qans === 5))) { return true; }
-            if ((!adj.left.isnull && (adj.left.qans === 2 || adj.left.qans === 5))) { return true; }
-            if (adj.bottom.adjacent.right !== undefined && (isTLSharp(adj.bottom.adjacent.right) || (adj.bottom.adjacent.right.qsub === 1 && isStickEdge(adj.bottom.adjacent.right)))) { return true; }
-            if (adj.bottom.adjacent.left !== undefined && !adj.bottom.adjacent.left.isnull && adj.bottom.adjacent.left.qans === 2) { return true; }
-            if (adj.top.adjacent.right !== undefined && !adj.top.adjacent.right.isnull && adj.top.adjacent.right.qans === 4) { return true; }
-            if (adj.top.adjacent.left !== undefined && !adj.top.adjacent.left.isnull && adj.top.adjacent.left.qans === 5) { return true; }
-            if (adj.bottom.adjacent.bottom !== undefined && !adj.bottom.adjacent.bottom.isnull && adj.bottom.adjacent.bottom.qans === 2) { return true; }
-            if (adj.right.adjacent.right !== undefined && !adj.right.adjacent.right.isnull && adj.right.adjacent.right.qans === 4) { return true; }
-            if (adj.bottom.adjacent.right !== undefined && !adj.bottom.adjacent.right.isnull) {
-                if (!adj.bottom.adjacent.right.adjacent.bottom.isnull && adj.bottom.adjacent.right.adjacent.bottom.qans === 3) { return true; }
-                if (!adj.bottom.adjacent.right.adjacent.right.isnull && adj.bottom.adjacent.right.adjacent.right.qans === 3) { return true; }
-            }
-            return false;
-        };
+        }
+
+        //start assist
         for (let i = 0; i < board.cell.length; i++) {
             let cell = board.cell[i];
             let adjcell = cell.adjacent;
@@ -929,23 +1169,21 @@
             //add dot
 
             //cannot place any triangle
-            if (isntBLTri(cell) && isntBRTri(cell) && isntTRTri(cell) && isntTLTri(cell)) {
-                add_dot(cell);
+            {
+                let temp = true;
+                for (let d = 0; d < 4; d++) {
+                    temp &= isntTriEx(cell, d);
+                }
+                if (temp) { add_dot(cell); }
             }
             //fill rectangle
             {
-                let fn = function (c, c1, c2, c12) {
-                    if (!c1.isnull && c1.qsub === 1 && !c2.isnull && c2.qsub === 1 && !c12.isnull && c12.qsub === 1) {
-                        add_dot(c);
+                let templist = [cell, offset(cell, 1, 0), offset(cell, 0, 1), offset(cell, 1, 1)];
+                if (templist.filter(c => c.isnull).length === 0) {
+                    templist = templist.filter(c => c.qsub !== cqsub.dot);
+                    if (templist.length === 1) {
+                        add_dot(templist[0]);
                     }
-                };
-                if (!adjcell.bottom.isnull) {
-                    fn(cell, adjcell.bottom, adjcell.left, adjcell.bottom.adjacent.left);
-                    fn(cell, adjcell.bottom, adjcell.right, adjcell.bottom.adjacent.right);
-                }
-                if (!adjcell.top.isnull) {
-                    fn(cell, adjcell.top, adjcell.right, adjcell.top.adjacent.right);
-                    fn(cell, adjcell.top, adjcell.left, adjcell.top.adjacent.left);
                 }
             }
             //dot by clue
@@ -954,147 +1192,97 @@
             }
             //pattern with clue 1
             if (cell.qnum === 1) {
-                if (!adjcell.top.isnull && (isEmpty(adjcell.top) || adjcell.top.qsub === 1)) {
-                    let temp = !adjcell.left.isnull && (isEmpty(adjcell.left) || adjcell.left.qsub === 1);
-                    if (temp && adjcell.top.adjacent.left.qnum === -1 && adjcell.top.adjacent.left.qans !== 3 && isntBRTri(adjcell.top.adjacent.left)) {
-                        add_dot(adjcell.bottom); add_dot(adjcell.right);
-                    }
-                    temp = !adjcell.right.isnull && (isEmpty(adjcell.right) || adjcell.right.qsub === 1);
-                    if (temp && adjcell.top.adjacent.right.qnum === -1 && adjcell.top.adjacent.right.qans !== 2 && isntBLTri(adjcell.top.adjacent.right)) {
-                        add_dot(adjcell.bottom); add_dot(adjcell.left);
-                    }
-                }
-                if (!adjcell.bottom.isnull && (isEmpty(adjcell.bottom) || adjcell.bottom.qsub === 1)) {
-                    let temp = !adjcell.left.isnull && (isEmpty(adjcell.left) || adjcell.left.qsub === 1);
-                    if (temp && adjcell.bottom.adjacent.left.qnum === -1 && adjcell.bottom.adjacent.left.qans !== 4 && isntTRTri(adjcell.bottom.adjacent.left)) {
-                        add_dot(adjcell.top); add_dot(adjcell.right);
-                    }
-                    temp = !adjcell.right.isnull && (isEmpty(adjcell.right) || adjcell.right.qsub === 1);
-                    if (temp && adjcell.bottom.adjacent.right.qnum === -1 && adjcell.bottom.adjacent.right.qans !== 5 && isntTLTri(adjcell.bottom.adjacent.right)) {
-                        add_dot(adjcell.top); add_dot(adjcell.left);
-                    }
+                for (let d = 0; d < 4; d++) {
+                    let tempcell = offset(cell, -1, 0, d);
+                    let tempstate = !tempcell.isnull && (isEmpty(tempcell) || tempcell.qsub === cqsub.dot);
+                    tempcell = offset(cell, 0, 1, d);
+                    tempstate &= !tempcell.isnull && (isEmpty(tempcell) || tempcell.qsub === cqsub.dot);
+                    tempcell = offset(cell, -1, 1, d);
+                    tempstate &= tempcell.qnum === cqnum.none && isntTriEx(tempcell, d + 2);
+                    if (tempstate) { add_dot(offset(cell, 1, 0, d)); add_dot(offset(cell, 0, -1, d)); }
                 }
             }
 
             //add triangle
 
             //cannot form non-rectangle
-            {
-                let fn_list1 = [isTRCorner, isTLCorner, isBLCorner, isBRCorner];
-                let fn_list2 = [[isBRCorner, isTLCorner], [isBLCorner, isTRCorner], [isTLCorner, isBRCorner], [isTRCorner, isBLCorner]];
-                let fn = function (c, c1, c2, c12, dir) {
-                    if (!c1.isnull && c1.qsub === 1 && !c2.isnull && c2.qsub === 1 && fn_list1[dir - 2](c12)) {
-                        add_triangle(c, dir);
+            if (isEmpty(cell)) {
+                for (let d = 0; d < 4; d++) {
+                    let templist = [offset(cell, -1, 0, d), offset(cell, 0, 1, d), offset(cell, -1, 1, d)];
+                    let templist_dot = templist.filter(c => !c.isnull && !isEmpty(c) && c.qsub === cqsub.dot);
+                    let templist_ndot = templist.filter(c => !c.isnull && !isEmpty(c) && c.qsub !== cqsub.dot);
+                    if (templist_dot.length === 2 && templist_ndot.length === 1) {
+                        let temp = templist_ndot[0];
+                        if (templist.indexOf(temp) === 0 && isCorner(temp, d + 1)) { add_triangle(cell, d); break; }
+                        else if (templist.indexOf(temp) === 1 && isCorner(temp, d + 3)) { add_triangle(cell, d); break; }
+                        else if (templist.indexOf(temp) === 2 && isCorner(temp, d + 2)) { add_triangle(cell, d); break; }
                     }
-                    else if (((!c1.isnull && c1.qsub === 1 && fn_list2[dir - 2][0](c2)) || (fn_list2[dir - 2][1](c1) && !c2.isnull && c2.qsub === 1)) && !c12.isnull && c12.qsub === 1) {
-                        add_triangle(c, dir);
-                    }
-                };
-                if (!adjcell.bottom.isnull) {
-                    fn(cell, adjcell.bottom, adjcell.left, adjcell.bottom.adjacent.left, 2);
-                    fn(cell, adjcell.bottom, adjcell.right, adjcell.bottom.adjacent.right, 3);
-                }
-                if (!adjcell.top.isnull) {
-                    fn(cell, adjcell.top, adjcell.right, adjcell.top.adjacent.right, 4);
-                    fn(cell, adjcell.top, adjcell.left, adjcell.top.adjacent.left, 5);
                 }
             }
             //triangle by clue
             if (emptynum === cell.qnum - trinum) {
-                let fn_list = [[isntBLTri, isntBRTri], [isntTLTri, isntTRTri], [isntBRTri, isntTRTri], [isntBLTri, isntTLTri]];
-                let dir_list = [[3, 2], [4, 5], [4, 3], [5, 2]];
-                let fn = function (c, dir) {
-                    if (fn_list[dir][0](c)) { add_triangle(c, dir_list[dir][0]); }
-                    else if (fn_list[dir][1](c)) { add_triangle(c, dir_list[dir][1]); }
-                };
-                fn(adjcell.top, 0);
-                fn(adjcell.bottom, 1);
-                fn(adjcell.left, 2);
-                fn(adjcell.right, 3);
+                for (let d = 0; d < 4; d++) {
+                    let adj = dir(adjcell, 4 - d);
+                    if (isEmpty(adj)) {
+                        if (isntTriEx(adj, d)) { add_triangle(adj, d + 1); }
+                        else if (isntTriEx(adj, d + 1)) { add_triangle(adj, d); }
+                    }
+                }
             }
+            //side extend
             if (cell.qans >= 2) {
-                //rectangle needs turn
-                {
-                    let fn_list = [isntBLTri, isntBRTri, isntTRTri, isntTLTri];
-                    let ans_list = [[5, 3], [4, 2], [5, 3], [4, 2]];
-                    let dir_list1 = [[adjcell.top.adjacent.left, adjcell.right.adjacent.bottom], [adjcell.top.adjacent.right, adjcell.left.adjacent.bottom],
-                    [adjcell.left.adjacent.top, adjcell.bottom.adjacent.right], [adjcell.right.adjacent.top, adjcell.bottom.adjacent.left]];
-                    let dir_list2 = [[adjcell.top, adjcell.right], [adjcell.top, adjcell.left], [adjcell.left, adjcell.bottom], [adjcell.right, adjcell.bottom]];
-                    for (let j = 0; j < 2; j++) {
-                        if (dir_list1[cell.qans - 2][j].qans !== cell.qans && fn_list[cell.qans - 2](dir_list1[cell.qans - 2][j])) {
-                            add_triangle(dir_list2[cell.qans - 2][j], ans_list[cell.qans - 2][j]);
-                        }
-                    }
+                let ndir = cell.qans - 2;
+                //rectangle needs turn or cannot turn
+                if (isntTriEx(offset(cell, -1, -1, ndir), ndir)) { add_triangle(offset(cell, 0, -1, ndir), ndir + 3); }
+                else if (isntTriEx(offset(cell, 0, -1, ndir), ndir + 3)) { add_triangle(offset(cell, -1, -1, ndir), ndir); }
+                if (isntTriEx(offset(cell, 1, 1, ndir), ndir)) { add_triangle(offset(cell, 1, 0, ndir), ndir + 1); }
+                else if (isntTriEx(offset(cell, 1, 0, ndir), ndir + 1)) { add_triangle(offset(cell, 1, 1, ndir), ndir); }
+                //only one opposite side position
+                if (isEdgeEx(offset(cell, 2, -1, ndir), ndir)) { add_triangle(offset(cell, 1, -1, ndir), ndir + 2); }
+                else if (isEdgeEx(offset(cell, 1, -2, ndir), ndir + 1)) { add_triangle(offset(cell, 1, -1, ndir), ndir + 2); }
+                else if (isSharp(offset(cell, 2, -2, ndir), ndir)) { add_triangle(offset(cell, 1, -1, ndir), ndir + 2); }
+                //rectangle opposite side extend
+                let temp = cell;
+                while (!offset(temp, -1, -1, ndir).isnull && offset(temp, -1, -1, ndir).qans === cell.qans) {
+                    temp = offset(temp, -1, -1, ndir);
                 }
-                //rectangle cannot turn
-                {
-                    let fn_list = [[isntTLTri, isntBRTri], [isntTRTri, isntBLTri], [isntTLTri, isntBRTri], [isntTRTri, isntBLTri]];
-                    let ans_list = [[5, 3], [4, 2], [5, 3], [4, 2]];
-                    let dir_list1 = [[adjcell.top, adjcell.right], [adjcell.top, adjcell.left], [adjcell.left, adjcell.bottom], [adjcell.right, adjcell.bottom]];
-                    let dir_list2 = [[adjcell.top.adjacent.left, adjcell.right.adjacent.bottom], [adjcell.top.adjacent.right, adjcell.left.adjacent.bottom],
-                    [adjcell.left.adjacent.top, adjcell.bottom.adjacent.right], [adjcell.right.adjacent.top, adjcell.bottom.adjacent.left]];
-                    for (let j = 0; j < 2; j++) {
-                        if (dir_list1[cell.qans - 2][j].qans !== ans_list[cell.qans - 2][j] && fn_list[cell.qans - 2][j](dir_list1[cell.qans - 2][j])) {
-                            add_triangle(dir_list2[cell.qans - 2][j], cell.qans);
+                let turn1 = offset(temp, 0, -1, ndir);
+                if (turn1.qans === (ndir + 3) % 4 + 2) {
+                    let temp = cell;
+                    while (!offset(temp, 1, 1, ndir).isnull && offset(temp, 1, 1, ndir).qans === cell.qans) {
+                        temp = offset(temp, 1, 1, ndir);
+                    }
+                    let turn2 = offset(temp, 1, 0, ndir);
+                    if (turn2.qans === (ndir + 1) % 4 + 2) {
+                        turn1 = offset(turn1, 1, -1, ndir);
+                        turn2 = offset(turn2, 1, -1, ndir);
+                        while ((!turn1.isnull && turn1.qans === (ndir + 3) % 4 + 2) ||
+                               (!turn2.isnull && turn2.qans === (ndir + 1) % 4 + 2)) {
+                            add_triangle(turn1, ndir + 3);
+                            add_triangle(turn2, ndir + 1);
+                            turn1 = offset(turn1, 1, -1, ndir);
+                            turn2 = offset(turn2, 1, -1, ndir);
                         }
-                    }
-                }
-                //opposite side of rectangle
-                {
-                    let ans_list = [4, 5, 2, 3];
-                    let fn_list = [[isBottomEdge, isLeftEdge, isBLSharp], [isBottomEdge, isRightEdge, isBRSharp],
-                    [isTopEdge, isRightEdge, isTRSharp], [isTopEdge, isLeftEdge, isTLSharp]];
-                    let fn = function (c, c1, c2, c12, dir) {
-                        let temp = (fn_list[dir][0](c1) || (c1.qsub === 1 && isStickEdge(c1)));
-                        temp |= (fn_list[dir][1](c2) || (c2.qsub === 1 && isStickEdge(c2)));
-                        if (temp || c12 === undefined || fn_list[dir][2](c12) || (c12.qsub === 1 && isStickEdge(c12))) {
-                            add_triangle(c, ans_list[dir]);
-                        }
-                    };
-                    let temp = adjcell.top.adjacent.right;
-                    if (cell.qans === 2 && temp !== undefined && isEmpty(temp)) {
-                        fn(temp, temp.adjacent.top, temp.adjacent.right, temp.adjacent.top.adjacent.right, 0);
-                    }
-                    temp = adjcell.top.adjacent.left;
-                    if (cell.qans === 3 && temp !== undefined && isEmpty(temp)) {
-                        fn(temp, temp.adjacent.top, temp.adjacent.left, temp.adjacent.top.adjacent.left, 1);
-                    }
-                    temp = adjcell.bottom.adjacent.left;
-                    if (cell.qans === 4 && temp !== undefined && isEmpty(temp)) {
-                        fn(temp, temp.adjacent.bottom, temp.adjacent.left, temp.adjacent.bottom.adjacent.left, 2);
-                    }
-                    temp = adjcell.bottom.adjacent.right;
-                    if (cell.qans === 5 && temp !== undefined && isEmpty(temp)) {
-                        fn(temp, temp.adjacent.bottom, temp.adjacent.right, temp.adjacent.bottom.adjacent.right, 3);
                     }
                 }
             }
             //2x2 pattern
-            {
-                let ans_list = [2, 2, 3, 3, 4, 4, 5, 5];
-                let fn_list = [[isTopEdge, isBottomEdge], [isRightEdge, isLeftEdge], [isLeftEdge, isRightEdge], [isTopEdge, isBottomEdge],
-                [isBottomEdge, isTopEdge], [isLeftEdge, isRightEdge], [isRightEdge, isLeftEdge], [isBottomEdge, isTopEdge]];
-                let fn = function (c, c1, c2, c3, c12, c22, dir) {
-                    let temp = (!c1.isnull && c1.qsub === 1 && !c2.isnull && isEmpty(c2) && fn_list[dir][0](c3));
-                    if (temp && fn_list[dir][1](c12) && (fn_list[dir][1](c22) || (c22.qsub == 1 && isStickEdge(c22)))) {
-                        add_triangle(c, ans_list[dir]);
+            if (isEmpty(cell)) {
+                for (let d = 0; d < 4; d++) {
+                    let templist = [offset(cell, -1, 0, d), offset(cell, 0, -1, d), offset(cell, 0, 1, d),
+                                    offset(cell, -1, -1, d), offset(cell, 0, -2, d)];
+                    if (!templist[0].isnull && templist[0].qsub === cqsub.dot && isEmpty(templist[1]) &&
+                        isEdge(templist[2], d + 3) && isEdge(templist[3], d + 1) && isEdgeEx(templist[4], d + 1)) {
+                        add_triangle(cell, d);
+                        break;
                     }
-                };
-                if (!adjcell.top.isnull) {
-                    fn(cell, adjcell.left, adjcell.top, adjcell.bottom, adjcell.top.adjacent.left, adjcell.top.adjacent.top, 0);
-                    fn(cell, adjcell.right, adjcell.top, adjcell.bottom, adjcell.top.adjacent.right, adjcell.top.adjacent.top, 3);
-                }
-                if (!adjcell.bottom.isnull) {
-                    fn(cell, adjcell.left, adjcell.bottom, adjcell.top, adjcell.bottom.adjacent.left, adjcell.bottom.adjacent.bottom, 7);
-                    fn(cell, adjcell.right, adjcell.bottom, adjcell.top, adjcell.bottom.adjacent.right, adjcell.bottom.adjacent.bottom, 4);
-                }
-                if (!adjcell.left.isnull) {
-                    fn(cell, adjcell.bottom, adjcell.left, adjcell.right, adjcell.left.adjacent.bottom, adjcell.left.adjacent.left, 2);
-                    fn(cell, adjcell.top, adjcell.left, adjcell.right, adjcell.left.adjacent.top, adjcell.left.adjacent.left, 5);
-                }
-                if (!adjcell.right.isnull) {
-                    fn(cell, adjcell.bottom, adjcell.right, adjcell.left, adjcell.right.adjacent.bottom, adjcell.right.adjacent.right, 1);
-                    fn(cell, adjcell.top, adjcell.right, adjcell.left, adjcell.right.adjacent.top, adjcell.right.adjacent.right, 6);
+                    templist = [offset(cell, 0, 1, d), offset(cell, 1, 0, d), offset(cell, -1, 0, d),
+                                    offset(cell, 1, 1, d), offset(cell, 2, 0, d)];
+                    if (!templist[0].isnull && templist[0].qsub === cqsub.dot && isEmpty(templist[1]) &&
+                        isEdge(templist[2], d + 2) && isEdge(templist[3], d) && isEdgeEx(templist[4], d)) {
+                        add_triangle(cell, d);
+                        break;
+                    }
                 }
             }
         }
@@ -1405,7 +1593,7 @@
             let adjline = cell.adjborder;
             //check clue
             if (cell.qnum >= 0 && cell.qdir !== qdir.none) {
-                let d = [-1, 0, 2, 3, 1][cell.qdir];
+                let d = qdirremap(cell.qdir);
                 let emptynum = 0;
                 let blocknum = 0;
                 let lastcell = cell;

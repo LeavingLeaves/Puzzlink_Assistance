@@ -11,14 +11,17 @@ Currently support:
 * Akari
 * Aquapelago
 * Ekawayeh
+* Guide Arrow
 * Heyawake
 * Icebarn
 * Lits
 * Masyu
 * No Three
+* Nurikabe
 * Nuri-Maze
 * Shakashaka
 * Simple Loop
+* Slant
 * Slither Link
 * Yajilin
 * Yin-Yang
