@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.10.20.1
+// @version      23.10.20.2
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -250,12 +250,13 @@
             let fn = function (c) {
                 let dfslist = [];
                 let dfs = function (c) {
-                    if (c.isnull || c === cell || isGreen(c) || dfslist.indexOf(c) !== -1) { return; }
+                    if (c.isnull || isGreen(c) || dfslist.indexOf(c) !== -1) { return; }
                     dfslist.push(c);
+                    if (c === cell) { return; }
                     fourside(dfs, c.adjacent);
                 };
                 dfs(c);
-                if (dfslist.filter(c => isBlock(c)).length === 0) {
+                if (dfslist.filter(c => isBlock(c)).length === 0 || dfslist.indexOf(cell) === -1) {
                     sparenum++;
                     return templist.length;
                 }
@@ -624,29 +625,33 @@
         );
         //cell at side is grouped when both sides are even
         if (board.rows % 2 === 0 && board.cols % 2 === 0) {
-            for (let i = 1; i + 1 < board.cols; i += 2) {
+            for (let i = 1; i + 1 < board.rows; i += 2) {
                 let cell1 = board.getc(board.minbx + 1, 2 * i + 1);
                 let cell2 = board.getc(board.minbx + 1, 2 * i + 3);
-                if (cell1.anum === canum.none && cell2.anum === canum.none) { continue; }
-                add_color(cell1, cell2.anum);
-                add_color(cell2, cell1.anum);
+                if (cell1.anum !== canum.none || cell2.anum !== canum.none) {
+                    add_color(cell1, cell2.anum);
+                    add_color(cell2, cell1.anum);
+                }
                 cell1 = board.getc(board.maxbx - 1, 2 * i + 1);
                 cell2 = board.getc(board.maxbx - 1, 2 * i + 3);
-                if (cell1.anum === canum.none && cell2.anum === canum.none) { continue; }
-                add_color(cell1, cell2.anum);
-                add_color(cell2, cell1.anum);
+                if (cell1.anum !== canum.none || cell2.anum !== canum.none) {
+                    add_color(cell1, cell2.anum);
+                    add_color(cell2, cell1.anum);
+                }
             }
-            for (let i = 1; i + 1 < board.rows; i += 2) {
-                let cell1 = board.getc(2 * i + 1, board.minbx + 1);
-                let cell2 = board.getc(2 * i + 3, board.minbx + 1);
-                if (cell1.anum === canum.none && cell2.anum === canum.none) { continue; }
-                add_color(cell1, cell2.anum);
-                add_color(cell2, cell1.anum);
-                cell1 = board.getc(2 * i + 1, board.maxbx - 1);
-                cell2 = board.getc(2 * i + 3, board.maxbx - 1);
-                if (cell1.anum === canum.none && cell2.anum === canum.none) { continue; }
-                add_color(cell1, cell2.anum);
-                add_color(cell2, cell1.anum);
+            for (let i = 1; i + 1 < board.cols; i += 2) {
+                let cell1 = board.getc(2 * i + 1, board.minby + 1);
+                let cell2 = board.getc(2 * i + 3, board.minby + 1);
+                if (cell1.anum !== canum.none || cell2.anum !== canum.none) {
+                    add_color(cell1, cell2.anum);
+                    add_color(cell2, cell1.anum);
+                }
+                cell1 = board.getc(2 * i + 1, board.maxby - 1);
+                cell2 = board.getc(2 * i + 3, board.maxby - 1);
+                if (cell1.anum !== canum.none || cell2.anum !== canum.none) {
+                    add_color(cell1, cell2.anum);
+                    add_color(cell2, cell1.anum);
+                }
             }
         }
         for (let i = 0; i < board.cell.length; i++) {
@@ -709,26 +714,83 @@
         No2x2Block();
         No2x2Green();
         GreenConnectedInCell();
-        GreenNoLoopInCell();
         CellConnected(
-            function (c) { return c.ques === cques.cir || c === board.getc(board.startpos.bx, board.startpos.by) || board.getc(board.goalpos.bx, board.goalpos.by); },
-            function (c) { return c.qans === cqans.block || c.ques === cques.tri; },
+            function (c) {
+                let startcell = board.getc(board.startpos.bx, board.startpos.by);
+                let goalcell = board.getc(board.goalpos.bx, board.goalpos.by);
+                return c === startcell || c === goalcell || c.qans === cques.cir;
+            },
+            function (c) { return c.qans === cqans.block || c.ques === cques.tri },
             add_green
         );
         let startcell = board.getc(board.startpos.bx, board.startpos.by);
         let goalcell = board.getc(board.goalpos.bx, board.goalpos.by);
         for (let i = 0; i < board.roommgr.components.length; i++) {
             let room = board.roommgr.components[i];
-            let templist = [];
+            let cellList = [];
             for (let j = 0; j < room.clist.length; j++) {
-                templist.push(room.clist[j]);
+                cellList.push(room.clist[j]);
             }
-            if (templist.filter(c => c.qsub === cqsub.green || c.ques === cques.cir || c.ques === cques.tri).length > 0 ||
+            if (cellList.filter(c => c.qsub === cqsub.green || c.ques === cques.cir || c.ques === cques.tri).length > 0 ||
                 room === startcell.room || room === goalcell.room) {
-                templist.forEach(c => add_green(c));
+                cellList.forEach(c => add_green(c));
+                continue;
             }
-            if (templist.filter(c => c.qans).length > 0) {
-                templist.forEach(c => add_block(c));
+            if (cellList.filter(c => c.qans === cqans.block).length > 0) {
+                cellList.forEach(c => add_block(c));
+                continue;
+            }
+            //no loop
+            let templist = [];
+            cellList.forEach(c => {
+                let fn = function (c) {
+                    if (c.isnull || templist.indexOf(c) !== -1) { return; }
+                    templist.push(c);
+                }
+                let list = [offset(c, -1, 0), offset(c, 0, -1), offset(c, 0, 1), offset(c, 1, 0)];
+                list.forEach(c => fn(c));
+            });
+            templist = templist.filter(c => !c.isnull && c.qsub === cqsub.green);
+            if (templist.length < 2) { continue; }
+            let fn1 = function (c) {
+                let dfslist = [];
+                let dfs = function (c) {
+                    if (c.isnull || c.qsub !== cqsub.green || dfslist.indexOf(c) !== -1) { return; }
+                    dfslist.push(c);
+                    fourside(dfs, c.adjacent);
+                };
+                dfs(c);
+                return dfslist.filter(c => templist.indexOf(c) !== -1).length;
+            };
+            let templist2 = templist.map(c => fn1(c));
+            if (templist2.filter(n => n > 1).length > 0) {
+                cellList.forEach(c => add_block(c));
+                continue;
+            }
+            //no branch
+            let fn2 = function (c) {
+                let res = 0;
+                let dfslist = [];
+                let dfs = function (c) {
+                    if (c.isnull || c.qsub !== cqsub.green || dfslist.indexOf(c) !== -1) { return; }
+                    if (c === startcell || c === goalcell || c.ques === cques.cir || c.lcnt > 0) {
+                        res += c === startcell;
+                        res += c === goalcell;
+                        res += (c.ques === cques.cir && c.lcnt === 0);
+                        res += c.lcnt;
+                        res += (dfslist.filter(c => c.ques === cques.tri).length > 0 ? 2 : 0);
+                        return;
+                    }
+                    dfslist.push(c);
+                    fourside(dfs, c.adjacent);
+                    dfslist.pop();
+                }
+                dfs(c);
+                return Math.min(res, 2);
+            }
+            templist2 = templist.map(c => fn2(c));
+            if (templist2.reduce(function (a, b) { return a + b; }) > 2) {
+                cellList.forEach(c => add_block(c));
             }
         }
         for (let i = 0; i < board.cell.length; i++) {
@@ -740,15 +802,17 @@
                     templist.forEach(c => add_green(c));
                 }
             }
-            let templist = [offset(cell, 1, 0, 0), offset(cell, 1, 0, 1), offset(cell, 1, 0, 2), offset(cell, 1, 0, 3)];
-            if (templist.filter(c => c.isnull || c.qans === cqans.block).length === 4) {
-                add_block(cell);
+            //surrounded by block
+            {
+                let templist = [offset(cell, 1, 0, 0), offset(cell, 1, 0, 1), offset(cell, 1, 0, 2), offset(cell, 1, 0, 3)];
+                if (templist.filter(c => c.isnull || c.qans === cqans.block).length === 4) {
+                    add_block(cell);
+                }
             }
             //no 2*2
             {
                 let templist = [cell, offset(cell, 1, 0), offset(cell, 0, 1), offset(cell, 1, 1)];
-                if (templist.filter(c => c.isnull).length > 0) { continue; }
-                if (templist.filter(c => c.qsub === cqsub.green).length === 0) {
+                if (templist.filter(c => c.isnull).length == 0 && templist.filter(c => c.qsub === cqsub.green).length === 0) {
                     let templist2 = templist.filter(c => !c.qans);
                     if (templist2.length > 0 && templist2.filter(c => c.room !== templist2[0].room).length === 0) {
                         add_green(templist2[0]);
@@ -782,7 +846,7 @@
                     add_green(cell);
                 }
                 //no branch
-                if (linenum === 2) {
+                if (linenum === 2 || linenum === 1 && (cell === startcell || cell === goalcell)) {
                     fourside(add_cross, adjline);
                 }
                 //no deadend
@@ -800,7 +864,41 @@
                 }
                 //2 degree path
                 if (emptynum === 2 && cell !== startcell && cell !== goalcell && (linenum === 1 || cell.ques === cques.cir)) {
-                    fourside(add_line, adjline);
+                    let fn = function (c, b) {
+                        add_line(b);
+                        if (!b.isnull && b.line) {
+                            add_green(c);
+                        }
+                    };
+                    fourside2(fn, adjcell, adjline);
+                }
+                //extend line
+                emptynum = 0;
+                linenum = 0;
+                fourside2(fn, adjcell, adjline);
+                if (linenum === 1 && cell !== startcell && cell !== goalcell ||
+                    linenum === 0 && (cell === startcell || cell === goalcell || cell.ques == cques.cir)) {
+                    let fn = function (c, b, list) {
+                        if (c.isnull || c.qsub !== cqsub.green || list.indexOf(c) !== -1) { return; }
+                        if (b !== null && b.line) { return; }
+                        list.push(c);
+                        if (c.lcnt === 1 || c.ques === cques.cir || c === startcell || c === goalcell) {
+                            for (let j = 1; j < list.length; j++) {
+                                let cell1 = list[j - 1];
+                                let cell2 = list[j];
+                                let border = board.getb((cell1.bx + cell2.bx) / 2, (cell1.by + cell2.by) / 2);
+                                add_line(border);
+                                add_green(cell1);
+                                add_green(cell2);
+                            }
+                        }
+                        fn(c.adjacent.top, c.adjborder.top, list);
+                        fn(c.adjacent.bottom, c.adjborder.bottom, list);
+                        fn(c.adjacent.left, c.adjborder.left, list);
+                        fn(c.adjacent.right, c.adjborder.right, list);
+                        list.pop();
+                    }
+                    fn(cell, null, []);
                 }
             }
         }
