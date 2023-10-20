@@ -679,6 +679,30 @@
                 }
             }
         }
+        //outside
+        {
+            let firstcell = board.cell[0];
+            let cellList = [];
+            for (let j = 0; j < board.rows; j++) { cellList.push(offset(firstcell, 0, j)); }
+            for (let i = 1; i < board.cols - 1; i++) { cellList.push(offset(firstcell, i, board.rows - 1)); }
+            for (let j = board.rows - 1; j >= 0; j--) { cellList.push(offset(firstcell, board.cols - 1, j)); }
+            for (let i = board.cols - 2; i > 0; i--) { cellList.push(offset(firstcell, i, 0)); }
+            let len = cellList.length;
+            if (cellList.filter(c => c.anum === canum.bcir).length > 0 && cellList.filter(c => c.anum === canum.wcir).length > 0) {
+                for (let i = 0; i < len; i++) {
+                    if (cellList[i].anum === canum.none || cellList[(i + 1) % len].anum !== canum.none) { continue; }
+                    for (let j = (i + 1) % len; j != i; j = (j + 1) % len) {
+                        if (cellList[j].anum === canum.bcir + canum.wcir - cellList[i].anum) { break; }
+                        if (cellList[j].anum === canum.none) { continue; }
+                        if (cellList[j].anum === cellList[i].anum) {
+                            for (let k = i; k != j; k = (k + 1) % len) {
+                                add_color(cellList[k], cellList[i].anum);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     function NurimazeAssist() {
@@ -1078,7 +1102,7 @@
         };
         //check dot area if stick edge
         let isDotEdge = function (c) {
-            if (c.qsub !== cqsub.dot ) { return false; }
+            if (c.qsub !== cqsub.dot) { return false; }
             let temp = false;
             let dfslist = [c];
             let dfs = function (c, ndir) {
@@ -1146,7 +1170,7 @@
         let isntTriEx = function (c, ndir) { //0 = bl, 1 = br, 2 = tr, 3 = tl
             if (isntTri(c, ndir)) { return true; }
             let templist = [offset(c, -1, 0, ndir), offset(c, 0, 1, ndir), offset(c, -2, 0, ndir),
-                            offset(c, 0, 2, ndir), offset(c, -1, 1, ndir)];
+            offset(c, 0, 2, ndir), offset(c, -1, 1, ndir)];
             if (isEmpty(templist[0]) && isEmpty(templist[1]) && isEdgeEx(templist[2], ndir + 2) &&
                 isEdgeEx(templist[3], ndir + 3) && isEmpty(templist[4]) && isntTri(templist[4], ndir + 2)) {
                 return true;
@@ -1257,7 +1281,7 @@
                         turn1 = offset(turn1, 1, -1, ndir);
                         turn2 = offset(turn2, 1, -1, ndir);
                         while ((!turn1.isnull && turn1.qans === (ndir + 3) % 4 + 2) ||
-                               (!turn2.isnull && turn2.qans === (ndir + 1) % 4 + 2)) {
+                            (!turn2.isnull && turn2.qans === (ndir + 1) % 4 + 2)) {
                             add_triangle(turn1, ndir + 3);
                             add_triangle(turn2, ndir + 1);
                             turn1 = offset(turn1, 1, -1, ndir);
@@ -1270,14 +1294,14 @@
             if (isEmpty(cell)) {
                 for (let d = 0; d < 4; d++) {
                     let templist = [offset(cell, -1, 0, d), offset(cell, 0, -1, d), offset(cell, 0, 1, d),
-                                    offset(cell, -1, -1, d), offset(cell, 0, -2, d)];
+                    offset(cell, -1, -1, d), offset(cell, 0, -2, d)];
                     if (!templist[0].isnull && templist[0].qsub === cqsub.dot && isEmpty(templist[1]) &&
                         isEdge(templist[2], d + 3) && isEdge(templist[3], d + 1) && isEdgeEx(templist[4], d + 1)) {
                         add_triangle(cell, d);
                         break;
                     }
                     templist = [offset(cell, 0, 1, d), offset(cell, 1, 0, d), offset(cell, -1, 0, d),
-                                    offset(cell, 1, 1, d), offset(cell, 2, 0, d)];
+                    offset(cell, 1, 1, d), offset(cell, 2, 0, d)];
                     if (!templist[0].isnull && templist[0].qsub === cqsub.dot && isEmpty(templist[1]) &&
                         isEdge(templist[2], d + 2) && isEdge(templist[3], d) && isEdgeEx(templist[4], d)) {
                         add_triangle(cell, d);
