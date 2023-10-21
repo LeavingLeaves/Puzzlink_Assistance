@@ -15,6 +15,7 @@
     'use strict';
 
     const maxLoop = 30;
+    const maxDfsCellNum = 50;
     let flg = true;
     let step = false;
     let board;
@@ -242,20 +243,23 @@
             let templist = [offset(cell, -1, -1), offset(cell, -1, 0), offset(cell, -1, 1), offset(cell, 0, -1),
             offset(cell, 0, 1), offset(cell, 1, -1), offset(cell, 1, 0), offset(cell, 1, 1)];
             templist = templist.filter(c => !c.isnull && !isGreen(c));
-            if (templist.length === 0) {
+            if (templist.length <= 1 || templist.length >= 7) {
                 continue;
             }
-            if (templist.length >= 7) { continue; }
             let sparenum = 0;
             let fn = function (c) {
                 let dfslist = [];
                 let dfs = function (c) {
+                    if (dfslist.filter(c => !isBlock(c)).length > maxDfsCellNum) { return; }
                     if (c.isnull || isGreen(c) || dfslist.indexOf(c) !== -1) { return; }
                     dfslist.push(c);
                     if (c === cell) { return; }
                     fourside(dfs, c.adjacent);
                 };
                 dfs(c);
+                if (dfslist.filter(c => !isBlock(c)).length > maxDfsCellNum) {
+                    return templist.length;
+                }
                 if (dfslist.filter(c => isBlock(c)).length === 0 || dfslist.indexOf(cell) === -1) {
                     sparenum++;
                     return templist.length;
@@ -377,11 +381,13 @@
                     if (isGreen(ncell)) { continue; }
                     let cellList = [];
                     let dfs = function (c) {
+                        if (cellList.length > maxDfsCellNum) { return; }
                         if (c.isnull || isGreen(c) || c === cell || cellList.indexOf(c) !== -1) { return; }
                         cellList.push(c);
                         fourside(dfs, c.adjacent);
                     }
                     dfs(ncell);
+                    if (cellList.length > maxDfsCellNum) { continue; }
                     let templist = cellList.filter(c => c.qnum !== cqnum.none);
                     if (templist.length === 0 && cellList.filter(c => isBlock(c)).length > 0) {
                         setBlock(cell);
@@ -538,12 +544,13 @@
     }
 
     function NurikabeAssist() {
-        //add dot on num
         for (let i = 0; i < board.cell.length; i++) {
+            //add dot on num
             let cell = board.cell[i];
             if (cell.qnum !== cqnum.none) {
                 add_green(cell);
             }
+            //surrounded white cell
             let templist = [offset(cell, 1, 0, 0), offset(cell, 1, 0, 1), offset(cell, 1, 0, 2), offset(cell, 1, 0, 3)];
             if (cell.qnum === cqnum.none && templist.filter(c => c.isnull || c.qans === cqans.block).length === 4) {
                 add_block(cell);
