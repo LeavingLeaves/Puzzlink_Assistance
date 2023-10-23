@@ -10,6 +10,7 @@ https://greasyfork.org/en/scripts/477117-puzz-link-assistance
 Currently support:
 * Akari
 * Aquapelago
+* Choco Banana
 * Ekawayeh
 * Guide Arrow
 * Heyawake
