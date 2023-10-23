@@ -97,7 +97,8 @@
         [/yinyang/, YinyangAssist],
         [/guidearrow/, GuideArrowAssist],
         [/nurikabe/, NurikabeAssist],
-        [/gokigen/, SlantAssist]
+        [/gokigen/, SlantAssist],
+        [/cbanana/, ChocoBananaAssist]
     ];
 
     if (genrelist.filter(g => g[0].test(document.URL)).length === 1) {
@@ -368,7 +369,7 @@
         }
     }
 
-    function NumberRegion(isBlock, isGreen, setBlock, setGreen, OneNumPerRegion = true) {
+    function NumberRegion(isBlock, isGreen, setBlock, setGreen, OneNumPerRegion = true, NoGreenNum = true) {
         for (let i = 0; i < board.cell.length; i++) {
             let cell = board.cell[i];
             //don't block region exit
@@ -388,11 +389,13 @@
                     }
                     dfs(ncell);
                     if (cellList.length > maxDfsCellNum) { continue; }
-                    let templist = cellList.filter(c => c.qnum !== cqnum.none);
-                    if (templist.length === 0 && cellList.filter(c => isBlock(c)).length > 0) {
+                    let templist = cellList.filter(c => c.qnum !== cqnum.none && (NoGreenNum || isBlock(c)));
+                    //extend region without num
+                    if (templist.length === 0 && cellList.filter(c => isBlock(c)).length > 0 && OneNumPerRegion) {
                         setBlock(cell);
                     }
-                    if (templist.length === 1 && templist[0].qnum !== cqnum.quesmark && templist[0].qnum > cellList.length) {
+                    //extend region with less cells
+                    if (templist.length >= 1 && templist[0].qnum !== cqnum.quesmark && templist[0].qnum > cellList.length) {
                         setBlock(cell);
                     }
                 }
@@ -421,8 +424,7 @@
                     fourside(dfs, c.adjacent);
                 }
                 dfs(cell);
-                let templist = cellList.filter(c => c.qnum !== cqnum.none);
-                if (templist.length === 1 && cell.qnum !== cqnum.quesmark && cell.qnum === cellList.length) {
+                if (cell.qnum !== cqnum.quesmark && cell.qnum === cellList.length) {
                     cellList.forEach(c => setBlock(c));
                 }
             }
@@ -448,23 +450,103 @@
                     if (cellList1.indexOf(cell2) !== -1) { continue; }
                     let templist1 = cellList1.filter(c => c.qnum !== cqnum.none);
                     let templist2 = cellList2.filter(c => c.qnum !== cqnum.none);
-                    if (templist1.length === 1 && templist2.length === 1) {
+                    if (templist1.length >= 1 && templist2.length >= 1) {
                         if (templist1[0].qnum !== cqnum.quesmark && templist2[0].qnum !== cqnum.quesmark && templist1[0].qnum !== templist2[0].qnum || OneNumPerRegion) {
                             setGreen(cell);
                         }
                     }
-                    if (templist1.length + templist2.length === 1) {
-                        let qnum = (templist1.length === 1 ? templist1[0] : templist2[0]).qnum;
+                    if (templist1.length + templist2.length >= 1) {
+                        let qnum = (templist1.length >= 1 ? templist1[0] : templist2[0]).qnum;
                         if (qnum !== cqnum.quesmark && cellList1.length + cellList2.length + 1 > qnum) {
                             setGreen(cell);
                         }
                     }
+                    if (cell.qnum >= 0 && cellList1.length + cellList2.length + 1 > cell.qnum) {
+                        setGreen(cell);
+                    }
+                }
+            }
+            //cell and region
+            for (let d = 0; d < 4; d++) {
+                if (isBlock(cell) || isGreen(cell) || cell.qnum === cqnum.none) { continue; }
+                let ncell = dir(cell.adjacent, d);
+                if (ncell.isnull || !isBlock(ncell)) { continue; }
+                let cellList = [];
+                let dfs = function (c) {
+                    if (c.isnull || !isBlock(c) || cellList.indexOf(c) !== -1) { return; }
+                    cellList.push(c);
+                    fourside(dfs, c.adjacent);
+                }
+                dfs(ncell, cellList);
+                let templist = cellList.filter(c => c.qnum !== cqnum.none);
+                if (templist.length >= 1 && (templist[0].qnum !== cqnum.quesmark && cell.qnum !== cqnum.quesmark && templist[0].qnum !== cell.qnum || OneNumPerRegion)) {
+                    setGreen(cell);
+                }
+                if (cell.qnum !== cqnum.quesmark && cellList.length + 1 > cell.qnum) {
+                    setGreen(cell);
                 }
             }
         }
     }
 
     //assist for certain genre
+    function ChocoBananaAssist() {
+        NumberRegion(
+            function (c) { return c.qans === cqans.block; },
+            function (c) { return c.qsub === cqsub.green; },
+            add_block,
+            add_green,
+            false,
+            false
+        );
+        NumberRegion(
+            function (c) { return c.qsub === cqsub.green; },
+            function (c) { return c.qans === cqans.block; },
+            add_green,
+            add_block,
+            false,
+            false
+        );
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (cell.qnum === 1 || cell.qnum === 2) {
+                add_block(cell);
+            }
+            let templist = [cell, offset(cell, 0, 1), offset(cell, 1, 0), offset(cell, 1, 1)];
+            if (templist.filter(c => c.qans === cqans.block).length === 3) {
+                templist.forEach(c => add_block(c));
+            }
+            let fn = function (c, c1, c2, c12) {
+                if (c1.isnull || c2.isnull || c12.isnull) { return; }
+                if (c1.qans === cqans.block && c2.qans === cqans.block && c12.qsub === cqsub.green) {
+                    add_green(c);
+                }
+                if (c1.qans === cqans.block && c2.qsub === cqsub.green && c12.qans === cqans.block) {
+                    add_green(c);
+                }
+                if (c1.qsub === cqsub.green && c2.qans === cqans.block && c12.qans === cqans.block) {
+                    add_green(c);
+                }
+            };
+            for (let d = 0; d < 4; d++) {
+                fn(cell, offset(cell, 1, 0, d), offset(cell, 0, 1, d), offset(cell, 1, 1, d));
+            }
+            if (cell.qsub === cqsub.green) {
+                let templist = [offset(cell, 1, 0), offset(cell, 0, 1), offset(cell, -1, 0), offset(cell, 0, -1)];
+                templist = templist.filter(c => !c.isnull && c.qans !== cqans.block);
+                if (templist.length === 1) {
+                    let ncell = templist[0];
+                    add_green(ncell);
+                    let templist2 = [offset(ncell, 1, 0), offset(ncell, 0, 1), offset(ncell, -1, 0), offset(ncell, 0, -1)];
+                    templist2 = templist2.filter(c => !c.isnull && c.qans !== cqans.block && c !== cell);
+                    if (templist2.length === 1) {
+                        add_green(templist2[0]);
+                    }
+                }
+            }
+        }
+    }
+
     function SlantAssist() {
         let add_slash = function (c, qans) {
             if (c === undefined || c.isnull || c.qans !== cqans.none) { return; }
