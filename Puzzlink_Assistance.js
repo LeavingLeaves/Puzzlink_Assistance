@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.10.20.2
+// @version      23.10.25.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -15,7 +15,7 @@
     'use strict';
 
     const maxLoop = 30;
-    const maxDfsCellNum = 50;
+    const maxDfsCellNum = 200;
     let flg = true;
     let step = false;
     let board;
@@ -23,6 +23,7 @@
     //const list
     const cqnum = {
         quesmark: -2,
+        circle: -2, //no number
         block: -2,
         none: -1,
         wcir: 1,
@@ -98,7 +99,8 @@
         [/guidearrow/, GuideArrowAssist],
         [/nurikabe/, NurikabeAssist],
         [/gokigen/, SlantAssist],
-        [/cbanana/, ChocoBananaAssist]
+        [/cbanana/, ChocoBananaAssist],
+        [/nurimisaki/, NurimisakiAssist],
     ];
 
     if (genrelist.filter(g => g[0].test(document.URL)).length === 1) {
@@ -251,14 +253,14 @@
             let fn = function (c) {
                 let dfslist = [];
                 let dfs = function (c) {
-                    if (dfslist.filter(c => !isBlock(c)).length > maxDfsCellNum) { return; }
                     if (c.isnull || isGreen(c) || dfslist.indexOf(c) !== -1) { return; }
+                    if (dfslist.length > maxDfsCellNum) { return; }
                     dfslist.push(c);
                     if (c === cell) { return; }
                     fourside(dfs, c.adjacent);
                 };
                 dfs(c);
-                if (dfslist.filter(c => !isBlock(c)).length > maxDfsCellNum) {
+                if (dfslist.length > maxDfsCellNum) {
                     return templist.length;
                 }
                 if (dfslist.filter(c => isBlock(c)).length === 0 || dfslist.indexOf(cell) === -1) {
@@ -490,6 +492,309 @@
     }
 
     //assist for certain genre
+    function NurimisakiAssist() {
+        let isEmpty = function (c) { return !c.isnull && c.qnum === cqnum.none && c.qsub === cqsub.none && c.qans === cqans.none; }
+        let isDot = function (c) { return !c.isnull && c.qsub === cqsub.dot; }
+        let isDotEmpty = function (c) { return isEmpty(c) || isDot(c); }
+        let isBlock = function (c) { return !c.isnull && c.qans === cqans.block; }
+        let isBlockEmpty = function (c) { return isEmpty(c) || isBlock(c); }
+        let isBorderBlock = function (c) { return c.isnull || c.qans === cqans.block; }
+        let isConnectBlock = function (c) { return isBorderBlock(c) || c.qnum !== cqnum.none; }
+        let isCircle = function (c) { return !c.isnull && c.qnum !== cqnum.none; }
+        let isDotCircle = function (c) { return isDot(c) || isCircle(c); }
+
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            let blocknum = 0;
+            let dotnum = 0;
+            let fn = function (c) {
+                if (isBorderBlock(c)) { blocknum++; }
+                if (isDot(c)) { dotnum++; }
+            };
+            fourside(fn, cell.adjacent);
+
+            //no clue pattern
+
+            //add dot
+            if (isEmpty(cell)) {
+                for (let d = 0; d < 4; d++) {
+                    //cannot place block with 2x2 block rule
+                    if (isEmpty(offset(cell, 0, -1, d)) && isBlock(offset(cell, 1, 0, d)) && isBlock(offset(cell, 1, -1, d)) &&
+                        (isBorderBlock(offset(cell, 0, -2, d)) || isBorderBlock(offset(cell, -1, -1, d)))) {
+                        add_dot(cell);
+                    }
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isBlock(offset(cell, -1, 0, d)) && isBlock(offset(cell, -1, -1, d)) &&
+                        (isBorderBlock(offset(cell, 0, -2, d)) || isBorderBlock(offset(cell, 1, -1, d)))) {
+                        add_dot(cell);
+                    }
+                    else if (isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 0, -1, d)) && isBlock(offset(cell, 1, -1, d)) &&
+                        (isBorderBlock(offset(cell, 2, 0, d)) || isBorderBlock(offset(cell, 1, 1, d))) &&
+                        (isBorderBlock(offset(cell, 0, -2, d)) || isBorderBlock(offset(cell, -1, -1, d)))) {
+                        add_dot(cell);
+                    }
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, -1, d)) && isBlock(offset(cell, 1, 0, d)) &&
+                        isBorderBlock(offset(cell, -1, -1, d)) && isBorderBlock(offset(cell, 0, -2, d)) && offset(cell, 1, -2, d).isnull) {
+                        add_dot(cell);
+                    }
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, -1, -1, d)) && isBlock(offset(cell, -1, 0, d)) &&
+                        isBorderBlock(offset(cell, 1, -1, d)) && isBorderBlock(offset(cell, 0, -2, d)) && offset(cell, -1, -2, d).isnull) {
+                        add_dot(cell);
+                    }
+                    //cannot place block with 2x2 dot rule
+                    else if (isBlock(offset(cell, 1, 0, d)) && isBlock(offset(cell, 1, 1, d)) && isDot(offset(cell, -1, 2, d)) &&
+                        isEmpty(offset(cell, 0, 1, d)) && isDotEmpty(offset(cell, -1, 1, d)) && isDotEmpty(offset(cell, 0, 2, d))) {
+                        add_dot(cell);
+                    }
+                    else if (isBlock(offset(cell, -1, 0, d)) && isBlock(offset(cell, -1, 1, d)) && isDot(offset(cell, 1, 2, d)) &&
+                        isEmpty(offset(cell, 0, 1, d)) && isDotEmpty(offset(cell, 1, 1, d)) && isDotEmpty(offset(cell, 0, 2, d))) {
+                        add_dot(cell);
+                    }
+                    //cannot place block with 2x2 block rule and 2x2 dot rule
+                    else if (isDotEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 0, -2, d)) &&
+                        isBlock(offset(cell, 1, -1, d)) && isBlock(offset(cell, 1, -2, d)) && isBorderBlock(offset(cell, 0, -3, d))) {
+                        add_dot(cell);
+                    }
+                    else if (isDotEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 0, -2, d)) &&
+                        isBlock(offset(cell, -1, -1, d)) && isBlock(offset(cell, -1, -2, d)) && isBorderBlock(offset(cell, 0, -3, d))) {
+                        add_dot(cell);
+                    }
+                    else if (isDotEmpty(offset(cell, -1, 0, d)) && isEmpty(offset(cell, -1, -1, d)) &&
+                        isBlock(offset(cell, 0, -1, d)) && isBorderBlock(offset(cell, -1, 1, d)) && isBorderBlock(offset(cell, -1, -2, d))) {
+                        add_dot(cell);
+                    }
+                    else if (isDotEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
+                        isBlock(offset(cell, 0, -1, d)) && isBorderBlock(offset(cell, 1, 1, d)) && isBorderBlock(offset(cell, 1, -2, d))) {
+                        add_dot(cell);
+                    }
+                    //cannot place block with 2x3 border pattern
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, -1, d)) && isEmpty(offset(cell, 2, -1, d)) &&
+                        isBorderBlock(offset(cell, -1, -1, d)) && isBorderBlock(offset(cell, 3, -1, d)) &&
+                        isBorderBlock(offset(cell, 3, 0, d)) && offset(cell, 0, -2, d).isnull) {
+                        add_dot(cell);
+                    }
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, -1, -1, d)) && isEmpty(offset(cell, -2, -1, d)) &&
+                        isBorderBlock(offset(cell, 1, -1, d)) && isBorderBlock(offset(cell, -3, -1, d)) &&
+                        isBorderBlock(offset(cell, -3, 0, d)) && offset(cell, 0, -2, d).isnull) {
+                        add_dot(cell);
+                    }
+                }
+            }
+            if (cell.qsub === cqsub.dot) {
+                //dot cannot be deadend
+                if (blocknum === 2) {
+                    fourside(add_dot, cell.adjacent);
+                }
+                for (let d = 0; d < 4; d++) {
+                    //avoid 2x2 dot
+                    if (isBorderBlock(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 0, 1, d)) &&
+                        isEmpty(offset(cell, -1, 0, d)) && isDot(offset(cell, 1, 1, d))) {
+                        add_dot(offset(cell, -1, 0, d));
+                    }
+                    else if (isBorderBlock(offset(cell, 0, -1, d)) && isEmpty(offset(cell, -1, 0, d)) && isEmpty(offset(cell, 0, 1, d)) &&
+                        isEmpty(offset(cell, 1, 0, d)) && isDot(offset(cell, -1, 1, d))) {
+                        add_dot(offset(cell, 1, 0, d));
+                    }
+                    //dot cannot be deadend with 2x2 dot rule
+                    else if (isBorderBlock(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isBorderBlock(offset(cell, 2, 0, d)) &&
+                        isBorderBlock(offset(cell, 1, -1, d)) && isEmpty(offset(cell, -1, 0, d))) {
+                        add_dot(offset(cell, -1, 0, d));
+                    }
+                    else if (isBorderBlock(offset(cell, 0, -1, d)) && isEmpty(offset(cell, -1, 0, d)) && isBorderBlock(offset(cell, -2, 0, d)) &&
+                        isBorderBlock(offset(cell, -1, -1, d)) && isEmpty(offset(cell, 1, 0, d))) {
+                        add_dot(offset(cell, 1, 0, d));
+                    }
+                }
+            }
+
+            //add block
+            if (isEmpty(cell)) {
+                //block deadend
+                if (blocknum >= 3) {
+                    add_block(cell);
+                }
+                for (let d = 0; d < 4; d++) {
+                    //cannot dot with 2x2 dot rule
+                    if (isBorderBlock(offset(cell, -1, 0, d)) && isBorderBlock(offset(cell, 2, 0, d)) && isEmpty(offset(cell, 1, 0, d)) &&
+                        offset(cell, 0, -1, d).isnull && offset(cell, 1, -1, d).isnull) {
+                        add_block(cell);
+                    }
+                    else if (isBorderBlock(offset(cell, 1, 0, d)) && isBorderBlock(offset(cell, 0, -1, d)) && isDot(offset(cell, -1, 1, d)) &&
+                        isDotEmpty(offset(cell, -1, 0, d)) && isDotEmpty(offset(cell, 0, 1, d))) {
+                        add_block(cell);
+                    }
+                }
+            }
+
+            //clue pattern
+
+            //any circle clue
+            if (cell.qnum !== cqnum.none) {
+                //clue deadend check
+                if (blocknum === 3) {
+                    fourside(add_dot, cell.adjacent);
+                }
+                else if (dotnum === 1) {
+                    fourside(add_block, cell.adjacent);
+                }
+                for (let d = 0; d < 4; d++) {
+                    //avoid 2x2 block pattern
+                    if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
+                        isBlock(offset(cell, 0, -2, d)) && isBlock(offset(cell, 1, -2, d))) {
+                        add_block(offset(cell, 0, 1, d));
+                        add_block(offset(cell, -1, 0, d));
+                    }
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
+                        isBlock(offset(cell, 2, 0, d)) && isBlock(offset(cell, 2, -1, d))) {
+                        add_block(offset(cell, 0, 1, d));
+                        add_block(offset(cell, -1, 0, d));
+                    }
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
+                        isEmpty(offset(cell, 0, -2, d)) && isBlock(offset(cell, 1, -2, d)) &&
+                        (isBorderBlock(offset(cell, 0, -3, d)) || isBorderBlock(offset(cell, -1, -2, d)))) {
+                        add_block(offset(cell, 0, 1, d));
+                        add_block(offset(cell, -1, 0, d));
+                    }
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
+                        isEmpty(offset(cell, 2, 0, d)) && isBlock(offset(cell, 2, -1, d)) &&
+                        (isBorderBlock(offset(cell, 3, 0, d)) || isBorderBlock(offset(cell, 2, 1, d)))) {
+                        add_block(offset(cell, 0, 1, d));
+                        add_block(offset(cell, -1, 0, d));
+                    }
+                    //avoid 2x2 block and 2x2 dot apttern
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isDotEmpty(offset(cell, 1, -1, d)) &&
+                        isEmpty(offset(cell, 1, -2, d)) && isBlock(offset(cell, 0, -2, d)) && isBorderBlock(offset(cell, 1, -3, d))) {
+                        add_block(offset(cell, 0, 1, d));
+                        add_block(offset(cell, -1, 0, d));
+                    }
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isDotEmpty(offset(cell, 1, -1, d)) &&
+                        isEmpty(offset(cell, 2, -1, d)) && isBlock(offset(cell, 2, 0, d)) && isBorderBlock(offset(cell, 3, -1, d))) {
+                        add_block(offset(cell, 0, 1, d));
+                        add_block(offset(cell, -1, 0, d));
+                    }
+                    //avoid border 2x2 block
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
+                        isDotEmpty(offset(cell, 2, 0, d)) && isEmpty(offset(cell, 2, -1, d)) && isBorderBlock(offset(cell, 3, 0, d)) &&
+                        isBorderBlock(offset(cell, 3, -1, d)) && offset(cell, 0, -2, d).isnull) {
+                        add_block(offset(cell, 0, 1, d));
+                        add_block(offset(cell, -1, 0, d));
+                    }
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
+                        isDotEmpty(offset(cell, 0, -2, d)) && isEmpty(offset(cell, 1, -2, d)) && isBorderBlock(offset(cell, 0, -3, d)) &&
+                        isBorderBlock(offset(cell, 1, -3, d)) && offset(cell, 2, 0, d).isnull) {
+                        add_block(offset(cell, 0, 1, d));
+                        add_block(offset(cell, -1, 0, d));
+                    }
+                    //avoid border 2x3 pattern
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
+                        isDotEmpty(offset(cell, 2, 0, d)) && isDotEmpty(offset(cell, 2, -1, d)) && isDotEmpty(offset(cell, 3, 0, d)) &&
+                        isEmpty(offset(cell, 3, -1, d)) && isBorderBlock(offset(cell, 4, 0, d)) &&
+                        isBorderBlock(offset(cell, 4, -1, d)) && offset(cell, 0, -2, d).isnull) {
+                        add_block(offset(cell, 0, 1, d));
+                        add_block(offset(cell, -1, 0, d));
+                    }
+                    else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
+                        isDotEmpty(offset(cell, 0, -2, d)) && isDotEmpty(offset(cell, 1, -2, d)) && isDotEmpty(offset(cell, 0, -3, d)) &&
+                        isEmpty(offset(cell, 1, -3, d)) && isBorderBlock(offset(cell, 0, -4, d)) &&
+                        isBorderBlock(offset(cell, 1, -4, d)) && offset(cell, 2, 0, d).isnull) {
+                        add_block(offset(cell, 0, 1, d));
+                        add_block(offset(cell, -1, 0, d));
+                    }
+                }
+            }
+            if (isEmpty(cell)) {
+                for (let d = 0; d < 4; d++) {
+                    //cannot place block with 2x2 white
+                    if (isBlock(offset(cell, 1, 0, d)) && isBlock(offset(cell, 1, 1, d)) && isCircle(offset(cell, -1, 2, d)) &&
+                        isEmpty(offset(cell, 0, 1, d)) && isEmpty(offset(cell, -1, 1, d)) && isEmpty(offset(cell, 0, 2, d))) {
+                        add_dot(cell);
+                    }
+                    else if (isBlock(offset(cell, -1, 0, d)) && isBlock(offset(cell, -1, 1, d)) && isCircle(offset(cell, 1, 2, d)) &&
+                        isEmpty(offset(cell, 0, 1, d)) && isEmpty(offset(cell, 1, 1, d)) && isEmpty(offset(cell, 0, 2, d))) {
+                        add_dot(cell);
+                    }
+                    //cannot place dot with 2x2 white
+                    else if (isBorderBlock(offset(cell, 1, 0, d)) && isBorderBlock(offset(cell, 0, -1, d)) && isCircle(offset(cell, -1, 1, d)) &&
+                        isEmpty(offset(cell, -1, 0, d)) && isEmpty(offset(cell, 0, 1, d))) {
+                        add_block(cell);
+                    }
+                }
+            }
+            if (cell.qsub === cqsub.dot) {
+                for (let d = 0; d < 4; d++) {
+                    //avoid 2x2 white
+                    if (isBorderBlock(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 0, 1, d)) &&
+                        isDotEmpty(offset(cell, -1, 0, d)) && isCircle(offset(cell, 1, 1, d))) {
+                        add_dot(offset(cell, -1, 0, d));
+                        add_block(offset(cell, 2, 1, d));
+                        add_block(offset(cell, 1, 2, d));
+                    }
+                    else if (isBorderBlock(offset(cell, 0, -1, d)) && isEmpty(offset(cell, -1, 0, d)) && isEmpty(offset(cell, 0, 1, d)) &&
+                        isDotEmpty(offset(cell, 1, 0, d)) && isCircle(offset(cell, -1, 1, d))) {
+                        add_dot(offset(cell, 1, 0, d));
+                        add_block(offset(cell, -2, 1, d));
+                        add_block(offset(cell, -1, 2, d));
+                    }
+                }
+            }
+
+            //circle clue with number
+            if (cell.qnum >= 2) {
+                for (let d = 0; d < 4; d++) {
+                    if (isEmpty(offset(cell, 0, -1, d))) {
+                        //avoid eyesight too long
+                        if (isDotCircle(offset(cell, 0, -cell.qnum, d))) {
+                            add_block(offset(cell, 0, -1, d));
+                        }
+                        //situation for clue at the end
+                        else if (isCircle(offset(cell, 0, -cell.qnum + 1, d)) &&
+                            offset(cell, 0, -cell.qnum + 1, d).qnum !== cqnum.circle && offset(cell, 0, -cell.qnum + 1, d).qnum !== cell.qnum) {
+                            add_block(offset(cell, 0, -1, d));
+                        }
+                    }
+                    if (isEmpty(offset(cell, 0, -1, d))) {
+                        for (let j = 2; j < cell.qnum; j++) {
+                            //eyesight not enough long
+                            if (j !== cell.qnum - 1 && isConnectBlock(offset(cell, 0, -j, d))) {
+                                add_block(offset(cell, 0, -1, d));
+                                break;
+                            }
+                            if (isBorderBlock(offset(cell, 0, -j, d))) {
+                                add_block(offset(cell, 0, -1, d));
+                                break;
+                            }
+                            //avoid 2x2 dot
+                            if (isDot(offset(cell, 1, -j + 1, d)) && isDot(offset(cell, 1, -j, d))) {
+                                add_block(offset(cell, 0, -1, d));
+                                break;
+                            }
+                            if (isDot(offset(cell, -1, -j + 1, d)) && isDot(offset(cell, -1, -j, d))) {
+                                add_block(offset(cell, 0, -1, d));
+                                break;
+                            }
+                        }
+                    }
+                    //extend eyesight
+                    if (isDot(offset(cell, 0, -1, d))) {
+                        for (let j = 2; j < cell.qnum; j++) {
+                            add_dot(offset(cell, 0, -j, d));
+                        }
+                        add_block(offset(cell, 0, -cell.qnum, d));
+                    }
+                }
+            }
+        }
+        //2x2 rules
+        No2x2Cell(
+            function (c) { return c.qans === cqans.block; },
+            add_dot
+        );
+        No2x2Cell(
+            function (c) { return c.qsub === cqsub.dot; },
+            add_block
+        );
+        CellConnected(isDot, isConnectBlock, add_dot);
+    }
+
     function ChocoBananaAssist() {
         NumberRegion(
             function (c) { return c.qans === cqans.block; },
@@ -638,6 +943,7 @@
                 add_block(cell);
             }
         }
+        flg = 0;
         BlockConnectedInCell();
         No2x2Block();
         NumberRegion(
@@ -646,6 +952,32 @@
             add_green,
             add_block
         );
+        //unreachable cell
+        {
+            let list = [];
+            for (let i = 0; i < board.cell.length; i++) {
+                let cell = board.cell[i];
+                if (cell.qnum !== cqnum.none) {
+                    list.push(cell);
+                    if (cell.qnum === cqnum.quesmark) { continue; }
+                    for (let dx = -cell.qnum + 1; dx <= cell.qnum - 1; dx++) {
+                        for (let dy = -cell.qnum + Math.abs(dx) + 1; dy <= cell.qnum - Math.abs(dx) - 1; dy++) {
+                            let c = offset(cell, dx, dy);
+                            if (c.isnull || list.indexOf(c) === -1) { continue; }
+                            list.push(c);
+                        }
+                    }
+                }
+            }
+            if (list.filter(c => c.qnum === cqnum.quesmark).length === 0) {
+                for (let i = 0; i < board.cell.length; i++) {
+                    let cell = board.cell[i];
+                    if (list.indexOf(cell) === -1) {
+                        add_block(cell);
+                    }
+                }
+            }
+        }
         //remove the dot on num because it looks weird
         if (!step) {
             for (let i = 0; i < board.cell.length; i++) {

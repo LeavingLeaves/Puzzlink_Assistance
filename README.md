@@ -20,6 +20,7 @@ Currently support:
 * No Three
 * Nurikabe
 * Nuri-Maze
+* Nurimisaki
 * Shakashaka
 * Simple Loop
 * Slant
