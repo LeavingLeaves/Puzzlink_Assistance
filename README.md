@@ -22,6 +22,7 @@ Currently support:
 * Nurikabe
 * Nuri-Maze
 * Nurimisaki
+* Starbattle
 * Shakashaka
 * Simple Loop
 * Slant
