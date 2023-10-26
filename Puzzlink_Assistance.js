@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.10.25.2
+// @version      23.10.26.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -40,6 +40,8 @@
     const CQANS = {
         none: 0,
         block: 1,
+        //starbattle
+        star: 1,
         //Akari
         light: 1,
         //Shakashaka triangle
@@ -115,6 +117,7 @@
         [/cbanana/, ChocoBananaAssist],
         [/nurimisaki/, NurimisakiAssist],
         [/castle/, CastleWallAssist],
+        [/starbattle/, StarbattleAssist]
     ];
 
     if (genrelist.filter(g => g[0].test(document.URL)).length === 1) {
@@ -183,7 +186,7 @@
         if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none) { return; }
         if (step && flg) { return; }
         b.setQsub(BQSUB.cross);
-        b.draw(); 3
+        b.draw();
         flg |= b.qsub === BQSUB.cross;
     };
     let add_line = function (b) {
@@ -506,6 +509,94 @@
     }
 
     //assist for certain genre
+    function StarbattleAssist() {
+        let add_cir = function (b) {
+            if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none) { return; }
+            if (step && flg) { return; }
+            b.setQsub(1);
+            b.draw();
+            flg |= b.qsub === BQSUB.cross;
+        };
+        let starcount = board.starCount.count;
+        let add_star = add_block;
+        for (let i = 0; i < board.roommgr.components.length; i++) {
+            let room = board.roommgr.components[i];
+            let cellList = [];
+            for (let j = 0; j < room.clist.length; j++) {
+                cellList.push(room.clist[j]);
+            }
+            //finish room
+            if (cellList.filter(c => c.qans === CQANS.star).length === starcount) {
+                cellList.forEach(c => add_dot(c));
+            }
+            if (cellList.filter(c => c.qsub !== CQSUB.dot).length === starcount) {
+                cellList.forEach(c => add_star(c));
+            }
+        }
+        for (let i = 0; i < board.rows; i++) {
+            let hcellList = [];
+            let vcellList = [];
+            for (let j = 0; j < board.cols; j++) {
+                hcellList.push(board.getc(2 * i + 1, 2 * j + 1));
+                vcellList.push(board.getc(2 * j + 1, 2 * i + 1));
+            }
+            //finish row/col
+            if (hcellList.filter(c => c.qans === CQANS.star).length === starcount) {
+                hcellList.forEach(c => add_dot(c));
+            }
+            if (hcellList.filter(c => c.qsub !== CQSUB.dot).length === starcount) {
+                hcellList.forEach(c => add_star(c));
+            }
+            if (vcellList.filter(c => c.qans === CQANS.star).length === starcount) {
+                vcellList.forEach(c => add_dot(c));
+            }
+            if (vcellList.filter(c => c.qsub !== CQSUB.dot).length === starcount) {
+                vcellList.forEach(c => add_star(c));
+            }
+        }
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (cell.qans === CQANS.star) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        add_dot(offset(cell, dx, dy));
+                    }
+                }
+            }
+        }
+        for (let i = 0; i < board.cross.length; i++) {
+            let cross = board.cross[i];
+            if (cross.qsub !== 1) { continue; }
+            for (let d = 0; d < 4; d++) {
+                if (offset(cross, .5, .5, d).qsub === CQSUB.dot && offset(cross, -.5, .5, d).qsub === CQSUB.dot) {
+                    add_cir(offset(cross, 0, -.5, d));
+                    cross.setQsub(0);
+                    cross.draw();
+                }
+            }
+        }
+        for (let i = 0; i < board.border.length; i++) {
+            let border = board.border[i];
+            if (border.qsub !== 1) { continue; }
+            if (border.isvert) {
+                add_dot(offset(border, -.5, -1));
+                add_dot(offset(border, +.5, -1));
+                add_dot(offset(border, -.5, +1));
+                add_dot(offset(border, +.5, +1));
+            } else {
+                add_dot(offset(border, -1, -.5));
+                add_dot(offset(border, -1, +.5));
+                add_dot(offset(border, +1, -.5));
+                add_dot(offset(border, +1, +.5));
+            }
+            for (let j = 0; j <= 1; j++) {
+                if (border.sidecell[j].qsub === CQSUB.dot) {
+                    add_star(border.sidecell[1 - j]);
+                }
+            }
+        }
+    }
+
     function CastleWallAssist() {
         SingleLoopInCell(
             function (c) { return c.qnum === CQNUM.none; },
@@ -1075,7 +1166,7 @@
                     for (let dx = -cell.qnum + 1; dx <= cell.qnum - 1; dx++) {
                         for (let dy = -cell.qnum + Math.abs(dx) + 1; dy <= cell.qnum - Math.abs(dx) - 1; dy++) {
                             let c = offset(cell, dx, dy);
-                            if (c.isnull || list.indexOf(c) === -1) { continue; }
+                            if (c.isnull || list.indexOf(c) !== -1) { continue; }
                             list.push(c);
                         }
                     }
@@ -1653,7 +1744,7 @@
                 //O...O...O
                 fn([cell, offset(cell, 4, 0, d), offset(cell, 8, 0, d)]);
                 //OXXXXOX?XXO
-                for (let l = 5; l * 2 < Math.min(board.cols, board.rows); l++) {
+                for (let l = 5; l * 2 < Math.max(board.cols, board.rows); l++) {
                     let templist1 = [cell, offset(cell, l, 0, d), offset(cell, 2 * l, 0, d)];
                     if (templist1.filter(c => c.isnull).length > 0) { continue; }
                     templist1 = templist1.filter(c => c.qans !== CQANS.block);
@@ -2330,7 +2421,6 @@
     }
 
     function SlitherlinkAssist() {
-        ui.toolarea.outlineshaded();
         let add_bg_color = function (c, color) {
             if (c === undefined || c.isnull || c.qsub !== CQSUB.none || c.qsub === color) { return; }
             if (step && flg) { return; }
@@ -2346,7 +2436,7 @@
         }
         CellConnected(
             function (c) { return c.qsub === CQSUB.green; },
-            function (c) { return c.qsub === CQSUB.yellow; },
+            function (c) { return c.qsub === CQSUB.yellow || c.qnum === 3; },
             add_bg_inner_color
         );
         let twonum = 0;
@@ -2633,6 +2723,7 @@
                 }
             }
         }
+        ui.toolarea.outlineshaded();
     }
 
 })();
