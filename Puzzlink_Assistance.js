@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.10.26.1
+// @version      23.10.27.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -256,63 +256,82 @@
         );
     }
 
-    function CellConnected(isBlock, isGreen, setBlock) {
-        for (let i = 0; i < board.cell.length; i++) {
-            let cell = board.cell[i];
-            if (isBlock(cell) || isGreen(cell)) { continue; }
-            let templist = [offset(cell, -1, -1), offset(cell, -1, 0), offset(cell, -1, 1), offset(cell, 0, -1),
-            offset(cell, 0, 1), offset(cell, 1, -1), offset(cell, 1, 0), offset(cell, 1, 1)];
-            templist = templist.filter(c => !c.isnull && !isGreen(c));
-            if (templist.length <= 1 || templist.length >= 7) {
-                continue;
-            }
-            let sparenum = 0;
-            let fn = function (c) {
-                let dfslist = [];
-                let dfs = function (c) {
-                    if (c.isnull || isGreen(c) || dfslist.indexOf(c) !== -1) { return; }
-                    if (dfslist.length > MAXDFSCELLNUM) { return; }
-                    dfslist.push(c);
-                    if (c === cell) { return; }
-                    fourside(dfs, c.adjacent);
-                };
-                dfs(c);
-                if (dfslist.length > MAXDFSCELLNUM) {
-                    return templist.length;
+    function CellConnected(isBlock, isGreen, setBlock, OutsideAsBlock = false) {
+        //use tarjan to find cut vertex
+        let n = 0;
+        let ord = new Map();
+        let low = new Map();
+        let blkn = new Map();
+        let dfs = function (c, f = null) {
+            if (!c.isnull && isGreen(c) || ord.has(c)) { return; }
+            if (c.isnull && !OutsideAsBlock) { return; }
+            ord.set(c, n);
+            low.set(c, n);
+            blkn.set(c, !c.isnull && isBlock(c) ? 1 : 0);
+            n++;
+            let fn = function (nc) {
+                if (nc === f || isGreen(nc)) { return; }
+                if (nc.isnull && !OutsideAsBlock) { return; }
+                if (ord.has(nc)) {
+                    low.set(c, Math.min(low.get(c), ord.get(nc)));
+                    return;
                 }
-                if (dfslist.filter(c => isBlock(c)).length === 0 || dfslist.indexOf(cell) === -1) {
-                    sparenum++;
-                    return templist.length;
+                dfs(nc, c);
+                low.set(c, Math.min(low.get(c), low.get(nc)));
+                if (ord.get(nc) > ord.get(c)) {
+                    blkn.set(c, blkn.get(c) + blkn.get(nc));
+                    if (ord.get(c) <= low.get(nc) && blkn.get(nc) > 0) {
+                        setBlock(c);
+                    }
                 }
-                return dfslist.filter(c => templist.indexOf(c) !== -1).length;
             };
-            let templist2 = templist.map(c => fn(c));
-            if (templist2.filter(n => n + sparenum < templist.length).length > 0) {
-                setBlock(cell);
+            if (!c.isnull) {
+                fourside(fn, c.adjacent);
+                return;
             }
+            for (let i = 0; i < board.cols; i++) {
+                for (let j = 0; j < board.rows; j++) {
+                    dfs(board.getc(2 * i + 1, 2 * j + 1));
+                }
+            }
+        };
+        if (OutsideAsBlock) {
+            dfs(board.getc(0, 0));
+            return;
+        }
+        for (let i = 0; i < board.cell.length; i++) {
+            if (!isBlock(board.cell[i])) { continue; }
+            dfs(board.cell[i]);
+            break;
         }
     }
 
     function CellNoLoop(isBlock, isGreen, setGreen) {
+        let ord = new Map();
+        let n = 0;
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (!isBlock(cell) || ord.has(cell)) { continue; }
+            let dfs = function (c) {
+                if (c.isnull || !isBlock(c) || ord.has(c)) { return; }
+                ord.set(c, n);
+                fourside(dfs, c.adjacent);
+            }
+            dfs(cell);
+            n++;
+        }
         for (let i = 0; i < board.cell.length; i++) {
             let cell = board.cell[i];
             if (isBlock(cell) || isGreen(cell)) { continue; }
             let templist = [offset(cell, -1, 0), offset(cell, 0, -1), offset(cell, 0, 1), offset(cell, 1, 0)];
             templist = templist.filter(c => !c.isnull && isBlock(c));
-            if (templist.length < 2) { continue; }
-            let fn = function (c) {
-                let dfslist = [];
-                let dfs = function (c) {
-                    if (c.isnull || c === cell || !isBlock(c) || dfslist.indexOf(c) !== -1) { return; }
-                    dfslist.push(c);
-                    fourside(dfs, c.adjacent);
-                };
-                dfs(c);
-                return dfslist.filter(c => templist.indexOf(c) !== -1).length;
-            };
-            let templist2 = templist.map(c => fn(c));
-            if (templist2.filter(n => n > 1).length > 0) {
-                setGreen(cell);
+            templist = templist.map(c => ord.get(c));
+            for (let i = 0; i < templist.length; i++) {
+                for (let j = i + 1; j < templist.length; j++) {
+                    if (templist[i] === templist[j]) {
+                        setGreen(cell);
+                    }
+                }
             }
         }
     }
@@ -392,7 +411,6 @@
         for (let i = 0; i < board.cell.length; i++) {
             let cell = board.cell[i];
             //don't block region exit
-            let blocknum = 0;
             let templist = [offset(cell, -1, -1), offset(cell, -1, 0), offset(cell, -1, 1), offset(cell, 0, -1),
             offset(cell, 0, 1), offset(cell, 1, -1), offset(cell, 1, 0), offset(cell, 1, 1)];
             if (!isBlock(cell) && !isGreen(cell) && templist.filter(c => isGreen(c) || c.isnull).length >= 2) {
@@ -2436,8 +2454,14 @@
         }
         CellConnected(
             function (c) { return c.qsub === CQSUB.green; },
-            function (c) { return c.qsub === CQSUB.yellow || c.qnum === 3; },
+            function (c) { return c.qsub === CQSUB.yellow || c.qnum === 3 && c.qsub === CQSUB.none; },
             add_bg_inner_color
+        );
+        CellConnected(
+            function (c) { return c.qsub === CQSUB.yellow; },
+            function (c) { return c.qsub === CQSUB.green || c.qnum === 3 && c.qsub === CQSUB.none; },
+            add_bg_outer_color,
+            true
         );
         let twonum = 0;
         let threenum = 0;
@@ -2663,8 +2687,7 @@
                     fn(cell, offset(cell, 1, 0, d), offset(cell, 0, 1, d), offset(cell, 1, 1, d));
                 }
             }
-            //number and color deduce
-            if (cell.qnum >= 0) {
+            {
                 let innernum = 0;
                 let outernum = 0;
                 let fn = function (c) {
@@ -2676,48 +2699,51 @@
                 if (innernum === 4) {
                     add_bg_inner_color(cell);
                 }
-                if (cell.qnum < innernum || 4 - cell.qnum < outernum) {
-                    add_bg_inner_color(cell);
-                }
-                if (cell.qnum < outernum || 4 - cell.qnum < innernum) {
-                    add_bg_outer_color(cell);
-                }
-                if (cell.qsub === CQSUB.green && cell.qnum === outernum) {
-                    fourside(add_bg_inner_color, adjcell);
-                }
-                if (cell.qsub === CQSUB.yellow && cell.qnum === innernum) {
-                    fourside(add_bg_outer_color, adjcell);
-                }
-                if (cell.qsub === CQSUB.yellow && cell.qnum === 4 - outernum) {
-                    fourside(add_bg_inner_color, adjcell);
-                }
-                if (cell.qsub === CQSUB.green && cell.qnum === 4 - innernum) {
-                    fourside(add_bg_outer_color, adjcell);
-                }
-                if (cell.qnum === CQSUB.yellow && outernum === 2) {
-                    fourside(add_bg_inner_color, adjcell);
-                }
-                if (cell.qnum === CQSUB.yellow && innernum === 2) {
-                    fourside(add_bg_outer_color, adjcell);
-                }
-                //2 different color around 1 or 3
-                {
-                    let fn = function (c, d) {
-                        if (!c.isnull && c.qsub === CQSUB.none) {
-                            if (cell.qnum === 1) { add_cross(d); }
-                            if (cell.qnum === 3) { add_line(d); }
-                        }
-                    };
-                    if ((cell.qnum === 1 || cell.qnum === 3) && innernum === 1 && outernum === 1) {
-                        fourside2(fn, adjcell, adjline);
+                //number and color deduce
+                if (cell.qnum >= 0) {
+                    if (cell.qnum < innernum || 4 - cell.qnum < outernum) {
+                        add_bg_inner_color(cell);
                     }
-                }
-                //same diagonal color as 3
-                if (cell.qnum === 3 && cell.qsub !== CQSUB.none) {
-                    for (let d = 0; d < 4; d++) {
-                        if (!dir(adjcell, d).isnull && !dir(adjcell, d + 1).isnull && dir(dir(adjcell, d).adjacent, d + 1).qsub === cell.qsub) {
-                            add_line(dir(adjline, d + 2));
-                            add_line(dir(adjline, d + 3));
+                    if (cell.qnum < outernum || 4 - cell.qnum < innernum) {
+                        add_bg_outer_color(cell);
+                    }
+                    if (cell.qsub === CQSUB.green && cell.qnum === outernum) {
+                        fourside(add_bg_inner_color, adjcell);
+                    }
+                    if (cell.qsub === CQSUB.yellow && cell.qnum === innernum) {
+                        fourside(add_bg_outer_color, adjcell);
+                    }
+                    if (cell.qsub === CQSUB.yellow && cell.qnum === 4 - outernum) {
+                        fourside(add_bg_inner_color, adjcell);
+                    }
+                    if (cell.qsub === CQSUB.green && cell.qnum === 4 - innernum) {
+                        fourside(add_bg_outer_color, adjcell);
+                    }
+                    if (cell.qnum === CQSUB.yellow && outernum === 2) {
+                        fourside(add_bg_inner_color, adjcell);
+                    }
+                    if (cell.qnum === CQSUB.yellow && innernum === 2) {
+                        fourside(add_bg_outer_color, adjcell);
+                    }
+                    //2 different color around 1 or 3
+                    {
+                        let fn = function (c, d) {
+                            if (!c.isnull && c.qsub === CQSUB.none) {
+                                if (cell.qnum === 1) { add_cross(d); }
+                                if (cell.qnum === 3) { add_line(d); }
+                            }
+                        };
+                        if ((cell.qnum === 1 || cell.qnum === 3) && innernum === 1 && outernum === 1) {
+                            fourside2(fn, adjcell, adjline);
+                        }
+                    }
+                    //same diagonal color as 3
+                    if (cell.qnum === 3 && cell.qsub !== CQSUB.none) {
+                        for (let d = 0; d < 4; d++) {
+                            if (!dir(adjcell, d).isnull && !dir(adjcell, d + 1).isnull && dir(dir(adjcell, d).adjacent, d + 1).qsub === cell.qsub) {
+                                add_line(dir(adjline, d + 2));
+                                add_line(dir(adjline, d + 3));
+                            }
                         }
                     }
                 }
