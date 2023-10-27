@@ -97,7 +97,7 @@
     };
 
     const genrelist = [
-        [/slither/, SlitherlinkAssist],
+        [/slither(_play)?/, SlitherlinkAssist],
         [/yaji[lr]in/, YajilinAssist],
         [/simpleloop/, SimpleloopAssist],
         [/mas[yh]u/, MasyuAssist],
@@ -120,7 +120,7 @@
         [/starbattle/, StarbattleAssist]
     ];
 
-    if (genrelist.filter(g => g[0].test(document.URL)).length === 1) {
+    if (genrelist.filter(g => RegExp('\\\?' + g[0].source + '\\\/').test(document.URL)).length === 1) {
         let btn = '<button type="button" class="btn" id="assist" style="display: inline;">Assist</button>';
         let btn2 = '<button type="button" class="btn" id="assiststep" style="display: inline;">Assist Step</button>';
         document.querySelector('#btntrial').insertAdjacentHTML('afterend', btn);
@@ -158,17 +158,17 @@
         if (dir === 2) { return board.getobj(c.bx - dx * 2, c.by - dy * 2); }
         if (dir === 3) { return board.getobj(c.bx - dy * 2, c.by + dx * 2); }
     }
-    let fourside = function (a, b) {
-        a(b.top);
-        a(b.bottom);
-        a(b.left);
-        a(b.right);
+    let fourside = function (f, a) {
+        f(a.top);
+        f(a.bottom);
+        f(a.left);
+        f(a.right);
     };
-    let fourside2 = function (a, b, c) {
-        a(b.top, c.top);
-        a(b.bottom, c.bottom);
-        a(b.left, c.left);
-        a(b.right, c.right);
+    let fourside2 = function (f, a, b) {
+        f(a.top, b.top);
+        f(a.bottom, b.bottom);
+        f(a.left, b.left);
+        f(a.right, b.right);
     };
     let dir = function (c, d) {
         d = (d % 4 + 4) % 4;
@@ -256,7 +256,10 @@
         );
     }
 
-    function CellConnected(isBlock, isGreen, setBlock, OutsideAsBlock = false) {
+    function CellConnected(isBlock, isGreen, setBlock,
+        isLinked = function (c, nb, nc) { return isBlock(c) && isBlock(nc); },
+        isNotPassable = function (c, nb, nc) { return false; },
+        OutsideAsBlock = false) {
         //use tarjan to find cut vertex
         let n = 0;
         let ord = new Map();
@@ -266,32 +269,52 @@
             if (!c.isnull && isGreen(c) || ord.has(c)) { return; }
             if (c.isnull && !OutsideAsBlock) { return; }
             ord.set(c, n);
-            low.set(c, n);
-            blkn.set(c, !c.isnull && isBlock(c) ? 1 : 0);
+            low.set(n, n);
+            blkn.set(n, 0);
             n++;
-            let fn = function (nc) {
+            let cellList = [];
+            if (!c.isnull) {
+                let linkdfs = function (c) {
+                    if (c.isnull || cellList.indexOf(c) !== -1) { return; }
+                    cellList.push(c);
+                    blkn.set(ord.get(c), blkn.get(ord.get(c)) + isBlock(c));
+                    let fn = function (nc, nb) {
+                        if (nc.isnull || nb.isnull || ord.has(nc)) { return; }
+                        if (!(isLinked(c, nb, nc) || isBlock(c) && isBlock(nc))) { return; }
+                        ord.set(nc, ord.get(c));
+                        linkdfs(nc);
+                    };
+                    fourside2(fn, c.adjacent, c.adjborder);
+                }
+                linkdfs(c);
+            }
+            let fn = function (nc, nb) {
+                if (isNotPassable(c, nb, nc)) { return; }
                 if (nc === f || isGreen(nc)) { return; }
                 if (nc.isnull && !OutsideAsBlock) { return; }
+                if (ord.get(c) === ord.get(nc)) { return; }
                 if (ord.has(nc)) {
-                    low.set(c, Math.min(low.get(c), ord.get(nc)));
+                    low.set(ord.get(c), Math.min(low.get(ord.get(c)), ord.get(nc)));
                     return;
                 }
                 dfs(nc, c);
-                low.set(c, Math.min(low.get(c), low.get(nc)));
-                if (ord.get(nc) > ord.get(c)) {
-                    blkn.set(c, blkn.get(c) + blkn.get(nc));
-                    if (ord.get(c) <= low.get(nc) && blkn.get(nc) > 0) {
-                        setBlock(c);
+                let ordc = ord.get(c);
+                let ordnc = ord.get(nc);
+                low.set(ordc, Math.min(low.get(ordc), low.get(ordnc)));
+                if (ordnc > ordc) {
+                    blkn.set(ordc, blkn.get(ordc) + blkn.get(ordnc));
+                    if (ordc <= low.get(ordnc) && blkn.get(ordnc) > 0) {
+                        cellList.forEach(c => setBlock(c));
                     }
                 }
             };
             if (!c.isnull) {
-                fourside(fn, c.adjacent);
-                return;
-            }
-            for (let i = 0; i < board.cols; i++) {
-                for (let j = 0; j < board.rows; j++) {
-                    dfs(board.getc(2 * i + 1, 2 * j + 1));
+                cellList.forEach(c => fourside2(fn, c.adjacent, c.adjborder));
+            } else if (c.isnull) {
+                for (let i = 0; i < board.cols; i++) {
+                    for (let j = 0; j < board.rows; j++) {
+                        dfs(board.getc(2 * i + 1, 2 * j + 1), c);
+                    }
                 }
             }
         };
@@ -1355,15 +1378,21 @@
     function NurimazeAssist() {
         No2x2Block();
         No2x2Green();
-        GreenConnectedInCell();
+        CellConnected(
+            function (c) { return c.qsub === CQSUB.green; },
+            function (c) { return c.qans === CQANS.block; },
+            add_green,
+            function (c, nb, nc) { return c.room === nc.room; },
+        );
         CellConnected(
             function (c) {
                 let startcell = board.getc(board.startpos.bx, board.startpos.by);
                 let goalcell = board.getc(board.goalpos.bx, board.goalpos.by);
-                return c === startcell || c === goalcell || c.qans === CQUES.cir;
+                return c === startcell || c === goalcell || c.ques === CQUES.cir;
             },
-            function (c) { return c.qans === CQANS.block || c.ques === CQUES.tri },
-            add_green
+            function (c) { return c.qans === CQANS.block || c.ques === CQUES.tri; },
+            add_green,
+            function (c, nb, nc) { return c.room === nc.room; },
         );
         let startcell = board.getc(board.startpos.bx, board.startpos.by);
         let goalcell = board.getc(board.goalpos.bx, board.goalpos.by);
@@ -2454,14 +2483,18 @@
         }
         CellConnected(
             function (c) { return c.qsub === CQSUB.green; },
-            function (c) { return c.qsub === CQSUB.yellow || c.qnum === 3 && c.qsub === CQSUB.none; },
-            add_bg_inner_color
+            function (c) { return c.qsub === CQSUB.yellow || c.qsub === CQSUB.none && c.qnum === 3; },
+            add_bg_inner_color,
+            function (c, nb, nc) { return nb.qsub === BQSUB.cross },
+            function (c, nb, nc) { return nb.line; },
         );
         CellConnected(
             function (c) { return c.qsub === CQSUB.yellow; },
-            function (c) { return c.qsub === CQSUB.green || c.qnum === 3 && c.qsub === CQSUB.none; },
+            function (c) { return c.qsub === CQSUB.green || c.qsub === CQSUB.none && c.qnum === 3; },
             add_bg_outer_color,
-            true
+            function (c, nb, nc) { return nb.qsub === BQSUB.cross },
+            function (c, nb, nc) { return nb.line; },
+            true,
         );
         let twonum = 0;
         let threenum = 0;
