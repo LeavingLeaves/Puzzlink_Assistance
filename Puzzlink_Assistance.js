@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.10.27.1
+// @version      23.10.29.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -63,7 +63,10 @@
         //Icebarn
         ice: 6,
         //Simpleloop
-        block: 7,
+        bwall: 7,
+        //Slalom
+        vgate: 21,
+        hgate: 22,
         //Nurimaze
         cir: 41,
         tri: 42,
@@ -117,7 +120,8 @@
         [/cbanana/, ChocoBananaAssist],
         [/nurimisaki/, NurimisakiAssist],
         [/castle/, CastleWallAssist],
-        [/starbattle/, StarbattleAssist]
+        [/starbattle/, StarbattleAssist],
+        [/slalom/, SlalomAssist],
     ];
 
     if (genrelist.filter(g => RegExp('\\\?' + g[0].source + '\\\/').test(document.URL)).length === 1) {
@@ -256,7 +260,7 @@
         );
     }
 
-    function CellConnected(isBlock, isGreen, setBlock,
+    function CellConnected(isBlock, isGreen, setBlock, setGreen,
         isLinked = function (c, nb, nc) { return isBlock(c) && isBlock(nc); },
         isNotPassable = function (c, nb, nc) { return false; },
         OutsideAsBlock = false) {
@@ -320,12 +324,18 @@
         };
         if (OutsideAsBlock) {
             dfs(board.getc(0, 0));
-            return;
+        } else {
+            for (let i = 0; i < board.cell.length; i++) {
+                if (!isBlock(board.cell[i])) { continue; }
+                dfs(board.cell[i]);
+                break;
+            }
         }
-        for (let i = 0; i < board.cell.length; i++) {
-            if (!isBlock(board.cell[i])) { continue; }
-            dfs(board.cell[i]);
-            break;
+        if (ord.size > 0) {
+            for (let i = 0; i < board.cell.length; i++) {
+                if (ord.has(board.cell[i]) || isBlock(board.cell[i]) || isGreen(board.cell[i])) { continue; }
+                setGreen(board.cell[i]);
+            }
         }
     }
 
@@ -363,7 +373,8 @@
         CellConnected(
             function (c) { return c.qsub === CQSUB.green; },
             function (c) { return c.qans === CQANS.block; },
-            add_green
+            add_green,
+            add_block,
         );
     }
 
@@ -371,7 +382,8 @@
         CellConnected(
             function (c) { return c.qans === CQANS.block; },
             function (c) { return c.qsub === CQSUB.green; },
-            add_block
+            add_block,
+            add_green,
         );
     }
 
@@ -391,10 +403,12 @@
         }
     }
 
-    function SingleLoopInCell(pathable = function (c) { return true; }, inPath = false) {
+    function SingleLoopInCell(pathable = function (c) { return true; }, inPath = function (c) { return false; }) {
         for (let i = 0; i < board.cell.length; i++) {
             let cell = board.cell[i];
-            if (!pathable(cell)) { continue; }
+            if (!pathable(cell)) {
+                fourside(add_cross, cell.adjborder);
+            }
             let emptynum = 0;
             let linenum = 0;
             let adjcell = cell.adjacent;
@@ -413,7 +427,7 @@
                 fourside(add_cross, adjline);
             }
             //2 degree path
-            if (emptynum === 2 && (linenum === 1 || cell.qsub === CQSUB.dot || inPath)) {
+            if (emptynum === 2 && (linenum === 1 || cell.qsub === CQSUB.dot || inPath(cell))) {
                 fourside(add_line, adjline);
             }
         }
@@ -550,6 +564,51 @@
     }
 
     //assist for certain genre
+    function SlalomAssist() {
+        SingleLoopInCell(
+            function (c) { return c.ques !== 1; },
+            function (c) { return c.bx === board.startpos.bx && c.by === board.startpos.by; }
+        );
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (cell.ques === 1) {
+                fourside(add_cross, cell.adjborder);
+            }
+            if (cell.ques === CQUES.vgate && (cell.adjacent.top.isnull || cell.adjacent.top.ques !== CQUES.vgate)) {
+                let list = [];
+                let pcell = cell;
+                while (!pcell.isnull && pcell.ques === CQUES.vgate) {
+                    add_cross(pcell.adjborder.top);
+                    add_cross(pcell.adjborder.bottom);
+                    list.push(pcell);
+                    pcell = pcell.adjacent.bottom;
+                }
+                if (list.filter(c => c.adjborder.left.line).length === 1) {
+                    list.forEach(c => add_cross(c.adjborder.left));
+                }
+                if (list.filter(c => c.adjborder.left.qsub !== BQSUB.cross).length === 1) {
+                    list.forEach(c => add_line(c.adjborder.left));
+                }
+            }
+            if (cell.ques === CQUES.hgate && (cell.adjacent.left.isnull || cell.adjacent.left.ques !== CQUES.hgate)) {
+                let list = [];
+                let pcell = cell;
+                while (!pcell.isnull && pcell.ques === CQUES.hgate) {
+                    add_cross(pcell.adjborder.left);
+                    add_cross(pcell.adjborder.right);
+                    list.push(pcell);
+                    pcell = pcell.adjacent.right;
+                }
+                if (list.filter(c => c.adjborder.top.line).length === 1) {
+                    list.forEach(c => add_cross(c.adjborder.top));
+                }
+                if (list.filter(c => c.adjborder.top.qsub !== BQSUB.cross).length === 1) {
+                    list.forEach(c => add_line(c.adjborder.top));
+                }
+            }
+        }
+    }
+
     function StarbattleAssist() {
         let add_cir = function (b) {
             if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none) { return; }
@@ -1036,7 +1095,7 @@
             function (c) { return c.qsub === CQSUB.dot; },
             add_block
         );
-        CellConnected(isDot, isConnectBlock, add_dot);
+        CellConnected(isDot, isConnectBlock, add_dot, add_block);
     }
 
     function ChocoBananaAssist() {
@@ -1273,12 +1332,14 @@
         CellConnected(
             function (c) { return c.anum === CANUM.wcir; },
             function (c) { return c.anum === CANUM.bcir; },
-            add_white
+            add_white,
+            add_black,
         );
         CellConnected(
             function (c) { return c.anum === CANUM.bcir; },
             function (c) { return c.anum === CANUM.wcir; },
-            add_black
+            add_black,
+            add_white,
         );
         No2x2Cell(
             function (c) { return c.anum === CANUM.wcir; },
@@ -1382,6 +1443,7 @@
             function (c) { return c.qsub === CQSUB.green; },
             function (c) { return c.qans === CQANS.block; },
             add_green,
+            add_block,
             function (c, nb, nc) { return c.room === nc.room; },
         );
         CellConnected(
@@ -1392,6 +1454,7 @@
             },
             function (c) { return c.qans === CQANS.block || c.ques === CQUES.tri; },
             add_green,
+            add_block,
             function (c, nb, nc) { return c.room === nc.room; },
         );
         let startcell = board.getc(board.startpos.bx, board.startpos.by);
@@ -2366,12 +2429,12 @@
     function SimpleloopAssist() {
         SingleLoopInCell(
             function (c) { return c.qnum !== CQNUM.block; },
-            true
+            function (c) { return c.qnum !== CQNUM.block; },
         );
         for (let i = 0; i < board.cell.length; i++) {
             let cell = board.cell[i];
             let adjline = cell.adjborder;
-            if (cell.ques === CQUES.block) {
+            if (cell.ques === CQUES.bwall) {
                 fourside(add_cross, adjline);
             }
         }
@@ -2485,6 +2548,7 @@
             function (c) { return c.qsub === CQSUB.green; },
             function (c) { return c.qsub === CQSUB.yellow || c.qsub === CQSUB.none && c.qnum === 3; },
             add_bg_inner_color,
+            add_bg_outer_color,
             function (c, nb, nc) { return nb.qsub === BQSUB.cross },
             function (c, nb, nc) { return nb.line; },
         );
@@ -2492,6 +2556,7 @@
             function (c) { return c.qsub === CQSUB.yellow; },
             function (c) { return c.qsub === CQSUB.green || c.qsub === CQSUB.none && c.qnum === 3; },
             add_bg_outer_color,
+            add_bg_inner_color,
             function (c, nb, nc) { return nb.qsub === BQSUB.cross },
             function (c, nb, nc) { return nb.line; },
             true,

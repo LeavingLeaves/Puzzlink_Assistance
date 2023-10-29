@@ -25,6 +25,7 @@ Currently support:
 * Starbattle
 * Shakashaka
 * Simple Loop
+* Slalom
 * Slant
 * Slither Link
 * Yajilin
