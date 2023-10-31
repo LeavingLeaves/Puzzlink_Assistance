@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.10.29.1
+// @version      23.11.1.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -9,6 +9,7 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=github.com
 // @grant        none
 // @namespace    https://greasyfork.org/users/1192854
+// @license      GPL
 // ==/UserScript==
 
 (function () {
@@ -40,7 +41,10 @@
     const CQANS = {
         none: 0,
         block: 1,
-        //starbattle
+        //Light and Shadow
+        black: 1,
+        white: 2,
+        //Starbattle
         star: 1,
         //Akari
         light: 1,
@@ -122,6 +126,8 @@
         [/castle/, CastleWallAssist],
         [/starbattle/, StarbattleAssist],
         [/slalom/, SlalomAssist],
+        [/lightshadow/, LightandShadowAssist],
+        [/tapa/, TapaAssist],
     ];
 
     if (genrelist.filter(g => RegExp('\\\?' + g[0].source + '\\\/').test(document.URL)).length === 1) {
@@ -132,8 +138,8 @@
         document.querySelector("#assist").addEventListener("click", assist, false);
         document.querySelector("#assiststep").addEventListener("click", assiststep, false);
         window.addEventListener("keypress", (event) => {
-            if (event.key === 'q') { assist(); }
-            if (event.key === 'w') { assiststep(); }
+            if (event.key === 'q' || (event.key === 'Q')) { assist(); }
+            if (event.key === 'w' || (event.key === 'W')) { assiststep(); }
         });
     }
 
@@ -208,7 +214,7 @@
         b.draw();
     };
     let add_block = function (c, notOnNum = false) {
-        if (notOnNum && c.qnum !== CQNUM.none) { return; }
+        if (notOnNum && (c.qnum !== CQNUM.none || c.qnums.length > 0)) { return; }
         if (c === undefined || c.isnull || c.lcnt !== 0 || c.qsub === CQSUB.dot || c.qans !== CQANS.none) { return; }
         if (step && flg) { return; }
         flg = true;
@@ -219,7 +225,7 @@
         add_block(c, true);
     };
     let add_dot = function (c) {
-        if (c === undefined || c.isnull || c.qnum !== CQNUM.none || c.qans !== CQANS.none || c.qsub === CQSUB.dot) { return; }
+        if (c === undefined || c.isnull || c.qnum !== CQNUM.none || c.qnums.length > 0 || c.qans !== CQANS.none || c.qsub === CQSUB.dot) { return; }
         if (step && flg) { return; }
         flg = true;
         c.setQsub(CQSUB.dot);
@@ -564,6 +570,106 @@
     }
 
     //assist for certain genre
+    function TapaAssist() {
+        No2x2Cell(
+            function (c) { return c.qans === CQANS.block; },
+            add_dot,
+        );
+        CellConnected(
+            function (c) { return c.qans === CQANS.block; },
+            function (c) { return c.qsub === CQSUB.dot || c.qnums.length > 0; },
+            add_block,
+            add_dot,
+        );
+        let check = function (qnums, s) {
+            if (s === "11111111") { return qnums.length === 1 && qnums[0] === 8 || qnums[0] === CQNUM.quesmark; }
+            while (s[0] !== '0') {
+                s = s.slice(1) + s[0];
+            }
+            s = s.split('0').filter(s => s.length > 0).map(s => s.length);
+            if (s.length === 0) { s = [0]; }
+            if (s.length !== qnums.length) { return false; }
+            for (let i = 0; i < qnums.length; i++) {
+                if (s.indexOf(qnums[i]) === -1) { continue; }
+                s.splice(s.indexOf(qnums[i]), 1);
+            }
+            return s.length === qnums.filter(n => n === CQNUM.quesmark).length;
+        };
+        let isEmpty = function (c) {
+            return !c.isnull && c.qans === CQANS.none && c.qsub === CQSUB.none && c.qnums.length === 0;
+        };
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (cell.qnums.length === 0) { continue; }
+            let list = [offset(cell, -1, -1), offset(cell, 0, -1), offset(cell, 1, -1), offset(cell, 1, 0),
+            offset(cell, 1, 1), offset(cell, 0, 1), offset(cell, -1, 1), offset(cell, -1, 0)];
+            let mask = parseInt(list.map(c => isEmpty(c) ? "1" : "0").join(""), 2);
+            let blk = parseInt(list.map(c => (!c.isnull && c.qans === CQANS.block ? "1" : "0")).join(""), 2);
+            let setb = 0b11111111, setd = 0b00000000, n = 0;
+            for (let j = mask; j >= 0; j--) {
+                j &= mask;
+                if (check(cell.qnums, (j | blk).toString(2).padStart(8, '0'))) {
+                    setb &= (j | blk);
+                    setd |= (j | blk);
+                    n++;
+                }
+            }
+            if (n === 0) { continue; }
+            setb = setb.toString(2).padStart(8, '0');
+            setd = setd.toString(2).padStart(8, '0');
+            for (let j = 0; j < 8; j++) {
+                if (setb[j] === '1') {
+                    add_block(list[j], true);
+                }
+                if (setd[j] === '0') {
+                    add_dot(list[j]);
+                }
+            }
+        }
+    }
+
+    function LightandShadowAssist() {
+        let add_black = function (c) {
+            if (c.isnull || c.qans !== CQANS.none) { return; }
+            if (step && flg) { return; }
+            flg = 1;
+            c.setQans(CQANS.black);
+            c.draw();
+        };
+        let add_white = function (c) {
+            if (c.isnull || c.qans !== CQANS.none) { return; }
+            if (step && flg) { return; }
+            flg = 1;
+            c.setQans(CQANS.white);
+            c.draw();
+        };
+        NumberRegion(
+            function (c) { return c.qans === CQANS.black; },
+            function (c) { return c.qans === CQANS.white; },
+            add_black,
+            add_white,
+            true,
+            false,
+        );
+        NumberRegion(
+            function (c) { return c.qans === CQANS.white; },
+            function (c) { return c.qans === CQANS.black; },
+            add_white,
+            add_black,
+            true,
+            false,
+        );
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (cell.qnum !== CQNUM.none && cell.ques === 1) {
+                add_black(cell);
+            }
+            if (cell.qnum !== CQNUM.none && cell.ques === 0) {
+                add_white(cell);
+            }
+        }
+    }
+
     function SlalomAssist() {
         SingleLoopInCell(
             function (c) { return c.ques !== 1; },
@@ -2742,7 +2848,7 @@
             let cell = board.cell[i];
             let adjline = cell.adjborder;
             let adjcell = cell.adjacent;
-            //same neighbor color
+            //neighbor color
             {
                 let fn = function (c, d) {
                     if (!c.isnull && cell.qsub !== CQSUB.none && cell.qsub === c.qsub) {
@@ -2750,6 +2856,12 @@
                     }
                     if (cell.qsub === CQSUB.yellow && c.isnull) {
                         add_cross(d);
+                    }
+                    if (!c.isnull && cell.qsub !== CQSUB.none && c.qsub !== CQSUB.none && cell.qsub !== c.qsub) {
+                        add_line(d);
+                    }
+                    if (cell.qsub === CQSUB.green && c.isnull) {
+                        add_line(d);
                     }
                 };
                 fourside2(fn, adjcell, adjline);
@@ -2847,7 +2959,6 @@
                 }
             }
         }
-        ui.toolarea.outlineshaded();
     }
 
 })();

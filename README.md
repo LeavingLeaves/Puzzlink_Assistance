@@ -16,6 +16,7 @@ Currently support:
 * Guide Arrow
 * Heyawake
 * Icebarn
+* Light and Shadow
 * Lits
 * Masyu
 * No Three
@@ -28,5 +29,6 @@ Currently support:
 * Slalom
 * Slant
 * Slither Link
+* Tapa
 * Yajilin
 * Yin-Yang
