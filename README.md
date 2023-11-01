@@ -11,6 +11,7 @@ Currently support:
 * Akari
 * Aquapelago
 * Castle Wall
+* Cave
 * Choco Banana
 * Ekawayeh
 * Guide Arrow
