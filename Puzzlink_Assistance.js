@@ -128,7 +128,7 @@
         [/slalom/, SlalomAssist],
         [/lightshadow/, LightandShadowAssist],
         [/tapa/, TapaAssist],
-        [/cave/, CaveAssist],
+        [/(cave|bag)/, CaveAssist],
     ];
 
     if (genrelist.filter(g => RegExp('\\\?' + g[0].source + '\\\/').test(document.URL)).length === 1) {
