@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.11.1.1
+// @version      23.11.2.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -165,9 +165,9 @@
     let offset = function (c, dx, dy, dir = 0) {
         dir = (dir % 4 + 4) % 4;
         if (dir === 0) { return board.getobj(c.bx + dx * 2, c.by + dy * 2); }
-        if (dir === 1) { return board.getobj(c.bx - dy * 2, c.by + dx * 2); }
+        if (dir === 1) { return board.getobj(c.bx + dy * 2, c.by - dx * 2); }
         if (dir === 2) { return board.getobj(c.bx - dx * 2, c.by - dy * 2); }
-        if (dir === 3) { return board.getobj(c.bx + dy * 2, c.by - dx * 2); }
+        if (dir === 3) { return board.getobj(c.bx - dy * 2, c.by + dx * 2); }
     }
     let fourside = function (f, a) {
         f(a.top);
@@ -184,12 +184,12 @@
     let dir = function (c, d) {
         d = (d % 4 + 4) % 4;
         if (d === 0) return c.top;
-        if (d === 1) return c.right;
+        if (d === 1) return c.left;
         if (d === 2) return c.bottom;
-        if (d === 3) return c.left;
+        if (d === 3) return c.right;
     }
     let qdirremap = function (qdir) {
-        return [-1, 0, 2, 3, 1][qdir];
+        return [-1, 0, 2, 1, 3][qdir];
     }
 
     //set val
@@ -2156,7 +2156,7 @@
                 }
             };
             for (let d = 0; d < 4; d++) {
-                dfs(dir(c.adjacent, 3 - d), d);
+                dfs(dir(c.adjacent, d + 1), d);
             }
             return temp;
         };
@@ -2285,7 +2285,7 @@
             //triangle by clue
             if (emptynum === cell.qnum - trinum) {
                 for (let d = 0; d < 4; d++) {
-                    let adj = dir(adjcell, 4 - d);
+                    let adj = dir(adjcell, d);
                     if (isEmpty(adj)) {
                         if (isntTriEx(adj, d)) { add_triangle(adj, d + 1); }
                         else if (isntTriEx(adj, d + 1)) { add_triangle(adj, d); }
@@ -2394,6 +2394,10 @@
                 list.push(cell);
                 cst.set(cell, (cell.qans === CQANS.block ? "BLK" : (cell.qsub === CQSUB.green ? "GRN" : "UNK")));
                 apl.set(cell, (cell.qans === CQANS.block ? "BLK" : (cell.qsub === CQSUB.green ? "GRN" : "UNK")));
+            }
+            if (qnum === list.filter(c => c.qans === CQANS.block).length) {
+                list.forEach(c => add_green(c));
+                continue;
             }
             //randomly chosen approximate formula
             if ((qnum - list.filter(c => c.qans === CQANS.block).length) * 2 + 5 <
