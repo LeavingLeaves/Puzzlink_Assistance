@@ -763,13 +763,13 @@
 
             let cnt = new Map();
             for (let cell of a) {
-                if (cell.qnum === CQNUM.none) continue;
+                if (cell.qnum === CQNUM.none || cell.qans === CQANS.block) continue;
                 let c = cnt.has(cell.qnum) ? cnt.get(cell.qnum) : 0;
                 c++;
                 cnt.set(cell.qnum, c);
             }
             for (let cell of a) {
-                if (cell.qnum === CQNUM.none) continue;
+                if (cell.qnum === CQNUM.none || cell.qans === CQANS.block) continue;
                 if (cnt.get(cell.qnum) >= 2) uniq.set(cell, false);
             }
 
@@ -779,7 +779,7 @@
                 add_green(a[i+1]);
             }
 
-            // a..bb
+            // a..aa
             for (let i = 0; i < a.length-1; i++) {
                 if (a[i].qnum === CQNUM.none || a[i].qnum !== a[i+1].qnum) continue;
                 for (let j = 0; j < a.length; j++) {
