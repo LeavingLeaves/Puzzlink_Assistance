@@ -106,7 +106,7 @@
     };
 
     const genrelist = [
-        [/slither(_play)?/, SlitherlinkAssist],
+        [/slither(link)?(_play)?/, SlitherlinkAssist],
         [/yaji[lr]in/, YajilinAssist],
         [/simpleloop/, SimpleloopAssist],
         [/mas[yh]u/, MasyuAssist],
@@ -1598,6 +1598,79 @@
                     add_green(dir(cell.adjacent, d));
                 }
                 continue;
+            }
+        }
+        // direction consistency
+        {
+            let vis = new Map();
+            let dfs = function(c, d) {
+                if (vis.has(c)) return;
+                vis.set(c, d);
+                for (let d1 = 0; d1 < 4; d1++) {
+                    if (d1 === d) continue;
+                    let c1 = dir(c.adjacent, d1);
+                    if (c1 === undefined || c1.isnull || c1.qsub !== CQSUB.green) continue;
+                    dfs(c1, (d1+2)%4);
+                }
+            };
+            dfs(goalcell, -1);
+            for (let i = 0; i < board.cell.length; i++) {
+                let cell = board.cell[i];
+                if (cell.qnum === CQNUM.none || cell.qnum === CQNUM.quesmark) continue;
+                dfs(cell, qdirremap(cell.qnum));
+            }
+            for (let i = 0; i < board.cell.length; i++) {
+                let cell = board.cell[i];
+                let adjcell = cell.adjacent;
+                if (cell.qsub !== CQSUB.none || cell.qans !== CQANS.none) continue;
+
+                let cnt = 0;
+                let fn = function (c) {
+                    if (!c.isnull && c.qsub === CQSUB.green && vis.has(c)) { cnt++; }
+                };
+                fourside(fn, adjcell);
+                if (cnt >= 2) add_block(cell);
+            }
+        }
+        // single out
+        {
+            let vis = new Map();
+            vis.set(goalcell, -1);
+            for (let i = 0; i < board.cell.length; i++) {
+                let cell = board.cell[i];
+                let d = (function () {
+                    if (cell.qnum === CQNUM.none || cell.qnum === CQNUM.quesmark) {
+                        let cnt = 0;
+                        let dd = -1;
+                        for (let d1 = 0; d1 < 4; d1++) {
+                            let c1 = dir(cell.adjacent, d1);
+                            if (c1 === undefined || c1.isnull || c1.qans === CQANS.block) continue;
+                            cnt++;
+                            dd = d1;
+                        }
+                        if (cnt === 1) return dd;
+                        return -1;
+                    }
+                    return qdirremap(cell.qnum);;
+                })();
+                if (d === -1) continue;
+                while (true) {
+                    if (vis.has(cell)) break;
+                    vis.set(cell, d);
+                    cell = dir(cell.adjacent, d);
+                    add_green(cell);
+                    let cnt = 0;
+                    let dd = -1;
+                    for (let d1 = 0; d1 < 4; d1++) {
+                        let c1 = dir(cell.adjacent, d1);
+                        if (c1 === undefined || c1.isnull || c1.qans === CQANS.block) continue;
+                        if (vis.has(c1) && vis.get(c1) === (d1+2)%4) continue;
+                        cnt++;
+                        dd = d1;
+                    }
+                    if (cnt !== 1) break;
+                    d = dd;
+                }
             }
         }
     }
