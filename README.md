@@ -21,6 +21,7 @@ Currently support:
 * Ekawayeh
 * Guide Arrow
 * Heyawake
+* Hitori
 * Icebarn
 * Kurodoko
 * Light and Shadow

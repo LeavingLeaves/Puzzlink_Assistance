@@ -790,14 +790,14 @@
         for (let i = 0; i < board.rows; i++) {
             let a = [];
             for (let j = 0; j < board.cols; j++) {
-                a.push(board.getc(2 * i + 1, 2 * j + 1));
+                a.push(board.getc(2 * j + 1, 2 * i + 1));
             }
             fn(a);
         }
         for (let j = 0; j < board.cols; j++) {
             let a = [];
             for (let i = 0; i < board.rows; i++) {
-                a.push(board.getc(2 * i + 1, 2 * j + 1));
+                a.push(board.getc(2 * j + 1, 2 * i + 1));
             }
             fn(a);
         }
@@ -3171,6 +3171,11 @@
             }
             //2 degree turn or line enter
             {
+                //+-+-+
+                //|.1.|
+                //+2+3+
+                //|.4c5
+                //+-+6+
                 let fn = function (b1, b2, b3, b4, b5, b6, c34) {
                     if (c34.isnull) { return; }
                     //avoid 1*1 loop with 2 degree turn
