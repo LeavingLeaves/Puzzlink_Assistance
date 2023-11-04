@@ -22,6 +22,7 @@ Currently support:
 * Guide Arrow
 * Heyawake
 * Icebarn
+* Kurodoko
 * Light and Shadow
 * Lits
 * Masyu

@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.11.4.1
+// @version      23.11.4.2
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -133,6 +133,7 @@
         [/(cave|bag)/, CaveAssist],
         [/aqre/, AqreAssist],
         [/nothing/, AllorNothingAssist],
+        [/kurodoko/, KurodokoAssist],
     ];
 
     if (genrelist.filter(g => RegExp('\\\?' + g[0].source + '\\\/').test(document.URL)).length === 1) {
@@ -571,6 +572,58 @@
         }
     }
 
+    function SightNumber(isBlock, isGreen, setBlock, setGreen) {
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            let qnum = cell.qnum;
+            if (cell.qnum !== CQNUM.none) {
+                setBlock(cell);
+            }
+            if (cell.qnum !== CQNUM.none && cell.qnum !== CQNUM.quesmark) {
+                let seennum = (isBlock(cell) ? 1 : 0);
+                let farthest = [0, 0, 0, 0];
+                //count seen green cells
+                for (let d = 0; d < 4; d++) {
+                    let pcell = dir(cell.adjacent, d);
+                    while (!pcell.isnull && isBlock(pcell)) {
+                        farthest[d]++;
+                        seennum++;
+                        pcell = dir(pcell.adjacent, d);
+                    }
+                    while (!pcell.isnull && !isGreen(pcell)) {
+                        farthest[d]++;
+                        pcell = dir(pcell.adjacent, d);
+                    }
+                }
+                //not extend too much
+                for (let d = 0; d < 4; d++) {
+                    let pcell = dir(cell.adjacent, d);
+                    while (!pcell.isnull && isBlock(pcell)) {
+                        pcell = dir(pcell.adjacent, d);
+                    }
+                    if (pcell.isnull || isGreen(pcell)) { continue; }
+                    let tcell = pcell;
+                    pcell = dir(pcell.adjacent, d);
+                    let n = 0;
+                    while (!pcell.isnull && isBlock(pcell)) {
+                        n++;
+                        pcell = dir(pcell.adjacent, d);
+                    }
+                    if (n + seennum + 1 > qnum) {
+                        setGreen(tcell);
+                    }
+                }
+                //must extend this way
+                let maxn = farthest.reduce(function (a, b) { return a + b; }) + (isBlock(cell) ? 1 : 0);
+                for (let d = 0; d < 4; d++) {
+                    for (let j = 1; j <= qnum - maxn + farthest[d]; j++) {
+                        add_green(offset(cell, 0, -j, d));
+                    }
+                }
+            }
+        }
+    }
+
     //assist for certain genre
     function AllorNothingAssist() {
         let add_color = function (c, color) {
@@ -671,6 +724,23 @@
         }
     }
 
+    function KurodokoAssist() {
+        GreenConnectedInCell();
+        BlockNotAdjacent();
+        SightNumber(
+            function (c) { return c.qsub === CQSUB.green; },
+            function (c) { return c.qans === CQANS.block; },
+            add_green,
+            add_block,
+        );
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (cell.qnum !== CQNUM.none) {
+                add_green(cell);
+            }
+        }
+    }
+
     function CaveAssist() {
         GreenConnectedInCell();
         CellConnected(
@@ -682,12 +752,17 @@
             function (c, nb, nc) { return false; },
             true
         );
+        SightNumber(
+            function (c) { return c.qsub === CQSUB.green; },
+            function (c) { return c.qans === CQANS.block; },
+            add_green,
+            add_block,
+        );
         for (let i = 0; i < board.cell.length; i++) {
             let cell = board.cell[i];
             if (cell.qnum !== CQNUM.none) {
                 add_green(cell);
             }
-            let qnum = cell.qnum;
             //checker
             if (cell.qsub === CQSUB.none && cell.qans === CQANS.none) {
                 let fn = function (c, c1, c2, c12) {
@@ -701,48 +776,6 @@
                 };
                 for (let d = 0; d < 4; d++) {
                     fn(cell, offset(cell, 1, 0, d), offset(cell, 0, 1, d), offset(cell, 1, 1, d));
-                }
-            }
-            if (cell.qnum !== CQNUM.none && cell.qnum !== CQNUM.quesmark) {
-                let seennum = 1;
-                let farest = [0, 0, 0, 0];
-                //count seen green cells
-                for (let d = 0; d < 4; d++) {
-                    let pcell = dir(cell.adjacent, d);
-                    while (!pcell.isnull && pcell.qsub === CQSUB.green) {
-                        farest[d]++;
-                        seennum++;
-                        pcell = dir(pcell.adjacent, d);
-                    }
-                    while (!pcell.isnull && pcell.qans !== CQANS.block) {
-                        farest[d]++;
-                        pcell = dir(pcell.adjacent, d);
-                    }
-                }
-                //not extend too much
-                for (let d = 0; d < 4; d++) {
-                    let pcell = dir(cell.adjacent, d);
-                    while (!pcell.isnull && pcell.qsub === CQSUB.green) {
-                        pcell = dir(pcell.adjacent, d);
-                    }
-                    if (pcell.isnull || pcell.qans === CQANS.block) { continue; }
-                    let tcell = pcell;
-                    pcell = dir(pcell.adjacent, d);
-                    let n = 0;
-                    while (!pcell.isnull && pcell.qsub === CQSUB.green) {
-                        n++;
-                        pcell = dir(pcell.adjacent, d);
-                    }
-                    if (n + seennum + 1 > qnum) {
-                        add_block(tcell);
-                    }
-                }
-                //must extend this way
-                let maxn = farest.reduce(function (a, b) { return a + b; }) + 1;
-                for (let d = 0; d < 4; d++) {
-                    for (let j = 1; j <= qnum - maxn + farest[d]; j++) {
-                        add_green(offset(cell, 0, -j, d));
-                    }
                 }
             }
         }
