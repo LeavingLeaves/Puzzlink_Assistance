@@ -3363,6 +3363,44 @@
                             }
                         }
                     }
+
+                    if (cell.qnum === 2) {
+                        for (let d = 0; d < 4; d++) {
+                            let c1 = dir(adjcell, d);
+                            let c2 = dir(adjcell, d+1);
+                            let l1 = (c1 === undefined || c1.isnull) ? undefined : dir(c1.adjborder, d+1);
+                            let l2 = (c2 === undefined || c2.isnull) ? undefined : dir(c2.adjborder, d);
+                            if (!(l1 === undefined || l1.qsub === BQSUB.cross)) continue;
+                            if (!(l2 === undefined || l2.qsub === BQSUB.cross)) continue;
+                            // l1 and l2 are both cross
+
+                            let c3 = dir(adjcell, d+2);
+                            let c4 = dir(adjcell, d+3);
+                            // color logic
+                            {
+                                let fn = function(ca, cb) {
+                                    if (cb === undefined || cb.isnull) return;
+                                    if (ca === undefined || ca.isnull || ca.qsub === CQSUB.yellow) {
+                                        add_bg_outer_color(cb);
+                                    }
+                                    if (ca !== undefined && !ca.isnull && ca.qsub === CQSUB.green) {
+                                        add_bg_inner_color(cb);
+                                    }
+                                };
+                                fn(c3, c4);
+                                fn(c4, c3);
+                            }
+                            // line logic
+                            let l3 = (c3 === undefined || c3.isnull) ? undefined : dir(c3.adjborder, d+3);
+                            let l4 = (c4 === undefined || c4.isnull) ? undefined : dir(c4.adjborder, d+2);
+                            if ((l3 !== undefined && l3.line) || (l4 !== undefined && l4.line)) {
+                                add_line(dir(adjline, d));
+                                add_line(dir(adjline, d+1));
+                                add_cross(dir(adjline, d+2));
+                                add_cross(dir(adjline, d+3));
+                            }
+                        }
+                    }
                 }
             }
         }
