@@ -748,7 +748,7 @@
             function (c) { return c.qsub === CQSUB.green; },
             add_block,
             add_green,
-            function (c, nb, nc) { return false; },
+            function (c, list) { list.push(c); return; },
             function (c, nb, nc) { return false; },
             true
         );
@@ -2923,7 +2923,7 @@
             function (c) { return c.qsub === CQSUB.yellow || c.qsub === CQSUB.none && c.qnum === 3; },
             add_bg_inner_color,
             add_bg_outer_color,
-            function (c, nb, nc) { return nb.qsub === BQSUB.cross },
+            function (c, list) { list.push(c); return; },
             function (c, nb, nc) { return nb.line; },
         );
         CellConnected(
@@ -2931,7 +2931,7 @@
             function (c) { return c.qsub === CQSUB.green || c.qsub === CQSUB.none && c.qnum === 3; },
             add_bg_outer_color,
             add_bg_inner_color,
-            function (c, nb, nc) { return nb.qsub === BQSUB.cross },
+            function (c, list) { list.push(c); return; },
             function (c, nb, nc) { return nb.line; },
             true,
         );
