@@ -134,6 +134,7 @@
         [/aqre/, AqreAssist],
         [/nothing/, AllorNothingAssist],
         [/kurodoko/, KurodokoAssist],
+        [/hitori/, HitoriAssist],
     ];
 
     if (genrelist.filter(g => RegExp('\\\?' + g[0].source + '\\\/').test(document.URL)).length === 1) {
@@ -738,6 +739,71 @@
             if (cell.qnum !== CQNUM.none) {
                 add_green(cell);
             }
+        }
+    }
+
+    function HitoriAssist() {
+        GreenConnectedInCell();
+        BlockNotAdjacent();
+        let uniq = new Map();
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            uniq.set(cell, true);
+        }
+        let fn = function(a) {
+            let vis = new Map();
+            for (let cell of a) {
+                if (cell.qnum === CQNUM.none) continue;
+                if (cell.qsub === CQSUB.green) vis.set(cell.qnum, cell);
+            }
+            for (let cell of a) {
+                if (cell.qnum === CQNUM.none) continue;
+                if (vis.has(cell.qnum)) add_block(cell);
+            }
+
+            let cnt = new Map();
+            for (let cell of a) {
+                if (cell.qnum === CQNUM.none) continue;
+                let c = cnt.has(cell.qnum) ? cnt.get(cell.qnum) : 0;
+                c++;
+                cnt.set(cell.qnum, c);
+            }
+            for (let cell of a) {
+                if (cell.qnum === CQNUM.none) continue;
+                if (cnt.get(cell.qnum) >= 2) uniq.set(cell, false);
+            }
+
+            // aba
+            for (let i = 0; i < a.length-2; i++) {
+                if (a[i].qnum === CQNUM.none || a[i].qnum !== a[i+2].qnum) continue;
+                add_green(a[i+1]);
+            }
+
+            // a..bb
+            for (let i = 0; i < a.length-1; i++) {
+                if (a[i].qnum === CQNUM.none || a[i].qnum !== a[i+1].qnum) continue;
+                for (let j = 0; j < a.length; j++) {
+                    if (j !== i && j !== i+1 && a[j].qnum === a[i].qnum) add_block(a[j]);
+                }
+            }
+        };
+        for (let i = 0; i < board.rows; i++) {
+            let a = [];
+            for (let j = 0; j < board.cols; j++) {
+                a.push(board.getc(2 * i + 1, 2 * j + 1));
+            }
+            fn(a);
+        }
+        for (let j = 0; j < board.cols; j++) {
+            let a = [];
+            for (let i = 0; i < board.rows; i++) {
+                a.push(board.getc(2 * i + 1, 2 * j + 1));
+            }
+            fn(a);
+        }
+        for (let i = 0; i < board.cell.length; i++) {
+            let cell = board.cell[i];
+            if (uniq.get(cell)) add_green(cell);
         }
     }
 
