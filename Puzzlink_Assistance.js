@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.11.4.2
+// @version      23.11.7.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -133,6 +133,7 @@ const genrelist = [
     [/nothing/, AllorNothingAssist],
     [/kurodoko/, KurodokoAssist],
     [/hitori/, HitoriAssist],
+    [/norinori/, NorinoriAssist],
 ];
 
 if (genrelist.filter(g => RegExp('\\\?' + g[0].source + '\\\/').test(document.URL)).length === 1) {
@@ -281,6 +282,7 @@ function CellConnected(isShaded, isUnshaded, add_shaded, add_unshaded,
     let ord = new Map();
     let low = new Map();
     let blkn = new Map();
+    let shadelist = [];
     let dfs = function (c, f = null) {
         if (!c.isnull && isUnshaded(c) || ord.has(c)) { return; }
         if (c.isnull && !OutsideAsBlack) { return; }
@@ -288,11 +290,11 @@ function CellConnected(isShaded, isUnshaded, add_shaded, add_unshaded,
         low.set(n, n);
         blkn.set(n, 0);
         n++;
-        let cellList = [];
+        const cellset = new Set();
         if (!c.isnull) {
             let linkdfs = function (c) {
-                if (c.isnull || cellList.indexOf(c) !== -1) { return; }
-                cellList.push(c);
+                if (c.isnull || cellset.has(c)) { return; }
+                cellset.add(c);
                 let fn = function (nb, nc) {
                     if (isLinked(c, nb, nc)) {
                         linkdfs(nc);
@@ -301,7 +303,7 @@ function CellConnected(isShaded, isUnshaded, add_shaded, add_unshaded,
                 fourside(fn, c.adjborder, c.adjacent);
             }
             linkdfs(c);
-            cellList.forEach(cl => {
+            cellset.forEach(cl => {
                 ord.set(cl, ord.get(c));
                 blkn.set(ord.get(cl), blkn.get(ord.get(cl)) + isShaded(cl));
             });
@@ -322,12 +324,12 @@ function CellConnected(isShaded, isUnshaded, add_shaded, add_unshaded,
             if (ordnc > ordc) {
                 blkn.set(ordc, blkn.get(ordc) + blkn.get(ordnc));
                 if (ordc <= low.get(ordnc) && blkn.get(ordnc) > 0) {
-                    cellList.forEach(c => add_shaded(c));
+                    cellset.forEach(c => shadelist.push(c));
                 }
             }
         };
         if (!c.isnull) {
-            cellList.forEach(c => fourside(fn, c.adjacent, c.adjborder));
+            cellset.forEach(c => fourside(fn, c.adjacent, c.adjborder));
         } else if (c.isnull) {
             for (let i = 0; i < board.cols; i++) {
                 dfs(board.getc(2 * i + 1, board.minby + 1), c);
@@ -347,6 +349,7 @@ function CellConnected(isShaded, isUnshaded, add_shaded, add_unshaded,
             dfs(board.cell[i]);
         }
     }
+    shadelist.forEach(c => add_shaded(c));
     if (ord.size > 0) {
         for (let i = 0; i < board.cell.length; i++) {
             if (ord.has(board.cell[i]) || isShaded(board.cell[i]) || isUnshaded(board.cell[i])) { continue; }
@@ -653,6 +656,65 @@ function NoChecker(isShaded, isUnshaded, add_shaded, add_unshaded) {
 }
 
 // assist for certain genre
+function NorinoriAssist() {
+    for (let i = 0; i < board.cell.length; i++) {
+        let cell = board.cell[i];
+        let list = adjlist(cell.adjacent);
+        // surrounded by dot
+        if (!list.some(c => !c.isnull && c.qsub !== CQSUB.dot)) {
+            add_dot(cell);
+        }
+        // extend domino
+        if (cell.qans === CQANS.black && list.filter(c => !c.isnull && c.qsub !== CQSUB.dot).length === 1) {
+            let ncell = list.find(c => !c.isnull && c.qsub !== CQSUB.dot);
+            add_black(ncell);
+        }
+        // finished domino
+        if (cell.qans === CQANS.black && list.some(c => !c.isnull && c.qans === CQANS.black)) {
+            let ncell = list.find(c => !c.isnull && c.qans === CQANS.black);
+            fourside(add_dot, cell.adjacent);
+            fourside(add_dot, ncell.adjacent);
+        }
+        // not making triomino
+        if (list.filter(c => !c.isnull && c.qans === CQANS.black).length >= 2) {
+            add_dot(cell);
+        }
+        //  .      . 
+        // .X  -> .X 
+        //          .
+        for (let d = 0; d < 4; d++) {
+            if (cell.qans === CQANS.black &&
+                (offset(cell, -1, 0, d).isnull || offset(cell, -1, 0, d).qsub === CQSUB.green) &&
+                (offset(cell, 0, -1, d).isnull || offset(cell, 0, -1, d).qsub === CQSUB.green)) {
+                add_dot(offset(cell, 1, 1, d));
+            }
+        }
+    }
+    for (let i = 0; i < board.roommgr.components.length; i++) {
+        let room = board.roommgr.components[i];
+        let list = [];
+        for (let j = 0; j < room.clist.length; j++) {
+            list.push(room.clist[j]);
+        }
+        // finish region
+        if (list.filter(c => c.qans === CQANS.black).length === 2) {
+            list.forEach(c => add_dot(c));
+        }
+        if (list.filter(c => c.qsub !== CQSUB.dot).length === 2) {
+            list.forEach(c => add_black(c));
+        }
+        if (list.filter(c => c.qans === CQANS.black).length === 1) {
+            list.forEach(c => {
+                if (c.qans === CQANS.black || c.qsub === CQSUB.dot) { return; }
+                if (!adjlist(c.adjacent).some(nc => !nc.isnull &&
+                    (c.room !== nc.room && nc.qsub !== CQSUB.dot || c.room === nc.room && nc.qans === CQANS.black))) {
+                    add_dot(c);
+                }
+            });
+        }
+    }
+}
+
 function AllorNothingAssist() {
     let add_color = function (c, color) {
         if (c.isnull || c.qsub !== CQSUB.none) { return; }

@@ -27,6 +27,7 @@ Currently support:
 * Light and Shadow
 * Lits
 * Masyu
+* Norinori
 * No Three
 * Nurikabe
 * Nuri-Maze
