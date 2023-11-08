@@ -18,26 +18,26 @@ Currently support:
 * Castle Wall
 * Cave
 * Choco Banana
-* Ekawayeh
+* ekawayeh
 * Guide Arrow
 * Heyawake
 * Hitori
 * Icebarn
 * Kurodoko
 * Light and Shadow
-* Lits
+* LITS
 * Masyu
 * Norinori
 * No Three
 * Nurikabe
 * Nuri-Maze
 * Nurimisaki
-* Starbattle
 * Shakashaka
 * Simple Loop
 * Slalom
 * Slant
-* Slither Link
+* Slitherlink
+* Star Battle
 * Tapa
 * Yajilin
 * Yin-Yang
