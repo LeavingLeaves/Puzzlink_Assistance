@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.11.10.3
+// @version      23.11.10.4
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -10,8 +10,8 @@
 // @grant        none
 // @namespace    https://greasyfork.org/users/1192854
 // @license      GPL
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/const_list.js#sha256=55dcd3c64623ffb2930857f7f6f2159b361953720f544b423c47bca701f94999
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/initiate.js#sha256=cbdd7ead6af32145cc3ccbe4cc3a55409f42872199bbfbe1cbffab86093965e0
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/const_list.js#sha256=8ee250719bd3371a93c1d29e2ebeba0dce41ff0c334f6e4b718d8c61944ce278
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/initiate.js#sha256=1dfcd563d242ebfc584d6df5566b288b24301fe01121a11cc7b70c6d1885522d
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/simple_func.js#sha256=30d23e3eebe9ab588fb24f7fccf4a1c31aaad00c30dd4e3507b8f1dc69ce5968
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/single_deduce.js#sha256=b578a12e38251c7e3022af68bde8742a283bd9b766b8d385cff4e631b9981593
 // ==/UserScript==
@@ -104,6 +104,9 @@ function TentaishoAssist() {
     let templist = [];
     for (let i = 0; i < board.cell.length; i++) {
         let cell = board.cell[i];
+        if (!isDot(cell) && adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans).length === 1) {
+            add_link(adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans)[0]);
+        }
         if (!isEmpty(cell) || id.has(cell) || templist.includes(cell)) { continue; }
         let clist = [];
         let nid = [];
@@ -136,6 +139,7 @@ function TentaishoAssist() {
             }
         }
     }
+    document.querySelector('#btncolor').click();
 }
 
 function NorinoriAssist() {
