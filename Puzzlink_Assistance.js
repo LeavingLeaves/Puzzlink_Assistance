@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.11.10.2
+// @version      23.11.10.3
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -10,8 +10,8 @@
 // @grant        none
 // @namespace    https://greasyfork.org/users/1192854
 // @license      GPL
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/initiate.js#sha256=59a71ee9dbc922efe5ccfc4ee7c5562f9e852774bd50aeb1093d491ee1259249
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/const_list.js#sha256=7744e668fd4c894b79162e4e36e49258a2ea687eabf2d944fa91fdc7bf4fef71
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/const_list.js#sha256=ad7a695cb94b94962aac6c0e1a269f90a9f7c4f9fc66b50d4ecb69b538cd9070
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/initiate.js#sha256=5b5fd3a2ccf4dbeaf1b3ffb85372bf35376e0b17ff8faf6922a440b410c16c2e
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/simple_func.js#sha256=30d23e3eebe9ab588fb24f7fccf4a1c31aaad00c30dd4e3507b8f1dc69ce5968
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/single_deduce.js#sha256=b578a12e38251c7e3022af68bde8742a283bd9b766b8d385cff4e631b9981593
 // ==/UserScript==
