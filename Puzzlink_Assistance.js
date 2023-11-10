@@ -13,7 +13,7 @@
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/const_list.js#sha256=d0TmaP1MiUt5Fi5ONuSSWKLqaH6r8tlE+pH9x79P73E=
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/initiate.js#sha256=0hRL1wjeULNgA0g5eVTtqa+O0xZ1xXA82/Ctq/4GdMA=
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/simple_func.js#sha256=MNI+Puvpq1iPsk9/zPShwxqq0Aww3U41B7jx3GnOWWg=
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/single_deduce.js#sha256=ukBAcenN82CxigSrBdKyOPcltd0Sw1+j8cu0YK/rUj4=
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/single_deduce.js#sha256=c3yei5efC1wcpHexxSUZJamD0yhUs4YeItG7cxVx8qE=
 // ==/UserScript==
 
 'use strict';
