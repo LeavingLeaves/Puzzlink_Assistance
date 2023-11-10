@@ -220,7 +220,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => b.qsub !==
                 }
             }
         }
-        if (linecnt === 0) {
+        if (linecnt === 0 && isPass(cell)) {
             let list = [];
             fourside((c, b) => {
                 if (isPathable(b)) { list.push([c, b]); }
