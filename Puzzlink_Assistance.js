@@ -10,51 +10,13 @@
 // @grant        none
 // @namespace    https://greasyfork.org/users/1192854
 // @license      GPL
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/initiate.js#sha256=59a71ee9dbc922efe5ccfc4ee7c5562f9e852774bd50aeb1093d491ee1259249
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/const_list.js#sha256=7744e668fd4c894b79162e4e36e49258a2ea687eabf2d944fa91fdc7bf4fef71
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/simple_func.js#sha256=30d23e3eebe9ab588fb24f7fccf4a1c31aaad00c30dd4e3507b8f1dc69ce5968
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/single_deduce.js#sha256=b578a12e38251c7e3022af68bde8742a283bd9b766b8d385cff4e631b9981593
 // ==/UserScript==
 
 'use strict';
-
-let GENRENAME = "";
-let flg = true;
-let step = false;
-let board;
-
-window.addEventListener('load', function () {
-    GENRENAME = this.window.ui.puzzle.info.en;
-    board = this.window.ui.puzzle.board;
-    if (genrelist.some(g => g[0] === GENRENAME)) {
-        let btn = '<button type="button" class="btn" id="assist" style="display: inline;">Assist</button>';
-        let btn2 = '<button type="button" class="btn" id="assiststep" style="display: inline;">Assist Step</button>';
-        document.querySelector('#btntrial').insertAdjacentHTML('afterend', btn);
-        document.querySelector("#assist").insertAdjacentHTML('afterend', btn2);
-        document.querySelector("#assist").addEventListener("click", assist, false);
-        document.querySelector("#assiststep").addEventListener("click", assiststep, false);
-        window.addEventListener("keypress", (event) => {
-            if (event.key === 'q' || (event.key === 'Q')) { assist(); }
-            if (event.key === 'w' || (event.key === 'W')) { assiststep(); }
-        });
-    }
-}, false);
-
-function assiststep() {
-    step = true;
-    assist();
-    step = false;
-}
-
-function assist() {
-    flg = true;
-    for (let loop = 0; loop < (step ? 1 : MAXLOOP); loop++) {
-        if (!flg) { break; }
-        flg = false;
-        genrelist.find(g => g[0] === GENRENAME)[1]();
-    }
-    ui.puzzle.redraw();
-    console.log('Assisted.');
-}
 
 // assist for certain genre
 function TentaishoAssist() {
