@@ -1,4 +1,3 @@
-let GENRENAME = "";
 let flg = true;
 let step = false;
 let board;

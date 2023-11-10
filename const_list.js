@@ -113,7 +113,7 @@ const genrelist = [
     [/slither(link)?(_play)?/, SlitherlinkAssist],
     [/starbattle/, StarbattleAssist],
     [/tapa/, TapaAssist],
-    [/tentaisho/, TentaishoAssist]
+    [/tentaisho/, TentaishoAssist],
     [/yaji[lr]in/, YajilinAssist],
     [/yinyang/, YinyangAssist],
 ];
