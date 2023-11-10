@@ -10,7 +10,6 @@
 // @grant        none
 // @namespace    https://greasyfork.org/users/1192854
 // @license      GPL
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/colored_shade.js#sha256=af29ae319d1fe8ed661cd3484a5e9db792392276833493e82eee3c6b4a6df7c3
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/const_list.js#sha256=7744e668fd4c894b79162e4e36e49258a2ea687eabf2d944fa91fdc7bf4fef71
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/simple_func.js#sha256=30d23e3eebe9ab588fb24f7fccf4a1c31aaad00c30dd4e3507b8f1dc69ce5968
 // @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/single_deduce.js#sha256=b578a12e38251c7e3022af68bde8742a283bd9b766b8d385cff4e631b9981593
@@ -26,7 +25,6 @@ let board;
 window.addEventListener('load', function () {
     GENRENAME = this.window.ui.puzzle.info.en;
     board = this.window.ui.puzzle.board;
-    colored_shade();
     if (genrelist.some(g => g[0] === GENRENAME)) {
         let btn = '<button type="button" class="btn" id="assist" style="display: inline;">Assist</button>';
         let btn2 = '<button type="button" class="btn" id="assiststep" style="display: inline;">Assist Step</button>';
