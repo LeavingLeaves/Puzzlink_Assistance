@@ -10,9 +10,9 @@
 // @grant        none
 // @namespace    https://greasyfork.org/users/1192854
 // @license      GPL
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/const_list.js#md5=44050b9959bccc9ae01c1d473237f02c
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/simple_func.js#md5=be3e1f5112a35c13df9ba84ee683bd47
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/single_deduce.js#md5=0e23ab2dee9c71d993e7ef6133028300
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/const_list.js#sha256=ef7c868858fb8ff883314b5d892bea92f9c5189193133dca213a9d66688685a0
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/simple_func.js#sha256=bc325787dd5729fa2e552d9fb96a667c251023a113d22ff5753b576c44f0fbd8
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/single_deduce.js#sha256=d277e4ca5ca61fec11d6fb2f4f400b385ab8880af681de8fa967ed6ec2eddb45
 // ==/UserScript==
 
 'use strict';
