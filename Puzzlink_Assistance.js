@@ -10,10 +10,10 @@
 // @grant        none
 // @namespace    https://greasyfork.org/users/1192854
 // @license      GPL
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/const_list.js#sha256=7744e668fd4c894b79162e4e36e49258a2ea687eabf2d944fa91fdc7bf4fef71
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/initiate.js#sha256=d2144bd708de50b3600348397954eda9af8ed31675c5703cdbf0adabfe0674c0
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/simple_func.js#sha256=30d23e3eebe9ab588fb24f7fccf4a1c31aaad00c30dd4e3507b8f1dc69ce5968
-// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/single_deduce.js#sha256=b578a12e38251c7e3022af68bde8742a283bd9b766b8d385cff4e631b9981593
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/const_list.js#sha256=d0TmaP1MiUt5Fi5ONuSSWKLqaH6r8tlE+pH9x79P73E=
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/initiate.js#sha256=Wace6dvJIu/lzPxO58VWL56FJ3S9UK6xCT1JHuElkkk=
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/simple_func.js#sha256=MNI+Puvpq1iPsk9/zPShwxqq0Aww3U41B7jx3GnOWWg=
+// @require      https://raw.githubusercontent.com/LeavingLeaves/Puzzlink_Assistance/main/single_deduce.js#sha256=tXihLjglHH4wIq9oveh0Kig72bdmuNOFz/TmMbmYFZM=
 // ==/UserScript==
 
 'use strict';
