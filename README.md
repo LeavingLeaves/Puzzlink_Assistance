@@ -39,6 +39,7 @@ Currently support:
 * Slitherlink
 * Star Battle
 * Tapa
+* Tasquare
 * Tentaisho
 * Yajilin
 * Yin-Yang
