@@ -440,7 +440,6 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => b.qsub !==
         let adjline = cell.adjborder;
         fourside((c, b) => {
             if (!isPassable(c) || !isPathable(b)) {
-                add_notpass(c);
                 add_notpath(b);
             }
             if (!c.isnull && isPassable(c) && isPathable(b)) { emptycnt++; }
@@ -761,20 +760,82 @@ function TasquareAssist() {
         isSquare: true,
     });
     CellConnected({
-        isShaded: c => c.qsub===CQSUB.dot || c.qnum!==CQNUM.none,
+        isShaded: c => c.qsub === CQSUB.dot || c.qnum !== CQNUM.none,
         isUnshaded: c => c.qans === CQANS.black,
         add_shaded: add_dot,
         add_unshaded: add_black,
     });
+    let is2x2able = function (c) {
+        for (let d = 0; d < 4; d++) {
+            let list = [c, offset(c, 0, 1, d), offset(c, 1, 0, d), offset(c, 1, 1, d)];
+            if (list.every(c => !c.isnull && c.qsub !== CQSUB.dot && c.qnum === CQNUM.none)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    let isNotBlack = c => c.isnull || c.qsub === CQSUB.dot || c.qnum !== CQNUM.none;
     for (let i = 0; i < board.cell.length; i++) {
         let cell = board.cell[i];
         if (cell.qnum === CQNUM.none) { continue; }
         add_dot(cell);
         let templist = adjlist(cell.adjacent);
-        if (templist.filter(c => !c.isnull && c.qsub !== CQSUB.dot && c.qnum === CQNUM.none).length === 1) {
+        if (templist.filter(c => !isNotBlack(c)).length === 1) {
             templist.forEach(c => add_black(c, true));
         }
         if (cell.qnum === CQNUM.quesmark) { continue; }
+        // black cells: n around 0~3, n-3 around 4~7, 2 around 8
+        if (cell.qnum <= 8) {
+            let list = adjlist(cell.adjacent).filter(c => !isNotBlack(c));
+            if ([0, 1, 2, 3].includes(cell.qnum) && list.length === cell.qnum ||
+                [4, 5, 6].includes(cell.qnum) && list.length === cell.qnum - 3 ||
+                cell.qnum === 8 && list.length === 2) {
+                list.forEach(c => add_black(c));
+            }
+        }
+        // 1*2^2 around 4~6, 2*2^2 around 8
+        if (cell.qnum >= 4 && cell.qnum <= 8) {
+            let list = [];
+            for (let d = 0; d < 4; d++) {
+                list.push([offset(cell, 2, 0, d), offset(cell, 1, 0, d)]);
+            }
+            list = list.filter(l => is2x2able(l[1]));
+            if (list.length === Math.floor(cell.qnum / 4)) {
+                list.forEach(l => { add_black(l[0]), add_black(l[1]) });
+            }
+        }
+        //        . .
+        //  3  ->  3 
+        //        . .
+        if (cell.qnum === 3) {
+            add_dot(offset(cell, -1, -1));
+            add_dot(offset(cell, -1, 1));
+            add_dot(offset(cell, 1, -1));
+            add_dot(offset(cell, 1, 1));
+        }
+        for (let d = 0; d < 4; d++) {
+            // ? # -> ?.# (?<=3)
+            if (cell.qnum <= 3 && offset(cell, 2, 0, d).qans === CQANS.black) {
+                add_dot(offset(cell, 1, 0, d));
+            }
+            // 4 . -> 4..
+            if (cell.qnum === 4 && isNotBlack(offset(cell, 2, 0, d))) {
+                add_dot(offset(cell, 1, 0, d));
+            }
+            //  .      . 
+            // .1  -> .1 
+            //          .
+            if (cell.qnum === 1 && isNotBlack(offset(cell, 0, -1, d)) && isNotBlack(offset(cell, -1, 0, d))) {
+                add_dot(offset(cell, 1, 1, d));
+            }
+            //  .      . 
+            //  2  ->  2 
+            //        . .
+            if (cell.qnum === 2 && isNotBlack(offset(cell, 0, -1, d))) {
+                add_dot(offset(cell, -1, 1, d));
+                add_dot(offset(cell, 1, 1, d));
+            }
+        }
         let blist = [];
         let dfs = function (c) {
             if (blist.includes(c) || c.isnull || c.qans !== CQANS.black) { return; }
