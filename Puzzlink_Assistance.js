@@ -98,7 +98,7 @@ const BQSUB = {
     arrow_lt: 13,
     arrow_rt: 14,
 };
-//TODO: Moon or Sun, Pencils, Fillomino, Square Jam, Country Road
+//TODO: Moon or Sun, Pencils, Fillomino, Country Road
 const GENRELIST = [
     ["Akari", AkariAssist],
     ["All or Nothing", AllorNothingAssist],
@@ -122,10 +122,12 @@ const GENRELIST = [
     ["Nuri-Maze", NuriMazeAssist],
     ["Nurimisaki", NurimisakiAssist],
     ["Shakashaka", ShakashakaAssist],
+    ["Shikaku", ShikakuAssist],
     ["Simple Loop", SimpleloopAssist],
     ["Slalom", SlalomAssist],
     ["Slant", SlantAssist],
     ["Slitherlink", SlitherlinkAssist],
+    ["Square Jam", SquareJamAssist],
     ["Star Battle", StarbattleAssist],
     ["Tapa", TapaAssist],
     ["Tasquare", TasquareAssist],
@@ -223,6 +225,13 @@ let add_line = function (b) {
     b.setLine(1);
     b.draw();
     flg |= b.line;
+};
+let add_side = function (b) {
+    if (b === undefined || b.isnull || b.qans || b.qsub === BQSUB.link) { return; }
+    if (step && flg) { return; }
+    b.setQans(1);
+    b.draw();
+    flg |= b.qans;
 };
 let add_arrow = function (b, dir) {
     if (b === undefined || b.isnull || b.qsub !== BQSUB.none) { return; }
@@ -749,8 +758,167 @@ function RectRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, isSqu
     }
     shadelist.forEach(c => add_shaded(c));
 }
+function RectRegion_Border({ isSquare = false } = {}) {
+    let isLink = b => !b.isnull && b.qsub === BQSUB.link;
+    let isSide = b => b.isnull || b.qans;
+    for (let i = 0; i < board.cross.length; i++) {
+        let cross = board.cross[i];
+        for (let d = 0; d < 4; d++) {
+            //  x      x 
+            // x+  -> x+x
+            //         x 
+            let b1 = dir(cross.adjborder, d);
+            let b2 = dir(cross.adjborder, d + 1);
+            if (isLink(b1) && isLink(b2)) {
+                add_link(dir(cross.adjborder, d + 2));
+                add_link(dir(cross.adjborder, d + 3));
+            }
+            //  |      | 
+            // x+  -> x+ 
+            //         | 
+            if (isSide(b1) && isLink(b2)) {
+                add_side(dir(cross.adjborder, d + 2));
+            }
+            //  x      x 
+            // -+  -> -+-
+            //           
+            if (isLink(b1) && isSide(b2)) {
+                add_side(dir(cross.adjborder, d + 3));
+            }
+            //  |      | 
+            //  +  -> -+-
+            //  x      x 
+            b2 = dir(cross.adjborder, d + 2);
+            if (isSide(b1) && isLink(b2)) {
+                add_side(dir(cross.adjborder, d + 1));
+                add_side(dir(cross.adjborder, d + 3));
+            }
+        }
+    }
+    if (!isSquare) { return; }
+    let drawlist = [];
+    for (let i = 0; i < board.cell.length; i++) {
+        let cell = board.cell[i];
+        if (isLink(cell.adjborder.top)) { continue; }
+        if (isLink(cell.adjborder.left)) { continue; }
+        let height = 1, width = 1;
+        while (isLink(offset(cell, 0, height - .5))) { height++; }
+        while (isLink(offset(cell, width - .5, 0))) { width++; }
+        // finished square
+        if (width === height) {
+            let templist = [offset(cell, -.5, 0), offset(cell, 0, -.5), offset(cell, width - .5, 0), offset(cell, 0, height - .5)];
+            if ([templist[0], templist[2]].every(c => isSide(c)) ||
+                [templist[1], templist[3]].every(c => isSide(c))) {
+                templist.forEach(c => add_side(c));
+            }
+        }
+        // extend square
+        if (height > width) {
+            for (let j = 0; j < height; j++) {
+                let c = offset(cell, 0, j);
+                let l = 0, r = 0;
+                while (!isSide(offset(c, l - .5, 0)) && l > width - height) { l--; }
+                while (!isSide(offset(c, r + .5, 0)) && r < height - 1) { r++; }
+                for (let k = r - height + 1.5; k <= l + height - 1.5; k++) {
+                    drawlist.push(offset(c, k, 0));
+                }
+            }
+        }
+        if (height < width) {
+            for (let j = 0; j < width; j++) {
+                let c = offset(cell, j, 0);
+                let l = 0, r = 0;
+                while (!isSide(offset(c, 0, l - .5)) && l > height - width) { l--; }
+                while (!isSide(offset(c, 0, r + .5)) && r < width - 1) { r++; }
+                for (let k = r - width + 1.5; k <= l + width - 1.5; k++) {
+                    drawlist.push(offset(c, 0, k));
+                }
+            }
+        }
+    }
+    drawlist.forEach(b => add_link(b));
+}
 
 // assist for certain genre
+function ShikakuAssist() {
+    RectRegion_Border();
+    for (let i = 0; i < board.cell.length; i++) {
+        let cell = board.cell[i];
+        if (cell.qnum < 0) { continue; }
+        for (let d = 0; d < 4; d++) {
+            if (dir(cell.adjacent, d).qnum !== CQNUM.none) {
+                add_side(dir(cell.adjborder, d));
+            }
+        }
+        let h1 = -.5, h2 = .5;
+        let w1 = -.5, w2 = .5;
+        while ((b => !b.isnull && b.qsub === BQSUB.link)(offset(cell, 0, h1))) { h1--; }
+        while ((b => !b.isnull && b.qsub === BQSUB.link)(offset(cell, 0, h2))) { h2++; }
+        while ((b => !b.isnull && b.qsub === BQSUB.link)(offset(cell, w1, 0))) { w1--; }
+        while ((b => !b.isnull && b.qsub === BQSUB.link)(offset(cell, w2, 0))) { w2++; }
+        if ((h2 - h1) * (w2 - w1) === cell.qnum) {
+            add_side(offset(cell, 0, h1));
+            add_side(offset(cell, 0, h2));
+            add_side(offset(cell, w1, 0));
+            add_side(offset(cell, w2, 0));
+            continue;
+        }
+        while ((b => !b.isnull && !b.qans)(offset(cell, 0, h1)) &&
+            (c => !c.isnull && c.qnum === CQNUM.none)(offset(cell, 0, h1 - .5))) { h1--; }
+        while ((b => !b.isnull && !b.qans)(offset(cell, 0, h2)) &&
+            (c => !c.isnull && c.qnum === CQNUM.none)(offset(cell, 0, h2 + .5))) { h2++; }
+        while ((b => !b.isnull && !b.qans)(offset(cell, w1, 0)) &&
+            (c => !c.isnull && c.qnum === CQNUM.none)(offset(cell, w1 - .5, 0))) { w1--; }
+        while ((b => !b.isnull && !b.qans)(offset(cell, w2, 0)) &&
+            (c => !c.isnull && c.qnum === CQNUM.none)(offset(cell, w2 + .5, 0))) { w2++; }
+        h1 = Math.max(h1, -cell.qnum + .5);
+        h2 = Math.min(h2, cell.qnum - .5);
+        w1 = Math.max(w1, -cell.qnum + .5);
+        w2 = Math.min(w2, cell.qnum - .5);
+        let minh = h2 - h1, minw = w2 - w1;
+        for (let k = Math.ceil(cell.qnum / (w2 - w1)); k <= h2 - h1; k++) {
+            if (cell.qnum % k !== 0) { continue; }
+            minh = Math.min(minh, k);
+            minw = Math.min(minw, cell.qnum / k);
+        }
+        for (let j = h2 - minh + 1; j <= h1 + minh - 1; j++) {
+            add_link(offset(cell, 0, j));
+        }
+        for (let j = w2 - minw + 1; j <= w1 + minw - 1; j++) {
+            add_link(offset(cell, j, 0));
+        }
+    }
+}
+
+function SquareJamAssist() {
+    RectRegion_Border({ isSquare: true });
+    for (let i = 0; i < board.cross.length; i++) {
+        let cross = board.cross[i];
+        let list = adjlist(cross.adjborder);
+        if (list.filter(b => !b.isnull && b.qans).length === 3) {
+            list.forEach(b => add_link(b));
+        }
+    }
+    for (let i = 0; i < board.cell.length; i++) {
+        let cell = board.cell[i];
+        if (cell.qnum < 0) { continue; }
+        let h1 = -.5, h2 = .5;
+        while ((b => !b.isnull && b.qsub === BQSUB.link)(offset(cell, 0, h1))) { h1--; }
+        while ((b => !b.isnull && b.qsub === BQSUB.link)(offset(cell, 0, h2))) { h2++; }
+        if (cell.qnum === h2 - h1) {
+            add_side(offset(cell, 0, h1));
+            add_side(offset(cell, 0, h2));
+        }
+        let w1 = -.5, w2 = .5;
+        while ((b => !b.isnull && b.qsub === BQSUB.link)(offset(cell, w1, 0))) { w1--; }
+        while ((b => !b.isnull && b.qsub === BQSUB.link)(offset(cell, w2, 0))) { w2++; }
+        if (cell.qnum === w2 - w1) {
+            add_side(offset(cell, w1, 0));
+            add_side(offset(cell, w2, 0));
+        }
+    }
+}
+
 function TasquareAssist() {
     RectRegion_Cell({
         isShaded: c => c.qans === CQANS.black,
@@ -851,20 +1019,13 @@ function TasquareAssist() {
 }
 
 function TentaishoAssist() {
-    let add_line = function (b) {
-        if (b === undefined || b.isnull || b.qsub === BQSUB.link || b.qans) { return; }
-        if (step && flg) { return; }
-        b.setQans(1);
-        b.draw();
-        flg |= b.qans;
-    };
     let isDot = obj => obj.qnum > 0;
     let isEmpty = c => !c.isnull && c.ques !== CQUES.bwall;
     for (let i = 0; i < board.cross.length; i++) {
         let cross = board.cross[i];
         let list = adjlist(cross.adjborder);
         if (list.filter(b => !b.isnull && b.qsub === BQSUB.link).length === 2 && cross.lcnt === 1) {
-            list.forEach(b => add_line(b));
+            list.forEach(b => add_side(b));
         }
         if (list.filter(b => !b.isnull && b.qsub === BQSUB.link).length === 3) {
             list.forEach(b => add_link(b));
@@ -883,8 +1044,8 @@ function TentaishoAssist() {
             let nb = board.getb(bbx, bby);
             let nc = board.getc(cbx, cby);
             if (!isEmpty(nc) || nb.qans || id.has(nc) && id.get(nc) !== id.get(c)) {
-                add_line(nb);
-                add_line(board.getb(2 * x - bbx, 2 * y - bby));
+                add_side(nb);
+                add_side(board.getb(2 * x - bbx, 2 * y - bby));
             }
             if (id.has(nc) && id.get(nc) === id.get(c)) {
                 add_link(nb);

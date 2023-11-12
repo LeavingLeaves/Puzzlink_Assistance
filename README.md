@@ -33,10 +33,12 @@ Currently support:
 * Nuri-Maze
 * Nurimisaki
 * Shakashaka
+* Shikaku
 * Simple Loop
 * Slalom
 * Slant
 * Slitherlink
+* Square Jam
 * Star Battle
 * Tapa
 * Tasquare
