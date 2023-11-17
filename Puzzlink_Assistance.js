@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.11.10.4
+// @version      23.11.17.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -104,10 +104,10 @@ const GENRELIST = [
     ["All or Nothing", AllorNothingAssist],
     ["Aqre", AqreAssist],
     ["Aquapelago", AquapelagoAssist],
+    ["Ayeheya", AyeheyaAssist],
     ["Castle Wall", CastleWallAssist],
     ["Cave", CaveAssist],
     ["Choco Banana", ChocoBananaAssist],
-    ["ekawayeh", EkawayehAssist],
     ["Guide Arrow", GuideArrowAssist],
     ["Heyawake", HeyawakeAssist],
     ["Hitori", HitoriAssist],
@@ -489,7 +489,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => b.qsub !==
             }, adjcell, adjline);
             if (list.length === 3) {
                 let fn = function (a, b, c) {
-                    if (a[0].path !== null && a[0].path === b[0].path) {
+                    if (a[0].path !== null && a[0].path === b[0].path && board.linegraph.components.length > 1) {
                         add_path(c[1]);
                     }
                 }
@@ -840,7 +840,7 @@ function RectRegion_Border({ isSquare = false } = {}) {
 }
 
 // assist for certain genre
-function ShikakuAssist() {
+function ShikakuAssist() { // TODO: make it more useful
     RectRegion_Border();
     for (let i = 0; i < board.cell.length; i++) {
         let cell = board.cell[i];
@@ -890,7 +890,7 @@ function ShikakuAssist() {
     }
 }
 
-function SquareJamAssist() {
+function SquareJamAssist() { // TODO: make it more useful
     RectRegion_Border({ isSquare: true });
     for (let i = 0; i < board.cross.length; i++) {
         let cross = board.cross[i];
@@ -1033,37 +1033,54 @@ function TentaishoAssist() {
     }
     let n = 0;
     let id = new Map(); // map every cell to unique dot id
-    let dotmap = new Map();
-    let bfs_c = function (clist, n) {
-        let c = clist.pop();
+    let dotmap = new Map(); // get dot obj
+    let bfs_id = function (clist, n) {
+        while (clist.length > 0) {
+            let c = clist.pop();
+            let x = dotmap.get(n).bx;
+            let y = dotmap.get(n).by;
+            if (!isEmpty(c) || id.has(c)) { continue; }
+            id.set(c, n);
+            let fn = function (bbx, bby, cbx, cby) {
+                let nb = board.getb(bbx, bby);
+                let nc = board.getc(cbx, cby);
+                if (!isEmpty(nc) || nb.qans || id.has(nc) && id.get(nc) !== id.get(c)) {
+                    add_side(nb);
+                    add_side(board.getb(2 * x - bbx, 2 * y - bby));
+                }
+                if (id.has(nc) && id.get(nc) === id.get(c)) {
+                    add_link(nb);
+                }
+                if (isEmpty(nc) && nb.qsub === BQSUB.link) {
+                    add_link(board.getb(2 * x - bbx, 2 * y - bby));
+                    clist.push(nc);
+                    clist.push(board.getc(2 * x - cbx, 2 * y - cby));
+                }
+            };
+            fn(c.bx - 1, c.by, c.bx - 2, c.by);
+            fn(c.bx + 1, c.by, c.bx + 2, c.by);
+            fn(c.bx, c.by - 1, c.bx, c.by - 2);
+            fn(c.bx, c.by + 1, c.bx, c.by + 2);
+        }
+    };
+    let id_choice = new Map();
+    let dfs_idc = function (c, n) {
         let x = dotmap.get(n).bx;
         let y = dotmap.get(n).by;
-        if (!isEmpty(c) || id.has(c)) { return; }
-        id.set(c, n);
-        let fn = function (bbx, bby, cbx, cby) {
-            let nb = board.getb(bbx, bby);
-            let nc = board.getc(cbx, cby);
-            if (!isEmpty(nc) || nb.qans || id.has(nc) && id.get(nc) !== id.get(c)) {
-                add_side(nb);
-                add_side(board.getb(2 * x - bbx, 2 * y - bby));
-            }
-            if (id.has(nc) && id.get(nc) === id.get(c)) {
-                add_link(nb);
-            }
-            if (isEmpty(nc) && nb.qsub === BQSUB.link) {
-                add_link(board.getb(2 * x - bbx, 2 * y - bby));
-                clist.push(nc);
-                clist.push(board.getc(2 * x - cbx, 2 * y - cby));
-            }
-        };
-        fn(c.bx - 1, c.by, c.bx - 2, c.by);
-        fn(c.bx + 1, c.by, c.bx + 2, c.by);
-        fn(c.bx, c.by - 1, c.bx, c.by - 2);
-        fn(c.bx, c.by + 1, c.bx, c.by + 2);
+        let oc = board.getc(2 * x - c.bx, 2 * y - c.by);
+        if (!isEmpty(c) || id.has(c) && id.get(c) !== n) { return; }
+        if (!isEmpty(oc) || id.has(oc) && id.get(oc) !== n) { return; }
+        if (id_choice.has(c) && id_choice.get(c).includes(n)) { return; }
+        if (id_choice.has(oc) && id_choice.get(oc).includes(n)) { return; }
+        if (!id_choice.has(c)) { id_choice.set(c, []); }
+        if (!id_choice.has(oc)) { id_choice.set(oc, []); }
+        id_choice.set(c, id_choice.get(c).concat([n]));
+        id_choice.set(oc, id_choice.get(oc).concat([n]));
+        fourside((nb, nc) => {
+            if (nb.qans) { return; }
+            dfs_idc(nc, n);
+        }, c.adjborder, c.adjacent);
     };
-    let bfs = function (clist, n) {
-        while (clist.length > 0) { bfs_c(clist, n); }
-    }
     // assign cells to dots and deduce
     for (let x = board.minbx + 1; x <= board.maxbx - 1; x++) {
         for (let y = board.minby + 1; y <= board.maxby - 1; y++) {
@@ -1088,7 +1105,35 @@ function TentaishoAssist() {
                     clist.push(board.getc(x + 1, y - 1));
                     clist.push(board.getc(x + 1, y + 1));
                 }
-                bfs(clist, n);
+                bfs_id(clist, n);
+            }
+        }
+    }
+    // assign cells to possible dots
+    n = 0;
+    for (let x = board.minbx + 1; x <= board.maxbx - 1; x++) {
+        for (let y = board.minby + 1; y <= board.maxby - 1; y++) {
+            if (isDot(board.getobj(x, y))) {
+                n++;
+                let clist = [];
+                if (x % 2 === 1 && y % 2 === 1) {
+                    clist.push(board.getc(x, y));
+                }
+                if (x % 2 === 1 && y % 2 === 0) {
+                    clist.push(board.getc(x, y - 1));
+                    clist.push(board.getc(x, y + 1));
+                }
+                if (x % 2 === 0 && y % 2 === 1) {
+                    clist.push(board.getc(x - 1, y));
+                    clist.push(board.getc(x + 1, y));
+                }
+                if (x % 2 === 0 && y % 2 === 0) {
+                    clist.push(board.getc(x - 1, y - 1));
+                    clist.push(board.getc(x - 1, y + 1));
+                    clist.push(board.getc(x + 1, y - 1));
+                    clist.push(board.getc(x + 1, y + 1));
+                }
+                dfs_idc(clist[0], n);
             }
         }
     }
@@ -1099,36 +1144,9 @@ function TentaishoAssist() {
         if (!isDot(cell) && adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans).length === 1) {
             add_link(adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans)[0]);
         }
-        if (!isEmpty(cell) || id.has(cell) || templist.includes(cell)) { continue; }
-        let clist = [];
-        let nid = [];
-        let dfs = function (c) {
-            if (!isEmpty(c) || clist.includes(c)) { return; }
-            clist.push(c);
-            templist.push(c);
-            fourside((nb, nc) => {
-                if (nb.qans || !isEmpty(nc) || clist.includes(nc)) { return; }
-                if (id.has(nc)) {
-                    if (!nid.includes(id.get(nc))) {
-                        nid.push(id.get(nc));
-                    }
-                    return;
-                }
-                if (isEmpty(nc)) {
-                    dfs(nc);
-                }
-            }, c.adjborder, c.adjacent)
-        };
-        dfs(cell);
-        for (let c of clist) {
-            let anid = nid.filter(n => {
-                let dot = dotmap.get(n);
-                let dc = board.getc(dot.bx * 2 - c.bx, dot.by * 2 - c.by);
-                return isEmpty(dc) && (!id.has(dc) || id.get(dc) === n);
-            });
-            if (anid.length === 1) {
-                bfs([c], anid[0]);
-            }
+        if (!isEmpty(cell) || id.has(cell)) { continue; }
+        if (id_choice.has(cell) && id_choice.get(cell).length === 1) {
+            bfs_id([cell], id_choice.get(cell)[0]);
         }
     }
     document.querySelector('#btncolor').click();
@@ -2883,7 +2901,7 @@ function NothreeAssist() {
     }
 }
 
-function EkawayehAssist() {
+function AyeheyaAssist() {
     for (let i = 0; i < board.roommgr.components.length; i++) {
         let room = board.roommgr.components[i];
         let qnum = room.top.qnum;

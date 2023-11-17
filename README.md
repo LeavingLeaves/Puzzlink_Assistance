@@ -15,10 +15,10 @@ Currently support:
 * All or Nothing
 * Aqre
 * Aquapelago
+* Ayeheya
 * Castle Wall
 * Cave
 * Choco Banana
-* ekawayeh
 * Guide Arrow
 * Heyawake
 * Hitori
