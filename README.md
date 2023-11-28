@@ -23,6 +23,7 @@ Currently support:
 * Heyawake
 * Hitori
 * Icebarn
+* Koburin
 * Kurodoko
 * Light and Shadow
 * LITS
