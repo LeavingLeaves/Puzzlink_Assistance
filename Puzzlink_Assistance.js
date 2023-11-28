@@ -868,6 +868,16 @@ function ShikakuAssist() {
             }, c.adjborder, c.adjacent)
         }
         dfs(cell);
+        if ((y2 - y1 + 2) * (x2 - x1 + 2) === 4 * cell.qnum) {
+            for (let i = x1; i <= x2; i += 2) {
+                add_side(board.getb(i, y1 - 1));
+                add_side(board.getb(i, y2 + 1));
+            }
+            for (let i = y1; i <= y2; i += 2) {
+                add_side(board.getb(x1 - 1, i));
+                add_side(board.getb(x2 + 1, i));
+            }
+        }
         id_info.set(n, { cell: cell, x1: x1, x2: x2, y1: y1, y2: y2 });
     }
     // check available rectangle
@@ -900,17 +910,18 @@ function ShikakuAssist() {
         let info = id_info.get(i);
         let cell = info.cell;
         let x1 = info.x1, x2 = info.x2, y1 = info.y1, y2 = info.y2;
+        let isExtendable = c => !c.isnull && (!id.has(c) || typeof (id.get(c)) !== "number") || id.get(c) === i;
         if (cell.qnum === CQNUM.none) { continue; }
         if (cell.qnum === CQNUM.quesmark) {
             for (let d = 0; d < 4; d++) {
                 let c = cell;
                 let maxn = Math.max(board.cols, board.rows);
-                while ((c => !c.isnull && (!id.has(c) || typeof (id.get(c)) !== "number"))(offset(c, 1, 0, d))) {
+                while (isExtendable(offset(c, 1, 0, d))) {
                     c = offset(c, 1, 0, d);
                     add_n(c, i);
                     let c2 = c;
                     let n = 0;
-                    while ((c => !c.isnull && (!id.has(c) || typeof (id.get(c)) !== "number"))(offset(c2, 0, 1, d)) && n < maxn) {
+                    while (isExtendable(offset(c2, 0, 1, d)) && n < maxn) {
                         c2 = offset(c2, 0, 1, d);
                         add_n(c2, i);
                         n++;
