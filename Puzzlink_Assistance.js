@@ -880,18 +880,21 @@ function ShikakuAssist() {
         }
         id_info.set(n, { cell: cell, x1: x1, x2: x2, y1: y1, y2: y2 });
     }
-    // check available rectangle
+    // add n into choices
     let add_n = function (c, idn) {
         let obj = [];
         if (id.has(c)) { obj = id.get(c); }
         if (typeof (obj) !== "number" && !obj.includes(idn)) { obj.push(idn); }
         id.set(c, obj);
     }
+    // check available rectangle
     let fn = function (sx, sy, h, w, idn) {
         for (let i = 0; i < w; i++)
             for (let j = 0; j < h; j++) {
                 let cell = board.getc(sx + i * 2, sy + j * 2);
                 if (cell.isnull) { return 0; }
+                if (i > 0 && cell.adjborder.left.qans) { return 0; }
+                if (j > 0 && cell.adjborder.top.qans) { return 0; }
                 let obj = [];
                 if (id.has(cell)) { obj = id.get(cell); }
                 if (typeof (obj) === "number" && obj !== idn) { return 0; }
@@ -910,23 +913,26 @@ function ShikakuAssist() {
         let info = id_info.get(i);
         let cell = info.cell;
         let x1 = info.x1, x2 = info.x2, y1 = info.y1, y2 = info.y2;
-        let isExtendable = c => !c.isnull && (!id.has(c) || typeof (id.get(c)) !== "number") || id.get(c) === i;
+        let isExtendable = c => !c.isnull && (!id.has(c) || typeof (id.get(c)) !== "number" || id.get(c) === i);
         if (cell.qnum === CQNUM.none) { continue; }
         if (cell.qnum === CQNUM.quesmark) {
             for (let d = 0; d < 4; d++) {
                 let c = cell;
                 let maxn = Math.max(board.cols, board.rows);
-                while (isExtendable(offset(c, 1, 0, d))) {
-                    c = offset(c, 1, 0, d);
-                    add_n(c, i);
-                    let c2 = c;
+                let fn = function (c2) {
                     let n = 0;
-                    while (isExtendable(offset(c2, 0, 1, d)) && n < maxn) {
+                    while (isExtendable(offset(c2, 0, 1, d)) && !offset(c, 0, .5, d).qans && n < maxn) {
                         c2 = offset(c2, 0, 1, d);
                         add_n(c2, i);
                         n++;
                     }
                     maxn = Math.min(maxn, n);
+                }
+                fn(c);
+                while (isExtendable(offset(c, 1, 0, d)) && !offset(c, .5, 0, d).qans) {
+                    c = offset(c, 1, 0, d);
+                    add_n(c, i);
+                    fn(c);
                 }
             }
             continue;
@@ -945,7 +951,9 @@ function ShikakuAssist() {
                         else { list = list.filter(c => tmp.includes(c)); }
                     }
             }
-        list.forEach(c => id.set(c, i));
+        if (list !== null) {
+            list.forEach(c => id.set(c, i));
+        }
     }
     // apply cell with only one possibility
     for (let i = 0; i < board.cell.length; i++) {
@@ -3287,7 +3295,7 @@ function HeyawakeAssist() {
             }
         }
     }
-    const MAXSIT = 50000;
+    const MAXSIT = 200000;
     const MAXAREA = 50;
     for (let i = 0; i < board.roommgr.components.length; i++) {
         let room = board.roommgr.components[i];
@@ -3590,6 +3598,15 @@ function KoburinAssist() {
         if (cell.qnum !== CQNUM.none) {
             fourside(add_cross, adjline);
             for (let d = 0; d < 4; d++) {
+                //        · ·
+                //  3  ->  3 
+                //        · ·
+                if (cell.qnum === 3) {
+                    add_dot(offset(cell, -1, -1));
+                    add_dot(offset(cell, -1, +1));
+                    add_dot(offset(cell, +1, -1));
+                    add_dot(offset(cell, +1, +1));
+                }
                 //          █  
                 //  3   -> █3  
                 //    █       █
@@ -3967,6 +3984,15 @@ function SlitherlinkAssist() {
                 add_line(offset(cell, 1.5, 0, d));
                 add_cross(offset(cell, .5, -1, d));
                 add_cross(offset(cell, .5, 1, d));
+            }
+            //   ×        ×  
+            // · · ·    · ╺━╸
+            //  1 3  -> ×1 3 
+            // · · ·    ·×· ·
+            if (cell.qnum === 1 && offset(cell, 1, 0, d).qnum === 3 && isCross(offset(cell, .5, -1, d))) {
+                add_line(offset(cell, 1, -.5, d));
+                add_cross(offset(cell, -.5, 0, d));
+                add_cross(offset(cell, 0, .5, d));
             }
             // ·×· ·    ·×· ·
             // ×1       ×1   
