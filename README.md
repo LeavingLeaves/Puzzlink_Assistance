@@ -21,10 +21,12 @@ Currently enhanced genre:
 * Castle Wall
 * Cave
 * Choco Banana
+* Creek
 * Guide Arrow
 * Heyawake
 * Hitori
 * Icebarn
+* Inverse LITSO
 * Koburin
 * Kurodoko
 * Light and Shadow
@@ -37,6 +39,7 @@ Currently enhanced genre:
 * Nurikabe
 * Nuri-Maze
 * Nurimisaki
+* Pencils
 * Shakashaka
 * Shikaku
 * Simple Loop

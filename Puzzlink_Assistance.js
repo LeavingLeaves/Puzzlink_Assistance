@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.12.6.1
+// @version      23.12.12.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -51,10 +51,10 @@ const CQANS = {
     // Akari
     light: 1,
     // Shakashaka triangle
-    bl: 2,
-    br: 3,
-    tr: 4,
-    tl: 5,
+    triBL: 2,
+    triBR: 3,
+    triTR: 4,
+    triTL: 5,
     // Slant
     rslash: 31,
     lslash: 32,
@@ -105,7 +105,7 @@ const BQSUB = {
     arrow_lt: 13,
     arrow_rt: 14,
 };
-// TODO: Pencils, Fillomino, Country Road
+// TODO: Fillomino, Country Road
 const GENRELIST = [
     ["Akari", AkariAssist],
     ["All or Nothing", AllorNothingAssist],
@@ -116,10 +116,12 @@ const GENRELIST = [
     ["Castle Wall", CastleWallAssist],
     ["Cave", CaveAssist],
     ["Choco Banana", ChocoBananaAssist],
+    ["Creek", CreekAssist],
     ["Guide Arrow", GuideArrowAssist],
     ["Heyawake", HeyawakeAssist],
     ["Hitori", HitoriAssist],
     ["Icebarn", IcebarnAssist],
+    ["Inverse LITSO", InverseLitsoAssist],
     ["Koburin", KoburinAssist],
     ["Kurodoko", KurodokoAssist],
     ["Light and Shadow", LightandShadowAssist],
@@ -132,6 +134,7 @@ const GENRELIST = [
     ["Nurikabe", NurikabeAssist],
     ["Nuri-Maze", NuriMazeAssist],
     ["Nurimisaki", NurimisakiAssist],
+    ["Pencils", PencilsAssist],
     ["Shakashaka", ShakashakaAssist],
     ["Shikaku", ShikakuAssist],
     ["Simple Loop", SimpleloopAssist],
@@ -149,11 +152,14 @@ const GENRELIST = [
 
 // main entrance
 ui.puzzle.on('ready', function () {
+    if (document.querySelector("#assist") !== null) { return; }
     console.log("Assistance running...");
     GENRENAME = ui.puzzle.info.en;
+    console.log(`Puzzle Genre Name: ${GENRENAME}`);
     let btnName = "Assist";
     let btn2Name = "Assist Step";
     if (!GENRELIST.some(g => g[0] === GENRENAME)) {
+        console.log("Automatically generated assistant.");
         btnName += "(AG)";
         btn2Name += "(AG)";
     }
@@ -195,8 +201,11 @@ let offset = function (c, dx, dy, dir = 0) {
     if (dir === 2) { return board.getobj(c.bx - dx * 2, c.by - dy * 2); }
     if (dir === 3) { return board.getobj(c.bx - dy * 2, c.by + dx * 2); }
 }
-let adjlist = function (a) {
-    return [a.top, a.left, a.bottom, a.right];
+let adjlist = function (a, b = undefined) {
+    if (b === undefined) {
+        return [a.top, a.left, a.bottom, a.right];
+    }
+    return [[a.top, b.top], [a.left, b.left], [a.bottom, b.bottom], [a.right, b.right]];
 }
 let fourside = function (f, a, b = undefined) {
     if (b === undefined) {
@@ -266,14 +275,14 @@ let add_black = function (c, notOnNum = false) {
     c.draw();
 };
 let add_dot = function (c) {
-    if (c === undefined || c.isnull || c.qnum !== CQNUM.none || c.qnums.length > 0 || c.qans !== CQANS.none || c.qsub === CQSUB.dot) { return; }
+    if (c === undefined || c.isnull || c.qnum !== CQNUM.none || c.qnums.length > 0 || c.qans !== CQANS.none || c.qsub !== CQSUB.none) { return; }
     if (step && flg) { return; }
     flg = true;
     c.setQsub(CQSUB.dot);
     c.draw();
 };
 let add_green = function (c) {
-    if (c === undefined || c.isnull || c.qans !== CQANS.none || c.qsub === CQSUB.dot) { return; }
+    if (c === undefined || c.isnull || c.qans !== CQANS.none || c.qsub !== CQSUB.none) { return; }
     if (step && flg) { return; }
     flg = true;
     c.setQsub(CQSUB.green);
@@ -947,6 +956,239 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function PencilsAssist() {
+    let add_tip = function (c, dir) {  // 1=↑, 2=↓, 3=←, 4=→
+        if (c === undefined || c.isnull || c.qsub === CQSUB.green || c.anum !== CANUM.none) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setQsub(CQSUB.yellow);
+        c.setAnum(dir);
+        c.draw();
+    }
+    let add_yellow = function (c) {
+        if (c === undefined || c.isnull || c.qans !== CQANS.none || c.qsub !== CQSUB.none) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setQsub(CQSUB.yellow);
+        c.draw();
+    };
+    let add_cross = function (b) {
+        if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none || b.qans || b.ques) { return; }
+        if (step && flg) { return; }
+        b.setQsub(BQSUB.cross);
+        b.draw();
+        flg |= b.qsub === BQSUB.cross;
+    };
+    for (let i = 0; i < board.border.length; i++) {
+        let border = board.border[i];
+        if (border.qans && border.qsub === BQSUB.cross) {
+            border.setQsub(BQSUB.none);
+        }
+    }
+    // record cells with line that belongs to a tip
+    let cllist = [];
+    for (let i = 0; i < board.cell.length; i++) {
+        let cell = board.cell[i];
+        if (cell.anum !== CANUM.none) {
+            let dfs = function (c) {
+                if (c.isnull || cllist.includes(c)) { return; }
+                cllist.push(c);
+                fourside((nb, nc) => {
+                    if (!nb.isnull && nb.line) {
+                        dfs(nc);
+                    }
+                }, c.adjborder, c.adjacent);
+            }
+            dfs(cell);
+        }
+    }
+    let isTipAble = function (c, dir) {
+        if (c.isnull || cllist.includes(c) && c.anum !== dir || c.qsub === CQSUB.green) {
+            return false;
+        }
+        return true;
+    }
+    for (let i = 0; i < board.cell.length; i++) {
+        let cell = board.cell[i];
+        if (cell.qdir !== 0) {
+            add_tip(cell, cell.qdir);
+        }
+        if (cell.qnum !== CQNUM.none) {
+            add_green(cell);
+        }
+        if (cell.qnum === 1) {
+            fourside(add_side, cell.adjborder);
+        }
+        if (cell.qnum > 1) {
+            // extend clue
+            for (let d = 0; d < 2; d++) {
+                let ll = 0, rr = 0;
+                while ((b => !b.isnull && b.qsub === BQSUB.cross)(offset(cell, ll - .5, 0, d)) &&
+                    offset(cell, ll - 1, 0, d).qsub !== CQSUB.yellow) { ll--; }
+                while ((b => !b.isnull && b.qsub === BQSUB.cross)(offset(cell, rr + .5, 0, d)) &&
+                    offset(cell, rr + 1, 0, d).qsub !== CQSUB.yellow) { rr++; }
+                let lc = ll, rc = rr;
+                while ((c => !c.isnull && c.qsub !== CQSUB.yellow && (c.qnum < 0 || c.qnum === cell.qnum))(offset(cell, lc - 1, 0, d)) &&
+                    !offset(cell, lc - .5, 0, d).qans && lc > 1 - cell.qnum + rr) {
+                    lc--;
+                }
+                while ((c => !c.isnull && c.qsub !== CQSUB.yellow && (c.qnum < 0 || c.qnum === cell.qnum))(offset(cell, rc + 1, 0, d)) &&
+                    !offset(cell, rc + .5, 0, d).qans && rc < cell.qnum - 1 + ll) {
+                    rc++;
+                }
+                if ((b => b.isnull || b.qans)(offset(cell, 0, .5, d)) && (b => b.isnull || b.qans)(offset(cell, 0, -.5, d))) {
+                    for (let j = rc - cell.qnum + 1; j <= lc + cell.qnum - 1; j++) {
+                        add_green(offset(cell, j, 0, d));
+                        add_side(offset(cell, j, -.5, d));
+                        add_side(offset(cell, j, +.5, d));
+                        if (j < lc + cell.qnum - 1) {
+                            add_cross(offset(cell, j + .5, 0, d));
+                        }
+                    }
+                    if (rc - lc + 1 === cell.qnum) {
+                        add_side(offset(cell, rc + .5, 0, d));
+                        add_side(offset(cell, lc - .5, 0, d));
+                        if (!isTipAble(offset(cell, rc + 1, 0, d), d === 0 ? 4 : 1)) {
+                            add_tip(offset(cell, lc - 1, 0, d), d === 0 ? 3 : 2)
+                        }
+                        if (!isTipAble(offset(cell, lc - 1, 0, d), d === 0 ? 3 : 2)) {
+                            add_tip(offset(cell, rc + 1, 0, d), d === 0 ? 4 : 1)
+                        }
+                    }
+                }
+                if (rc - lc + 1 === cell.qnum && !isTipAble(offset(cell, rc + 1, 0, d), d === 0 ? 4 : 1) &&
+                    !isTipAble(offset(cell, lc - 1, 0, d), d === 0 ? 3 : 2)) {
+                    add_side(offset(cell, +.5, 0, d));
+                    add_side(offset(cell, -.5, 0, d));
+                }
+                if (rc - lc + 1 < cell.qnum) {
+                    add_side(offset(cell, +.5, 0, d));
+                    add_side(offset(cell, -.5, 0, d));
+                }
+            }
+        }
+        // add tip 
+        if (cell.qsub === CQSUB.green && (b => b.isnull || b.qans)(offset(cell, -.5, 0)) && (b => b.isnull || b.qans)(offset(cell, 0, -.5))) {
+            let dc = 0, rc = 0;
+            while ((b => !b.isnull && b.qsub === BQSUB.cross)(offset(cell, 0, dc + .5))) { dc++; }
+            while ((b => !b.isnull && b.qsub === BQSUB.cross)(offset(cell, rc + .5, 0))) { rc++; }
+            if ((b => b.isnull || b.qans)(offset(cell, 0, dc + .5)) && (b => b.isnull || b.qans)(offset(cell, rc + .5, 0))) {
+                let list = [];
+                if (dc === 0) {
+                    list.push([offset(cell, -1, 0), 3]);
+                    list.push([offset(cell, rc + 1, 0), 4]);
+                }
+                if (rc === 0) {
+                    list.push([offset(cell, 0, -1), 1]);
+                    list.push([offset(cell, 0, dc + 1), 2]);
+                }
+                list = list.filter(p => isTipAble(p[0], p[1]));
+                if (list.length === 1) {
+                    add_tip(list[0][0], list[0][1]);
+                }
+            }
+        }
+        // extend to match line and pencil
+        if (cell.anum !== CANUM.none) {
+            add_yellow(cell);
+            let d = qdirremap(cell.anum);
+            add_green(offset(cell, 0, 1, d));
+            add_side(offset(cell, 0, .5, d));
+            add_side(offset(cell, -.5, 1, d));
+            add_side(offset(cell, +.5, 1, d));
+            let pc = cell, lc = cell, llc = cell;
+            while (offset(pc, 0, .5, d).qsub === BQSUB.cross || pc === cell) {
+                let list = adjlist(lc.adjborder, lc.adjacent);
+                list = list.filter(([nb, nc]) => {
+                    if (nc === llc) { return false; }
+                    if (nc.isnull || nc.qsub === CQSUB.green || nc.anum !== CANUM.none) { return false; }
+                    if (cllist.includes(nc) && !nb.line) { return false; }
+                    if (nb.isnull || nb.qsub === BQSUB.cross || nb.qans) { return false; }
+                    return true;
+                });
+                if (list.some(p => p[0].line)) {
+                    list = list.filter(p => p[0].line);
+                }
+                if (list.length !== 1) { break; }
+                add_line(list[0][0]);
+                fourside((nb, nc) => {
+                    if (nc.qsub === CQSUB.yellow) {
+                        add_cross(nb);
+                    }
+                }, lc.adjborder, lc.adjacent);
+                llc = lc;
+                lc = list[0][1];
+                pc = offset(pc, 0, 1, d);
+                add_yellow(lc);
+            }
+            while (lc.lcnt === 2 || lc === cell && lc.lcnt === 1) {
+                add_cross(offset(pc, 0, .5, d));
+                pc = offset(pc, 0, 1, d);
+                add_green(pc);
+                add_side(offset(pc, -.5, 0, d));
+                add_side(offset(pc, +.5, 0, d));
+                [llc, lc] = [lc, adjlist(lc.adjborder, lc.adjacent).find(([nb, nc]) => !nb.isnull && nb.line && nc !== llc)[1]];
+            }
+            if (adjlist(lc.adjborder, lc.adjacent).every(([nb, nc]) =>
+                nc === llc || nb.isnull || nb.qsub === BQSUB.cross || nb.qans)) {
+                add_side(offset(pc, 0, .5, d));
+            }
+            if (pc !== cell && (b => b.isnull || b.qans)(offset(pc, 0, .5, d))) {
+                fourside((nb, nc) => {
+                    if (nc.qsub === CQSUB.yellow) {
+                        add_cross(nb);
+                    }
+                }, lc.adjborder, lc.adjacent);
+            }
+        }
+        if (cell.lcnt === 0 && adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => nb.isnull || nb.qans || nb.qsub === BQSUB.cross || nc.qsub === CQSUB.green || nc.lcnt === 2 || nc.lcnt === 1 && nc.anum !== CANUM.none)) {
+            add_green(cell);
+        }
+        if (adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => {
+            if (nc.isnull || nb.qans && nc.qsub === CQSUB.green) { return true; }
+            if (cllist.includes(nc) && nc.anum === CANUM.none) { return true; }
+            if (nc.anum !== CANUM.none && offset(nc, 0, 1, qdirremap(nc.anum)) !== cell) { return true; }
+            return false;
+        })) {
+            add_yellow(cell);
+        }
+        if (cell.lcnt > 0) {
+            add_yellow(cell);
+        }
+        if (cell.qsub === CQSUB.yellow && adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans && b.qsub !== BQSUB.cross).length === 1) {
+            add_line(adjlist(cell.adjborder).find(b => !b.isnull && !b.qans && b.qsub !== BQSUB.cross));
+        }
+        if ([[offset(cell, -1, 0), 3], [offset(cell, 1, 0), 4], [offset(cell, 0, -1), 1], [offset(cell, 0, 1), 2]].every(([c, d]) => !isTipAble(c, d)) &&
+            adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans).length === 1) {
+            add_cross(adjlist(cell.adjborder).find(b => !b.isnull && !b.qans));
+        }
+        for (let d = 0; d < 4; d++) {
+            let nc = offset(cell, 1, 0, d);
+            if (nc.isnull) { continue; }
+            // cross between cells in cllist
+            if (cllist.includes(cell) && cllist.includes(nc)) {
+                add_cross(offset(cell, .5, 0, d));
+            }
+            // add side between inner and outer
+            if (cell.qsub !== CQSUB.none && nc.qsub !== CQSUB.none && cell.qsub !== nc.qsub) {
+                add_side(offset(cell, .5, 0, d));
+            }
+            // extend pencil by cross mark
+            if (cell.qsub === CQSUB.green && (b => b.qsub === BQSUB.cross && !b.qans)(offset(cell, .5, 0, d))) {
+                add_side(offset(cell, 0, -.5, d));
+                add_side(offset(cell, 0, +.5, d));
+                add_side(offset(cell, 1, -.5, d));
+                add_side(offset(cell, 1, +.5, d));
+                add_green(nc);
+            }
+            // different clue
+            if (cell.qnum > 0 && nc.qnum > 0 && cell.qnum !== nc.qnum) {
+                add_side(offset(cell, .5, 0, d));
+            }
+        }
+    }
+}
+
 function MoonOrSunAssist() {
     RoomPassOnce();
     SingleLoopInCell({
@@ -977,7 +1219,7 @@ function MoonOrSunAssist() {
             if (c2.qnum === CQNUM.sun && c2.qsub === CQSUB.cross) { return 2; }
         }
         return 0;
-    } 
+    }
     for (let i = 0; i < board.cell.length; i++) {
         let cell = board.cell[i];
         fourside((nb, nc) => {
@@ -1913,8 +2155,10 @@ function StarbattleAssist() {
         for (let d = 0; d < 4; d++) {
             if (offset(cross, .5, .5, d).qsub === CQSUB.dot && offset(cross, -.5, .5, d).qsub === CQSUB.dot) {
                 add_cir(offset(cross, 0, -.5, d));
-                cross.setQsub(0);
-                cross.draw();
+                if (offset(cross, 0, -.5, d).qsub === 1) {
+                    cross.setQsub(0);
+                    cross.draw();
+                }
             }
         }
     }
@@ -2396,6 +2640,52 @@ function ChocoBananaAssist() {
     }
 }
 
+function CreekAssist() {
+    GreenConnected();
+    let dotcnt = 0;
+    for (let i = 0; i < board.cell.length; i++) {
+        let cell = board.cell[i];
+        dotcnt += cell.qsub === CQSUB.dot;
+    }
+    for (let i = 0; i < board.cross.length; i++) {
+        let cross = board.cross[i];
+        let list = [board.getc(cross.bx - 1, cross.by - 1), board.getc(cross.bx - 1, cross.by + 1),
+        board.getc(cross.bx + 1, cross.by - 1), board.getc(cross.bx + 1, cross.by + 1)];
+        list = list.filter(c => !c.isnull);
+        if (cross.qnum >= 0) {
+            if (list.filter(c => c.qans === CQANS.black).length === cross.qnum) {
+                list.forEach(c => add_dot(c));
+            }
+            if (list.filter(c => c.qsub !== CQSUB.dot).length === cross.qnum) {
+                list.forEach(c => add_black(c));
+            }
+        }
+        for (let d = 0; d < 4; d++) {
+            // + + + +    + + + +
+            //             ·   █ 
+            // + 1 3 + -> + 1 3 +
+            //             ·   █ 
+            // + + + +    + + + +
+            if (cross.qnum === 1 && offset(cross, 1, 0, d).qnum === 3) {
+                add_dot(offset(cross, -.5, -.5, d));
+                add_dot(offset(cross, -.5, +.5, d));
+                add_black(offset(cross, 1.5, -.5, d));
+                add_black(offset(cross, 1.5, +.5, d));
+            }
+            // + + + +    + + + +
+            //                   
+            // + 3 + +    + 3 + +
+            //         ->    █   
+            // + + 3 +    + + 3 +
+            //                   
+            // + + + +    + + + +
+            if (cross.qnum === 3 && offset(cross, 1, 1, d).qnum === 3 && dotcnt > 0) {
+                add_black(offset(cross, .5, .5, d));
+            }
+        }
+    }
+}
+
 function SlantAssist() {
     let add_slash = function (c, qans) {
         if (c === undefined || c.isnull || c.qans !== CQANS.none) { return; }
@@ -2423,18 +2713,26 @@ function SlantAssist() {
                 adjcellList.forEach(c => add_slash(c[0], c[1]));
             }
         }
-        // diagonal 1 & 1
-        if (cross.qnum === 1 && isNotSide(cross)) {
-            for (let d = 0; d < 4; d++) {
+        for (let d = 0; d < 4; d++) {
+            // + + + +    + + + +
+            //                   
+            // + 1 + +    + 1 + +
+            //         ->    ╱   
+            // + + 1 +    + + 1 +
+            //                   
+            // + + + +    + + + +
+            if (cross.qnum === 1 && isNotSide(cross)) {
                 let cross2 = offset(cross, 1, 1, d);
                 if (cross2.qnum === 1 && isNotSide(cross2)) {
                     add_slash(offset(cross, .5, .5, d), CQANS.lslash + d);
                 }
             }
-        }
-        // 1 & 1
-        if (cross.qnum === 1) {
-            for (let d = 0; d < 4; d++) {
+            // + + + +    + + + +
+            //             ╱   ╲ 
+            // + 1 1 + -> + 1 1 +
+            //             ╲   ╱ 
+            // + + + +    + + + +
+            if (cross.qnum === 1) {
                 if (offset(cross, 0, 1, d).isnull || offset(cross, 0, -1, d).isnull) { continue; }
                 if (!offset(cross, 1, 0, d).isnull && offset(cross, 1, 0, d).qnum === 1) {
                     add_slash(offset(cross, -0.5, -.5, d), CQANS.lslash + d);
@@ -2443,10 +2741,12 @@ function SlantAssist() {
                     add_slash(offset(cross, +1.5, +.5, d), CQANS.lslash + d);
                 }
             }
-        }
-        // 3 & 3
-        if (cross.qnum === 3) {
-            for (let d = 0; d < 4; d++) {
+            // + + + +    + + + +
+            //             ╲   ╱ 
+            // + 3 3 + -> + 3 3 +
+            //             ╱   ╲ 
+            // + + + +    + + + +
+            if (cross.qnum === 3) {
                 if (!offset(cross, 1, 0, d).isnull && offset(cross, 1, 0, d).qnum === 3 && isNotSide(offset(cross, 1, 0, d))) {
                     add_slash(offset(cross, -0.5, -.5, d), CQANS.rslash + d);
                     add_slash(offset(cross, -0.5, +.5, d), CQANS.lslash + d);
@@ -2457,6 +2757,11 @@ function SlantAssist() {
         }
     }
     // no loop
+    // + + +    + + +
+    //  / \      / \ 
+    // + + + -> + + +
+    //  \        \ \ 
+    // + + +    + + +
     for (let i = 0; i < board.cell.length; i++) {
         let cell = board.cell[i];
         if (cell.qans !== CQANS.none) { continue; }
@@ -3116,6 +3421,67 @@ function IcebarnAssist() {
     }
 }
 
+function InverseLitsoAssist() {
+    BlackConnected();
+    No2x2Black();
+    for (let i = 0; i < board.roommgr.components.length; i++) {
+        let room = board.roommgr.components[i];
+        let templist = [];
+        for (let j = 0; j < room.clist.length; j++) {
+            templist.push(room.clist[j]);
+        }
+        if (templist.filter(c => c.qsub === CQSUB.dot).length === 4) {
+            templist.forEach(c => add_black(c));
+        }
+        if (templist.filter(c => c.qans !== CQANS.black).length === 4) {
+            templist.forEach(c => add_dot(c));
+        }
+        for (let j = 0; j < room.clist.length; j++) {
+            let cell = room.clist[j];
+            // if (cell.qans === CQANS.black) { continue; }
+            // clean out region lower than 4
+            let templist2 = [];
+            let fn = function (c) {
+                if (c.room !== room || c.qans === CQANS.black || templist2.includes(c)) { return; }
+                templist2.push(c);
+                fourside(fn, c.adjacent);
+            }
+            fn(cell);
+            if (templist2.length < 4) {
+                templist2.forEach(c => add_black(c));
+            }
+
+            // out of reach in 3 steps
+            templist2 = [];
+            let fn2 = function (c, step = 3) {
+                if (step < 0 || c.room !== room) { return; }
+                templist2.push(c);
+                fn2(c.adjacent.top, step - 1);
+                fn2(c.adjacent.bottom, step - 1);
+                fn2(c.adjacent.left, step - 1);
+                fn2(c.adjacent.right, step - 1);
+            }
+            if (cell.qsub === CQSUB.dot) {
+                fn2(cell);
+                templist.forEach(c => {
+                    if (!templist2.includes(c)) {
+                        add_black(c);
+                    }
+                });
+            }
+            let list = [cell, offset(cell, 1, 0), offset(cell, 0, 1), offset(cell, 1, 1)];
+            if (!list.some(c => c.isnull || c.room !== cell.room)) {
+                list.forEach(c => fn2(c));
+                templist.forEach(c => {
+                    if (!templist2.includes(c)) {
+                        add_black(c);
+                    }
+                });
+            }
+        }
+    }
+}
+
 function LitsAssist() {
     BlackConnected();
     No2x2Black();
@@ -3132,18 +3498,21 @@ function LitsAssist() {
             templist.forEach(c => add_dot(c));
         }
         for (let j = 0; j < room.clist.length; j++) {
-            if (room.clist[j].qsub === CQSUB.dot) { continue; }
+            let cell = room.clist[j];
+            if (cell.qsub === CQSUB.dot) { continue; }
+            // clean out region lower than 4
             let templist2 = [];
             let fn = function (c) {
                 if (c.room !== room || c.qsub === CQSUB.dot || templist2.includes(c)) { return; }
                 templist2.push(c);
                 fourside(fn, c.adjacent);
             }
-            fn(room.clist[j]);
+            fn(cell);
             if (templist2.length < 4) {
                 templist2.forEach(c => add_dot(c));
             }
-            if (room.clist[j].qans !== CQANS.black) { continue; }
+            if (cell.qans !== CQANS.black) { continue; }
+            // out of reach in 3 steps
             templist2 = [];
             let fn2 = function (c, step = 3) {
                 if (step < 0 || c.room !== room) { return; }
@@ -3153,7 +3522,7 @@ function LitsAssist() {
                 fn2(c.adjacent.left, step - 1);
                 fn2(c.adjacent.right, step - 1);
             }
-            fn2(room.clist[j]);
+            fn2(cell);
             templist.forEach(c => {
                 if (!templist2.includes(c)) {
                     add_dot(c);
@@ -3280,11 +3649,10 @@ function AyeheyaAssist() {
 }
 
 function ShakashakaAssist() {
-    let isEmpty = function (c) {
-        return !c.isnull && c.qnum === CQNUM.none && c.qsub === CQSUB.none && c.qans === CQANS.none;
-    };
+    let isEmpty = c => !c.isnull && c.qnum === CQNUM.none && c.qsub === CQSUB.none && c.qans === CQANS.none;
+    let isNotBlack = c => !c.isnull && c.qnum === CQNUM.none;
     // draw triangle
-    let add_triangle = function (c, ndir) { // 0 = bl, 1 = br, 2 = tr, 3 = tl
+    let add_tri = function (c, ndir) { // 0 = ◣, 1 = ◢, 2 = ◥, 3 = ◤
         if (c === undefined || c.isnull || !isEmpty(c)) { return; }
         if (step && flg) { return; }
         flg = true;
@@ -3292,217 +3660,203 @@ function ShakashakaAssist() {
         c.setQans(ndir + 2);
         c.draw();
     };
-    // check blacking edge
+    // check black edge
     let isEdge = function (c, ndir) { // 0 = left, 1 = bottom, 2 = right, 3 = top
         ndir = (ndir % 4 + 4) % 4;
-        let tdir = (ndir + 3) % 4;
-        return c.isnull || c.qnum !== CQNUM.none || c.qans === tdir + 2 || c.qans === ndir + 2;
+        let tri = [(ndir + 0) % 4 + 2, (ndir + 1) % 4 + 2, (ndir + 2) % 4 + 2, (ndir + 3) % 4 + 2];
+        return c.isnull || c.qnum !== CQNUM.none || c.qans === tri[0] || c.qans === tri[3];
     };
-    // check dot area if stick edge
+    // check if dot connects to edge
     let isDotEdge = function (c) {
         if (c.qsub !== CQSUB.dot) { return false; }
-        let temp = false;
-        let dfslist = [c];
-        let dfs = function (c, ndir) {
+        let dfslist = [];
+        let dfs = function (c, ndir = -1) {
             if (isEmpty(c) || dfslist.includes(c)) { return; }
-            if (isEdge(c, ndir + 2)) { temp = true; return; }
+            if (ndir !== -1 && isEdge(c, ndir + 2)) { return true; }
             if (c.qsub === CQSUB.dot) {
                 dfslist.push(c);
-                dfs(offset(c, -1, 0), 0);
-                dfs(offset(c, 0, 1), 1);
-                dfs(offset(c, 1, 0), 2);
-                dfs(offset(c, 0, -1), 3);
+                for (let d = 0; d < 4; d++) {
+                    if (dfs(dir(c.adjacent, d + 1), d)) { return true; }
+                }
             }
+            return false;
         };
-        for (let d = 0; d < 4; d++) {
-            dfs(dir(c.adjacent, d + 1), d);
-        }
-        return temp;
+        return dfs(c);
     };
-    // check blacking edge including dot
+    let isNotDiagRect = function (c) {
+        return c.isnull || c.qnum !== CQNUM.none || isDotEdge(c);
+    }
+    // check if connects to edge
     let isEdgeEx = function (c, ndir) { // 0 = left, 1 = bottom, 2 = right, 3 = top
         return isEdge(c, ndir) || isDotEdge(c);
     };
-    // check blacking corner including dot
-    let isCorner = function (c, ndir) { // 0 = bl, 1 = br, 2 = tr, 3 = tl
+    // corner of a rectangle i.e. both side connects to edge
+    let isCorner = function (c, ndir) { // 0 = ◣, 1 = ◢, 2 = ◥, 3 = ◤
         ndir = (ndir % 4 + 4) % 4;
-        return c.isnull || c.qnum !== CQNUM.none || c.qans === ndir + 2 || isDotEdge(c);
+        return isEdgeEx(c, ndir) && isEdgeEx(c, (ndir + 1) % 4)
     };
-    // check blacking sharp including dot
-    let isSharp = function (c, ndir) { // 0 = bl, 1 = br, 2 = tr, 3 = tl
+    // if can place a specific triangle
+    let isTriAble_Basic = function (c, ndir) { // 0 = ◣, 1 = ◢, 2 = ◥, 3 = ◤
         ndir = (ndir % 4 + 4) % 4;
-        return isEdgeEx(c, ndir) || c.qans === (ndir + 1) % 4 + 2;
-    };
-    // if can place triangle of specific direction
-    let isntTri = function (c, ndir) { // 0 = bl, 1 = br, 2 = tr, 3 = tl
-        ndir = (ndir % 4 + 4) % 4;
-        if (!isEmpty(c) && c.qans !== ndir + 2) { return true; }
-        if (c.qans === ndir + 2) { return false; }
-        let temp = offset(c, 1, 0, ndir);
-        if (isEdgeEx(temp, ndir) || temp.qans === (ndir + 2) % 4 + 2) { return true; }
-        temp = offset(c, 0, -1, ndir);
-        if (isEdgeEx(temp, ndir + 1) || temp.qans === (ndir + 2) % 4 + 2) { return true; }
-        temp = offset(c, -1, 0, ndir);
-        if (!temp.isnull && (temp.qans === (ndir + 3) % 4 + 2 || temp.qans === ndir + 2)) { return true; }
-        temp = offset(c, 0, 1, ndir);
-        if (!temp.isnull && (temp.qans === ndir + 2 || temp.qans === (ndir + 1) % 4 + 2)) { return true; }
-        temp = offset(c, 1, -1, ndir);
-        if (!temp.isnull && isSharp(temp, ndir)) { return true; }
-        temp = offset(c, -1, -1, ndir);
-        if (!temp.isnull && temp.qans === (ndir + 3) % 4 + 2) { return true; }
-        temp = offset(c, -1, 1, ndir);
-        if (!temp.isnull && temp.qans === ndir + 2) { return true; }
-        temp = offset(c, 1, 1, ndir);
-        if (!temp.isnull && temp.qans === (ndir + 1) % 4 + 2) { return true; }
-        temp = offset(c, 2, 0, ndir);
-        if (!temp.isnull && temp.qans === (ndir + 1) % 4 + 2) { return true; }
-        temp = offset(c, 0, -2, ndir);
-        if (!temp.isnull && temp.qans === (ndir + 3) % 4 + 2) { return true; }
-        temp = offset(c, 2, -1, ndir);
-        if (!temp.isnull && temp.qans === (ndir + 2) % 4 + 2) { return true; }
-        temp = offset(c, 1, -2, ndir);
-        if (!temp.isnull && temp.qans === (ndir + 2) % 4 + 2) { return true; }
-        return false;
+        let tri = [(ndir + 0) % 4 + 2, (ndir + 1) % 4 + 2, (ndir + 2) % 4 + 2, (ndir + 3) % 4 + 2];
+        let fn = (c, qans) => !c.isnull && c.qans === qans;
+        // already placed other triangle
+        if (!isEmpty(c) && c.qans !== tri[0]) { return false; }
+        // already placed the triangle
+        if (c.qans === tri[0]) { return true; }
+        // check if all ～s can be part of a diagonal rectangle.
+        // ～～
+        // ◣～
+        if (isNotDiagRect(offset(c, +1, +0, ndir)) || isNotDiagRect(offset(c, +0, -1, ndir))) { return false; }
+        if (isNotDiagRect(offset(c, +1, -1, ndir))) { return false; }
+        // ＿＿＿    ＿◥＿    ＿＿＿    ＿＿＿    ＿＿＿    ＿＿＿
+        // ＿◣◥ or ＿◣＿ or ◣◣＿ or ◤◣＿ or ＿◣＿ or ＿◣＿
+        // ＿＿＿    ＿＿＿    ＿＿＿    ＿＿＿    ＿◣＿    ＿◢＿
+        if (fn(offset(c, +1, +0, ndir), tri[2]) || fn(offset(c, +0, -1, ndir), tri[2])) { return false; }
+        if (fn(offset(c, -1, +0, ndir), tri[0]) || fn(offset(c, -1, -1, ndir), tri[3])) { return false; }
+        if (fn(offset(c, +0, +1, ndir), tri[0]) || fn(offset(c, +0, +1, ndir), tri[1])) { return false; }
+        // ＿＿◤    ＿＿◣    ＿＿◢    ◤＿＿    ＿＿＿    ＿＿＿
+        // ＿◣＿ or ＿◣＿ or ＿◣＿ or ＿◣＿ or ＿◣＿ or ＿◣＿
+        // ＿＿＿    ＿＿＿    ＿＿＿    ＿＿＿    ◣＿＿    ＿＿◢
+        if (fn(offset(c, +1, -1, ndir), tri[3]) || fn(offset(c, -1, -1, ndir), tri[3])) { return false; }
+        if (fn(offset(c, +1, -1, ndir), tri[0]) || fn(offset(c, -1, +1, ndir), tri[0])) { return false; }
+        if (fn(offset(c, +1, -1, ndir), tri[1]) || fn(offset(c, +1, +1, ndir), tri[1])) { return false; }
+        // ◤＿＿    ＿＿＿    ＿◥＿    ＿＿＿
+        // ＿＿＿ or ＿＿＿ or ＿＿＿ or ＿＿◥
+        // ◣＿＿    ◣＿◢    ◣＿＿    ◣＿＿
+        if (fn(offset(c, +0, -2, ndir), tri[3]) || fn(offset(c, +2, +0, ndir), tri[1])) { return false; }
+        if (fn(offset(c, +1, -2, ndir), tri[2]) || fn(offset(c, +2, -1, ndir), tri[2])) { return false; }
+        return true;
     };
     // extend of isntTri including some complex logic
-    let isntTriEx = function (c, ndir) { // 0 = bl, 1 = br, 2 = tr, 3 = tl
-        if (isntTri(c, ndir)) { return true; }
-        let templist = [offset(c, -1, 0, ndir), offset(c, 0, 1, ndir), offset(c, -2, 0, ndir),
-        offset(c, 0, 2, ndir), offset(c, -1, 1, ndir)];
-        if (isEmpty(templist[0]) && isEmpty(templist[1]) && isEdgeEx(templist[2], ndir + 2) &&
-            isEdgeEx(templist[3], ndir + 3) && isEmpty(templist[4]) && isntTri(templist[4], ndir + 2)) {
-            return true;
+    let isTriAble = function (c, ndir, itercnt = 0) { // 0 = ◣, 1 = ◢, 2 = ◥, 3 = ◤
+        ndir = (ndir % 4 + 4) % 4;
+        if (!isTriAble_Basic(c, ndir)) { return false; }
+        if (itercnt >= 5) { return true; }
+        itercnt++;
+        // 〓＿◣
+        // ＿～＿ && ～ !== ◥
+        // ＿＿〓
+        if (isNotBlack(offset(c, -1, 0, ndir)) && isNotBlack(offset(c, 0, 1, ndir)) &&
+            isEdgeEx(offset(c, -2, 0, ndir), ndir + 2) && isEdgeEx(offset(c, 0, 2, ndir), ndir + 3) &&
+            isNotBlack(offset(c, -1, 1, ndir)) && !isTriAble(offset(c, -1, 1, ndir), ndir + 2, itercnt)) {
+            return false;
         }
-        return false;
+        // ◣＿＿    ＿◤＿   ＿＿＿    ＿＿＿
+        // ＿◣＿ or ＿◣＿ , ＿◣＿ or ＿◣◢
+        // ＿＿＿    ＿＿＿   ＿＿◣    ＿＿＿
+        if (!isTriAble(offset(c, -1, -1, ndir), ndir, itercnt) &&
+            !isTriAble(offset(c, +0, -1, ndir), ndir + 3, itercnt)) { return false; }
+        if (!isTriAble(offset(c, +1, +1, ndir), ndir, itercnt) &&
+            !isTriAble(offset(c, +1, +0, ndir), ndir + 1, itercnt)) { return false; }
+        return true;
     }
-
+    let sel_tri = function (c) {
+        if (!isEmpty(c)) { return; }
+        let list = [0, 1, 2, 3].map(n => isTriAble(c, n));
+        if (list.filter(b => b).length === 1) {
+            add_tri(c, list.indexOf(true));
+        }
+    }
     // start assist
     for (let i = 0; i < board.cell.length; i++) {
         let cell = board.cell[i];
-        let adjcell = cell.adjacent;
-        let tricnt = 0;
-        let emptycnt = 0;
-        fourside(c => {
-            if (!c.isnull && c.qans >= 2) { tricnt++; }
-            if (isEmpty(c)) { emptycnt++; }
-        }, adjcell);
-
-        // add dot
-
-        // cannot place any triangle
-        {
-            let temp = true;
-            for (let d = 0; d < 4; d++) {
-                temp &= isntTriEx(cell, d);
-            }
-            if (temp) { add_dot(cell); }
-        }
-        // fill rectangle
-        {
-            let templist = [cell, offset(cell, 1, 0), offset(cell, 0, 1), offset(cell, 1, 1)];
-            if (!templist.some(c => c.isnull)) {
-                templist = templist.filter(c => c.qsub !== CQSUB.dot);
-                if (templist.length === 1) {
-                    add_dot(templist[0]);
-                }
-            }
-        }
         // dot by clue
-        if (tricnt === cell.qnum) {
-            fourside(add_dot, adjcell);
-        }
-        // pattern with clue 1
-        if (cell.qnum === 1) {
-            for (let d = 0; d < 4; d++) {
-                let tempcell = offset(cell, -1, 0, d);
-                let tempstate = !tempcell.isnull && (isEmpty(tempcell) || tempcell.qsub === CQSUB.dot);
-                tempcell = offset(cell, 0, 1, d);
-                tempstate &= !tempcell.isnull && (isEmpty(tempcell) || tempcell.qsub === CQSUB.dot);
-                tempcell = offset(cell, -1, 1, d);
-                tempstate &= tempcell.qnum === CQNUM.none && isntTriEx(tempcell, d + 2);
-                if (tempstate) { add_dot(offset(cell, 1, 0, d)); add_dot(offset(cell, 0, -1, d)); }
-            }
-        }
-
-        // add triangle
-
-        // cannot form non-rectangle
-        if (isEmpty(cell)) {
-            for (let d = 0; d < 4; d++) {
-                let templist = [offset(cell, -1, 0, d), offset(cell, 0, 1, d), offset(cell, -1, 1, d)];
-                let templist_dot = templist.filter(c => !c.isnull && !isEmpty(c) && c.qsub === CQSUB.dot);
-                let templist_ndot = templist.filter(c => !c.isnull && !isEmpty(c) && c.qsub !== CQSUB.dot);
-                if (templist_dot.length === 2 && templist_ndot.length === 1) {
-                    let temp = templist_ndot[0];
-                    if (templist.indexOf(temp) === 0 && isCorner(temp, d + 1)) { add_triangle(cell, d); break; }
-                    else if (templist.indexOf(temp) === 1 && isCorner(temp, d + 3)) { add_triangle(cell, d); break; }
-                    else if (templist.indexOf(temp) === 2 && isCorner(temp, d + 2)) { add_triangle(cell, d); break; }
-                }
-            }
+        if (cell.qnum >= 0 && adjlist(cell.adjacent).filter(c => isNotBlack(c) && c.qans !== CQANS.none).length === cell.qnum) {
+            fourside(add_dot, cell.adjacent);
         }
         // triangle by clue
-        if (emptycnt === cell.qnum - tricnt) {
-            for (let d = 0; d < 4; d++) {
-                let adj = dir(adjcell, d);
-                if (isEmpty(adj)) {
-                    if (isntTriEx(adj, d)) { add_triangle(adj, d + 1); }
-                    else if (isntTriEx(adj, d + 1)) { add_triangle(adj, d); }
+        if (cell.qnum >= 0 && adjlist(cell.adjacent).filter(c => isNotBlack(c) && c.qsub !== CQSUB.dot).length === cell.qnum) {
+            fourside(sel_tri, cell.adjacent);
+        }
+        // cannot place any triangle
+        if (isEmpty(cell) && ![0, 1, 2, 3].some(n => isTriAble(cell, n))) {
+            add_dot(cell);
+        }
+        for (let d = 0; d < 4; d++) {
+            // ＿＊    ＊＊
+            // ＊＊ -> ＊＊
+            let list = [offset(cell, 1, 0, d), offset(cell, 0, 1, d), offset(cell, 1, 1, d)];
+            if (!list.some(c => c.isnull || c.qsub !== CQSUB.dot) && isDotEdge(list[0])) {
+                add_dot(cell);
+            }
+            // 〓＿〓 -> 〓＊〓
+            if (isEdgeEx(offset(cell, -1, 0, d), d + 2) && isEdgeEx(offset(cell, 1, 0, d), d)) {
+                add_dot(cell);
+            }
+            // ＿＿＿    －     －    ＿＊＿
+            // ＿１＿ && ～ !== ◥ -> ＿１＊
+            // ～＿＿    －     －    ＿＿＿
+            if (cell.qnum === 1 &&
+                (c => !c.isnull && (isNotBlack(c) || c.qsub === CQSUB.dot))(offset(cell, -1, 0, d)) &&
+                (c => !c.isnull && (isNotBlack(c) || c.qsub === CQSUB.dot))(offset(cell, 0, +1, d)) &&
+                (c => c.qnum === CQNUM.none && !isTriAble(c, d + 2))(offset(cell, -1, 1, d))) {
+                add_dot(offset(cell, 1, 0, d));
+                add_dot(offset(cell, 0, -1, d));
+            }
+            // 〓＿    ＊＿    ＊＿    ～◣
+            // ＊＊ or 〓＊ or ＊〓 -> ～～
+            if (isEmpty(cell)) {
+                let list = [offset(cell, -1, 0, d), offset(cell, 0, 1, d), offset(cell, -1, 1, d)];
+                if (list.filter(c => !c.isnull && !isEmpty(c) && c.qsub === CQSUB.dot).length === 2 &&
+                    list.filter(c => !c.isnull && !isEmpty(c) && c.qsub !== CQSUB.dot).length === 1) {
+                    let temp = list.find(c => !c.isnull && !isEmpty(c) && c.qsub !== CQSUB.dot);
+                    if (list.indexOf(temp) === 0 && isCorner(temp, d + 1) ||
+                        list.indexOf(temp) === 1 && isCorner(temp, d + 3) ||
+                        list.indexOf(temp) === 2 && isCorner(temp, d + 2)) { add_tri(cell, d); }
                 }
+            }
+            // ＿＿〓    ＿＿〓    ◣＿〓    ◢＿〓
+            // ＊〓＿ or 〓＊＿ -> ～～＿ or ～～＿
+            if (isEmpty(offset(cell, 0, 0, d)) && isEmpty(offset(cell, 1, 0, d)) && (
+                offset(cell, 0, 1, d).qsub === CQSUB.dot && isEdge(offset(cell, 1, 1, d), d + 3) ||
+                offset(cell, 1, 1, d).qsub === CQSUB.dot && isEdge(offset(cell, 0, 1, d), d + 3)) &&
+                isEdgeEx(offset(cell, 2, 0, d), d)) {
+                sel_tri(cell);
+            }
+            if (isEmpty(offset(cell, 0, 0, d)) && isEmpty(offset(cell, 1, 0, d)) && (
+                offset(cell, 0, -1, d).qsub === CQSUB.dot && isEdge(offset(cell, 1, -1, d), d + 1) ||
+                offset(cell, 1, -1, d).qsub === CQSUB.dot && isEdge(offset(cell, 0, -1, d), d + 1)) &&
+                isEdgeEx(offset(cell, 2, 0, d), d)) {
+                sel_tri(cell);
             }
         }
         // side extend
-        if (cell.qans >= 2) {
+        if (cell.qans !== CQANS.none) {
             let ndir = cell.qans - 2;
-            // rectangle needs turn or cannot turn
-            if (isntTriEx(offset(cell, -1, -1, ndir), ndir)) { add_triangle(offset(cell, 0, -1, ndir), ndir + 3); }
-            else if (isntTriEx(offset(cell, 0, -1, ndir), ndir + 3)) { add_triangle(offset(cell, -1, -1, ndir), ndir); }
-            if (isntTriEx(offset(cell, 1, 1, ndir), ndir)) { add_triangle(offset(cell, 1, 0, ndir), ndir + 1); }
-            else if (isntTriEx(offset(cell, 1, 0, ndir), ndir + 1)) { add_triangle(offset(cell, 1, 1, ndir), ndir); }
-            // only one opposite side position
-            if (isEdgeEx(offset(cell, 2, -1, ndir), ndir)) { add_triangle(offset(cell, 1, -1, ndir), ndir + 2); }
-            else if (isEdgeEx(offset(cell, 1, -2, ndir), ndir + 1)) { add_triangle(offset(cell, 1, -1, ndir), ndir + 2); }
-            else if (isSharp(offset(cell, 2, -2, ndir), ndir)) { add_triangle(offset(cell, 1, -1, ndir), ndir + 2); }
-            // rectangle opposite side extend
-            let temp = cell;
-            while (!offset(temp, -1, -1, ndir).isnull && offset(temp, -1, -1, ndir).qans === cell.qans) {
-                temp = offset(temp, -1, -1, ndir);
+            // ◣＿＿    ＿◤＿   ＿＿＿    ＿＿＿
+            // ＿◣＿ or ＿◣＿ , ＿◣＿ or ＿◣◢
+            // ＿＿＿    ＿＿＿   ＿＿◣    ＿＿＿
+            if (!isTriAble(offset(cell, -1, -1, ndir), ndir + 0)) { add_tri(offset(cell, +0, -1, ndir), ndir + 3); }
+            if (!isTriAble(offset(cell, +0, -1, ndir), ndir + 3)) { add_tri(offset(cell, -1, -1, ndir), ndir + 0); }
+            if (!isTriAble(offset(cell, +1, +1, ndir), ndir + 0)) { add_tri(offset(cell, +1, +0, ndir), ndir + 1); }
+            if (!isTriAble(offset(cell, +1, +0, ndir), ndir + 1)) { add_tri(offset(cell, +1, +1, ndir), ndir + 0); }
+            // ＿〓＿    ＿＿〓    ＿＿＿    ＿＿＿
+            // ＿＿＿ or ＿＿＿ or ＿＿〓 -> ＿◥＿
+            // ◣＿＿    ◣＿＿    ◣＿＿    ◣＿＿
+            if (isEdgeEx(offset(cell, 2, -1, ndir), ndir) || isEdgeEx(offset(cell, 1, -2, ndir), ndir + 1) ||
+                isEdgeEx(offset(cell, 2, -2, ndir), ndir) || isEdgeEx(offset(cell, 2, -2, ndir), ndir + 1)) {
+                add_tri(offset(cell, 1, -1, ndir), ndir + 2);
             }
-            let turn1 = offset(temp, 0, -1, ndir);
-            if (turn1.qans === (ndir + 3) % 4 + 2) {
-                let temp = cell;
-                while (!offset(temp, 1, 1, ndir).isnull && offset(temp, 1, 1, ndir).qans === cell.qans) {
-                    temp = offset(temp, 1, 1, ndir);
-                }
-                let turn2 = offset(temp, 1, 0, ndir);
-                if (turn2.qans === (ndir + 1) % 4 + 2) {
+            // rectangle opposite side extend
+            // ＿◤＿    ＿◤＿
+            // ◤＿＿ -> ◤＿◢
+            // ◣◢＿    ◣◢＿
+            let tri = [(ndir + 0) % 4 + 2, (ndir + 1) % 4 + 2, (ndir + 2) % 4 + 2, (ndir + 3) % 4 + 2];
+            let turn1 = offset(cell, 0, -1, ndir);
+            let turn2 = cell;
+            while (!offset(turn2, 1, 1, ndir).isnull && offset(turn2, 1, 1, ndir).qans === tri[0]) {
+                turn2 = offset(turn2, 1, 1, ndir);
+            }
+            turn2 = offset(turn2, 1, 0, ndir);
+            if (turn1.qans === tri[3] && turn2.qans === tri[1]) {
+                turn1 = offset(turn1, 1, -1, ndir);
+                turn2 = offset(turn2, 1, -1, ndir);
+                while ((!turn1.isnull && turn1.qans === tri[3]) || (!turn2.isnull && turn2.qans === tri[1])) {
+                    add_tri(turn1, ndir + 3);
+                    add_tri(turn2, ndir + 1);
                     turn1 = offset(turn1, 1, -1, ndir);
                     turn2 = offset(turn2, 1, -1, ndir);
-                    while ((!turn1.isnull && turn1.qans === (ndir + 3) % 4 + 2) ||
-                        (!turn2.isnull && turn2.qans === (ndir + 1) % 4 + 2)) {
-                        add_triangle(turn1, ndir + 3);
-                        add_triangle(turn2, ndir + 1);
-                        turn1 = offset(turn1, 1, -1, ndir);
-                        turn2 = offset(turn2, 1, -1, ndir);
-                    }
-                }
-            }
-        }
-        // 2x2 pattern
-        if (isEmpty(cell)) {
-            for (let d = 0; d < 4; d++) {
-                let templist = [offset(cell, -1, 0, d), offset(cell, 0, -1, d), offset(cell, 0, 1, d),
-                offset(cell, -1, -1, d), offset(cell, 0, -2, d)];
-                if (!templist[0].isnull && templist[0].qsub === CQSUB.dot && isEmpty(templist[1]) &&
-                    isEdge(templist[2], d + 3) && isEdge(templist[3], d + 1) && isEdgeEx(templist[4], d + 1)) {
-                    add_triangle(cell, d);
-                    break;
-                }
-                templist = [offset(cell, 0, 1, d), offset(cell, 1, 0, d), offset(cell, -1, 0, d),
-                offset(cell, 1, 1, d), offset(cell, 2, 0, d)];
-                if (!templist[0].isnull && templist[0].qsub === CQSUB.dot && isEmpty(templist[1]) &&
-                    isEdge(templist[2], d + 2) && isEdge(templist[3], d) && isEdgeEx(templist[4], d)) {
-                    add_triangle(cell, d);
-                    break;
                 }
             }
         }
