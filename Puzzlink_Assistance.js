@@ -759,10 +759,16 @@ function RectRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, isSqu
         width--;
         // finished square
         if (width === height) {
-            let templist = [offset(cell, -1, 0), offset(cell, 0, -1), offset(cell, width, 0), offset(cell, 0, height)];
-            if ([templist[0], templist[2]].every(c => c.isnull || isUnshaded(c)) ||
-                [templist[1], templist[3]].every(c => c.isnull || isUnshaded(c))) {
-                templist.forEach(c => add_unshaded(c));
+            // 123
+            // 0 4
+            // 765
+            let list = [offset(cell, -1, 0), offset(cell, -1, -1),
+            offset(cell, 0, -1), offset(cell, width, -1),
+            offset(cell, width, 0), offset(cell, width, height),
+            offset(cell, 0, height), offset(cell, -1, height)];
+            let list2 = [[0, 4], [2, 6], [0, 2, 5], [1, 3, 6], [2, 4, 7], [3, 5, 0], [4, 6, 1], [5, 7, 2], [6, 0, 3], [7, 1, 4], [1, 3, 5, 7]];
+            if (list2.some(arr => arr.every(n => list[n].isnull || isUnshaded(list[n])))) {
+                [0,2,4,6].forEach(n => add_unshaded(list[n]));
             }
         }
         // extend square
@@ -891,6 +897,12 @@ function RoomPassOnce() {
         }
     }
 }
+function ForEachCell(f = c => { }) {
+    for (let i = 0; i < board.cell.length; i++) {
+        let cell = board.cell[i];
+        f(cell);
+    }
+}
 
 function GeneralAssist() {
     // see all checks from ui.puzzle.pzpr.common.AnsCheck.prototype
@@ -952,6 +964,21 @@ function GeneralAssist() {
     }
     if (checklist.some(f => f.name === "checkRoomPassOnce")) {
         RoomPassOnce();
+    }
+    if (checklist.some(f => f.name === "checkUnshadeOnCircle")) {
+        ForEachCell(c => { if (c.qnum === CQNUM.wcir) add_green(c); })
+    }
+    if (checklist.some(f => f.name === "checkShadeOnCircle")) {
+        ForEachCell(c => { if (c.qnum === CQNUM.bcir) add_black(c); })
+    }
+    if (checklist.some(f => f.name == "checkUnshadeSquare")) {
+        RectRegion_Cell({
+            isShaded: c => c.qsub === CQSUB.green,
+            isUnshaded: c => c.qans === CQANS.black,
+            add_shaded: add_green,
+            add_unshaded: add_black,
+            isSquare: true,
+        })
     }
 }
 

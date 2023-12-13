@@ -21,6 +21,7 @@ Currently enhanced genre:
 * Castle Wall
 * Cave
 * Choco Banana
+* Circles and Squares (AG)
 * Creek
 * Guide Arrow
 * Heyawake
