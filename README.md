@@ -51,6 +51,7 @@ Currently enhanced genre:
 * Star Battle
 * Tapa
 * Tasquare
+* Tatamibari
 * Tentaisho
 * Yajilin
 * Yin-Yang

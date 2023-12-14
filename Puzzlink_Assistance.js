@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.12.12.1
+// @version      23.12.13.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -145,6 +145,7 @@ const GENRELIST = [
     ["Star Battle", StarbattleAssist],
     ["Tapa", TapaAssist],
     ["Tasquare", TasquareAssist],
+    ["Tatamibari", TatamibariAssist],
     ["Tentaisho", TentaishoAssist],
     ["Yajilin", YajilinAssist],
     ["Yin-Yang", YinyangAssist],
@@ -768,7 +769,7 @@ function RectRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, isSqu
             offset(cell, 0, height), offset(cell, -1, height)];
             let list2 = [[0, 4], [2, 6], [0, 2, 5], [1, 3, 6], [2, 4, 7], [3, 5, 0], [4, 6, 1], [5, 7, 2], [6, 0, 3], [7, 1, 4], [1, 3, 5, 7]];
             if (list2.some(arr => arr.every(n => list[n].isnull || isUnshaded(list[n])))) {
-                [0,2,4,6].forEach(n => add_unshaded(list[n]));
+                [0, 2, 4, 6].forEach(n => add_unshaded(list[n]));
             }
         }
         // extend square
@@ -797,7 +798,7 @@ function RectRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, isSqu
     }
     shadelist.forEach(c => add_shaded(c));
 }
-function RectRegion_Border({ isSquare = false } = {}) {
+function RectRegion_Border({ isSizeAble = (w, h, sc, c = undefined) => true } = {}) {
     let isLink = b => !b.isnull && b.qsub === BQSUB.link;
     let isSide = b => b.isnull || b.qans;
     for (let i = 0; i < board.cross.length; i++) {
@@ -834,48 +835,108 @@ function RectRegion_Border({ isSquare = false } = {}) {
             }
         }
     }
-    if (!isSquare) { return; }
-    let drawlist = [];
+    // record the sides count in (0,0) to (a,b); s1 for horizontal side, s2 for vertical side
+    const s1 = Array.from(new Array(board.rows), () => new Array(board.cols).fill(0));
+    const s2 = Array.from(new Array(board.rows), () => new Array(board.cols).fill(0));
+    // record the links count in a row; l1 for vertical link, l2 for horizontal link
+    const l1 = Array.from(new Array(board.rows), () => new Array(board.cols).fill(0));
+    const l2 = Array.from(new Array(board.rows), () => new Array(board.cols).fill(0));
+    for (let i = 0; i < board.rows; i++) {
+        for (let j = 0; j < board.cols; j++) {
+            s1[i][j] = (b => !b.isnull && b.qans ? 1 : 0)(board.getb(2 * j + 1, 2 * i));
+            s2[i][j] = (b => !b.isnull && b.qans ? 1 : 0)(board.getb(2 * j, 2 * i + 1));
+            s1[i][j] += (i > 0 ? s1[i - 1][j] : 0) + (j > 0 ? s1[i][j - 1] : 0) - (i > 0 && j > 0 ? s1[i - 1][j - 1] : 0);
+            s2[i][j] += (i > 0 ? s2[i - 1][j] : 0) + (j > 0 ? s2[i][j - 1] : 0) - (i > 0 && j > 0 ? s2[i - 1][j - 1] : 0);
+            l1[i][j] = (b => !b.isnull && b.qsub === BQSUB.link ? 1 : 0)(board.getb(2 * j + 1, 2 * i));
+            l2[i][j] = (b => !b.isnull && b.qsub === BQSUB.link ? 1 : 0)(board.getb(2 * j, 2 * i + 1));
+            l1[i][j] += (j > 0 ? l1[i][j - 1] : 0);
+            l2[i][j] += (i > 0 ? l2[i - 1][j] : 0);
+        }
+    }
+    // check if there can be a rectangle exactly between c1 and c2
+    let isRectAble = function (c1, c2) {
+        if (c1.isnull || c2.isnull) { return 0; }
+        let [x1, x2] = [(c1.bx - 1) / 2, (c2.bx - 1) / 2].sort((x, y) => x - y);
+        let [y1, y2] = [(c1.by - 1) / 2, (c2.by - 1) / 2].sort((x, y) => x - y);
+        let f1 = (a, b) => a < 0 || b < 0 ? 0 : s1[a][b];
+        let f2 = (a, b) => a < 0 || b < 0 ? 0 : s2[a][b];
+        return f1(y2, x2) - f1(y1, x2) - f1(y2, x1 - 1) + f1(y1, x1 - 1)
+            + f2(y2, x2) - f2(y1 - 1, x2) - f2(y2, x1) + f2(y1 - 1, x1) === 0;
+    }
+    let isRectAble2 = function (c1, c2) {
+        if (c1.isnull || c2.isnull) { return 0; }
+        let [x1, x2] = [(c1.bx - 1) / 2, (c2.bx - 1) / 2].sort((x, y) => x - y);
+        let [y1, y2] = [(c1.by - 1) / 2, (c2.by - 1) / 2].sort((x, y) => x - y);
+        let g1 = (a, b) => a < 0 || b < 0 || a >= board.rows || b >= board.cols ? 0 : l1[a][b];
+        let g2 = (a, b) => a < 0 || b < 0 || a >= board.rows || b >= board.cols ? 0 : l2[a][b];
+        return g1(y1, x2) - g1(y1, x1 - 1) === 0 && g1(y2 + 1, x2) - g1(y2 + 1, x1 - 1) === 0 &&
+            g2(y2, x1) - g2(y1 - 1, x1) === 0 && g2(y2, x2 + 1) - g2(y1 - 1, x2 + 1) === 0;
+    }
     for (let i = 0; i < board.cell.length; i++) {
         let cell = board.cell[i];
         if (isLink(cell.adjborder.top)) { continue; }
         if (isLink(cell.adjborder.left)) { continue; }
-        let height = 1, width = 1;
-        while (isLink(offset(cell, 0, height - .5))) { height++; }
-        while (isLink(offset(cell, width - .5, 0))) { width++; }
-        // finished square
-        if (width === height) {
-            let templist = [offset(cell, -.5, 0), offset(cell, 0, -.5), offset(cell, width - .5, 0), offset(cell, 0, height - .5)];
-            if ([templist[0], templist[2]].every(c => isSide(c)) ||
-                [templist[1], templist[3]].every(c => isSide(c))) {
-                templist.forEach(c => add_side(c));
-            }
-        }
-        // extend square
-        if (height > width) {
-            for (let j = 0; j < height; j++) {
-                let c = offset(cell, 0, j);
-                let l = 0, r = 0;
-                while (!isSide(offset(c, l - .5, 0)) && l > width - height) { l--; }
-                while (!isSide(offset(c, r + .5, 0)) && r < height - 1) { r++; }
-                for (let k = r - height + 1.5; k <= l + height - 1.5; k++) {
-                    drawlist.push(offset(c, k, 0));
+        let wid = 1, hei = 1;
+        while (isLink(offset(cell, wid - .5, 0))) { wid++; }
+        while (isLink(offset(cell, 0, hei - .5))) { hei++; }
+        let sc = null;
+        for (let dx = 0; dx < wid; dx++) {
+            for (let dy = 0; dy < hei; dy++) {
+                if (offset(cell, dx, dy).qnum >= 0) {
+                    sc = offset(cell, dx, dy);
                 }
             }
         }
-        if (height < width) {
-            for (let j = 0; j < width; j++) {
-                let c = offset(cell, j, 0);
-                let l = 0, r = 0;
-                while (!isSide(offset(c, 0, l - .5)) && l > height - width) { l--; }
-                while (!isSide(offset(c, 0, r + .5)) && r < width - 1) { r++; }
-                for (let k = r - width + 1.5; k <= l + width - 1.5; k++) {
-                    drawlist.push(offset(c, 0, k));
+        let rectlist = [];
+        let ml = -board.cols, mu = -board.rows, mr = board.cols, md = board.rows;
+        (function () {
+            let canPlace = true;
+            for (let nw = wid; canPlace; nw++) {
+                canPlace = false;
+                let canPlace2 = true;
+                for (let nh = hei; canPlace2; nh++) {
+                    canPlace2 = false;
+                    for (let dl = wid - nw; dl <= 0; dl++) {
+                        for (let du = hei - nh; du <= 0; du++) {
+                            let dr = dl + nw - 1, dd = du + nh - 1;
+                            if (!isRectAble(offset(cell, dl, du), offset(cell, dr, dd))) { continue; }
+                            canPlace = canPlace2 = true;
+                            if (!isSizeAble(nw, nh, sc)) { break; }
+                            if (!isSizeAble(nw, nh, sc, offset(cell, dl, du))) { continue; }
+                            if (!isRectAble2(offset(cell, dl, du), offset(cell, dr, dd))) { continue; }
+                            rectlist.push([dl, du, dr, dd]);
+                            ml = Math.max(ml, dl); mr = Math.min(mr, dr);
+                            mu = Math.max(mu, du); md = Math.min(md, dd);
+                            if (rectlist.length > 1 && mr - ml + 1 === wid && md - mu + 1 === hei) { return; }
+                        }
+                        if (canPlace2 && !isSizeAble(nw, nh, sc)) { break; }
+                    }
                 }
             }
+        })();
+        if (rectlist.length === 0) { continue; }
+        for (let j = ml; j < mr; j++) {
+            add_link(offset(cell, j + .5, 0));
+        }
+        for (let j = mu; j < md; j++) {
+            add_link(offset(cell, 0, j + .5));
+        }
+        if (rectlist.length === 1) {
+            add_side(offset(cell, ml - .5, 0));
+            add_side(offset(cell, mr + .5, 0));
+            add_side(offset(cell, 0, mu - .5));
+            add_side(offset(cell, 0, md + .5));
         }
     }
-    drawlist.forEach(b => add_link(b));
+}
+function NoCrossingSide() {
+    for (let i = 0; i < board.cross.length; i++) {
+        let cross = board.cross[i];
+        let list = adjlist(cross.adjborder);
+        if (list.filter(b => !b.isnull && b.qans).length === 3) {
+            list.forEach(b => add_link(b));
+        }
+    }
 }
 function RoomPassOnce() {
     for (let i = 0; i < board.roommgr.components.length; i++) {
@@ -924,7 +985,7 @@ function GeneralAssist() {
             add_unshaded: setGreen,
         });
     }
-    if (checklist.some(f => f.name === "checkConnectUnshadeRB" || f.name === "checkConnectUnshadeRB")) {
+    if (checklist.some(f => f.name === "checkConnectUnshadeRB" || f.name === "checkConnectUnshade")) {
         CellConnected({
             isShaded: isGreen,
             isUnshaded: isBlack,
@@ -980,9 +1041,30 @@ function GeneralAssist() {
             isSquare: true,
         })
     }
+    if (checklist.some(f => f.name === "checkBorderCross")) {
+        NoCrossingSide();
+    }
 }
 
 // assist for certain genre
+function TatamibariAssist() {
+    RectRegion_Border({
+        isSizeAble: (w, h, sc, c = undefined) => {
+            if (sc !== null && !(sc.qnum === 1 && w === h || sc.qnum === 2 && w < h || sc.qnum === 3 && w > h)) { return false; }
+            if (c === undefined) { return true; }
+            for (let i = 0; i < w; i++) {
+                for (let j = 0; j < h; j++) {
+                    if (sc !== null && offset(c, i, j) !== sc && offset(c, i, j).qnum !== CQNUM.none) { return false; }
+                    if (sc === null && offset(c, i, j).qnum !== CQNUM.none) { sc = offset(c, i, j); }
+                }
+            }
+            if (sc === null) { return false; }
+            return sc.qnum === CQNUM.quesmark || sc.qnum === 1 && w === h || sc.qnum === 2 && w < h || sc.qnum === 3 && w > h;
+        }
+    });
+    NoCrossingSide();
+}
+
 function PencilsAssist() {
     let add_tip = function (c, dir) {  // 1=↑, 2=↓, 3=←, 4=→
         if (c === undefined || c.isnull || c.qsub === CQSUB.green || c.anum !== CANUM.none) { return; }
@@ -1286,8 +1368,21 @@ function MoonOrSunAssist() {
 }
 
 function ShikakuAssist() {
-    RectRegion_Border();
-    let n = 0;
+    RectRegion_Border({
+        isSizeAble: (w, h, sc, c = undefined) => {
+            if (sc !== null && w * h !== sc.qnum) { return false; }
+            if (c === undefined) { return true; }
+            for (let i = 0; i < w; i++) {
+                for (let j = 0; j < h; j++) {
+                    if (sc !== null && offset(c, i, j) !== sc && offset(c, i, j).qnum !== CQNUM.none) { return false; }
+                    if (sc === null && offset(c, i, j).qnum !== CQNUM.none) { sc = offset(c, i, j); }
+                }
+            }
+            if (sc === null) { return false; }
+            return sc.qnum === CQNUM.quesmark || w * h === sc.qnum;
+        }
+    });
+    let n = 0; 7
     let id = new Map(); // map every cell to unique clue id
     let id_info = new Map(); // get region info
     // assign id
@@ -1426,17 +1521,30 @@ function ShikakuAssist() {
     }
 }
 
-function SquareJamAssist() { // TODO: make it more useful
-    RectRegion_Border({ isSquare: true });
-    for (let i = 0; i < board.cross.length; i++) {
-        let cross = board.cross[i];
-        let list = adjlist(cross.adjborder);
-        if (list.filter(b => !b.isnull && b.qans).length === 3) {
-            list.forEach(b => add_link(b));
+function SquareJamAssist() {
+    RectRegion_Border({
+        isSizeAble: (w, h, sc, c = undefined) => {
+            if (w !== h) { return false; }
+            if (sc !== null && w !== sc.qnum) { return false; }
+            if (c === undefined) { return true; }
+            for (let i = 0; i < w; i++) {
+                for (let j = 0; j < h; j++) {
+                    if (offset(c, i, j).qnum > 0 && offset(c, i, j).qnum !== sc.qnum) { return false; }
+                }
+            }
+            return true;
         }
-    }
+    });
+    NoCrossingSide();
     for (let i = 0; i < board.cell.length; i++) {
         let cell = board.cell[i];
+        // ━ ━ -> ━━━
+        if ((b => !b.isnull && b.qans)(offset(cell, -1, .5)) && (b => !b.isnull && b.qans)(offset(cell, 1, .5))) {
+            add_side(offset(cell, 0, .5));
+        }
+        if ((b => !b.isnull && b.qans)(offset(cell, .5, -1)) && (b => !b.isnull && b.qans)(offset(cell, .5, 1))) {
+            add_side(offset(cell, .5, 0));
+        }
         if (cell.qnum < 0) { continue; }
         let h1 = -.5, h2 = .5;
         while ((b => !b.isnull && b.qsub === BQSUB.link)(offset(cell, 0, h1))) { h1--; }
@@ -3349,7 +3457,7 @@ function AquapelagoAssist() {
                 fn(offset(c, -1, +1));
                 fn(offset(c, +1, -1));
                 fn(offset(c, +1, +1));
-            }
+            };
             fn(cell);
             if (templist.length === cell.qnum) {
                 templist.forEach(c => {
@@ -3358,6 +3466,23 @@ function AquapelagoAssist() {
                     add_green(offset(c, +1, -1));
                     add_green(offset(c, +1, +1));
                 });
+            }
+            if (templist.length < cell.qnum) {
+                let list = [];
+                let fn = function (c) {
+                    if (c.isnull || c.qans === CQANS.black || c.qsub === CQSUB.green) { return; }
+                    if (list.includes(c)) { return; }
+                    list.push(c);
+                };
+                templist.forEach(c => {
+                    fn(offset(c, -1, -1));
+                    fn(offset(c, -1, +1));
+                    fn(offset(c, +1, -1));
+                    fn(offset(c, +1, +1));
+                });
+                if (list.length === 1) {
+                    add_black(list[0]);
+                }
             }
         }
     }
