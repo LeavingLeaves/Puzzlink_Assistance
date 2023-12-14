@@ -1397,7 +1397,7 @@ function SquareJamAssist() {
                     if (offset(c, i, j).qnum > 0 && offset(c, i, j).qnum !== sc.qnum) { return false; }
                 }
             }
-            return true;
+            return sc === null || w === sc.qnum;
         }
     });
     NoCrossingSide();
