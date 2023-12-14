@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.12.13.1
+// @version      23.12.15.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -1372,6 +1372,7 @@ function ShikakuAssist() {
         isSizeAble: (w, h, sc, c = undefined) => {
             if (sc !== null && w * h !== sc.qnum) { return false; }
             if (c === undefined) { return true; }
+            // TODO: change this to a prefix 2d array sum
             for (let i = 0; i < w; i++) {
                 for (let j = 0; j < h; j++) {
                     if (sc !== null && offset(c, i, j) !== sc && offset(c, i, j).qnum !== CQNUM.none) { return false; }
@@ -1382,143 +1383,6 @@ function ShikakuAssist() {
             return sc.qnum === CQNUM.quesmark || w * h === sc.qnum;
         }
     });
-    let n = 0; 7
-    let id = new Map(); // map every cell to unique clue id
-    let id_info = new Map(); // get region info
-    // assign id
-    for (let i = 0; i < board.cell.length; i++) {
-        let cell = board.cell[i];
-        if (cell.qnum === CQNUM.none) { continue; }
-        n++;
-        let x1 = cell.bx, x2 = cell.bx, y1 = cell.by, y2 = cell.by;
-        let dfs = function (c) {
-            if (id.has(c)) { return; }
-            id.set(c, n);
-            x1 = Math.min(x1, c.bx);
-            x2 = Math.max(x2, c.bx);
-            y1 = Math.min(y1, c.by);
-            y2 = Math.max(y2, c.by);
-            fourside((nb, nc) => {
-                if (nb.qsub === BQSUB.link) {
-                    dfs(nc);
-                }
-            }, c.adjborder, c.adjacent)
-        }
-        dfs(cell);
-        if ((y2 - y1 + 2) * (x2 - x1 + 2) === 4 * cell.qnum) {
-            for (let i = x1; i <= x2; i += 2) {
-                add_side(board.getb(i, y1 - 1));
-                add_side(board.getb(i, y2 + 1));
-            }
-            for (let i = y1; i <= y2; i += 2) {
-                add_side(board.getb(x1 - 1, i));
-                add_side(board.getb(x2 + 1, i));
-            }
-        }
-        id_info.set(n, { cell: cell, x1: x1, x2: x2, y1: y1, y2: y2 });
-    }
-    // add n into choices
-    let add_n = function (c, idn) {
-        let obj = [];
-        if (id.has(c)) { obj = id.get(c); }
-        if (typeof (obj) !== "number" && !obj.includes(idn)) { obj.push(idn); }
-        id.set(c, obj);
-    }
-    // check available rectangle
-    let fn = function (sx, sy, h, w, idn) {
-        for (let i = 0; i < w; i++)
-            for (let j = 0; j < h; j++) {
-                let cell = board.getc(sx + i * 2, sy + j * 2);
-                if (cell.isnull) { return 0; }
-                if (i > 0 && cell.adjborder.left.qans) { return 0; }
-                if (j > 0 && cell.adjborder.top.qans) { return 0; }
-                let obj = [];
-                if (id.has(cell)) { obj = id.get(cell); }
-                if (typeof (obj) === "number" && obj !== idn) { return 0; }
-            }
-        let list = [];
-        for (let i = 0; i < w; i++)
-            for (let j = 0; j < h; j++) {
-                let cell = board.getc(sx + i * 2, sy + j * 2);
-                add_n(cell, idn);
-                if (!list.includes(cell)) { list.push(cell); }
-            }
-        return list;
-    }
-    // try every possible rectangle for each clue
-    for (let i = 1; i <= n; i++) {
-        let info = id_info.get(i);
-        let cell = info.cell;
-        let x1 = info.x1, x2 = info.x2, y1 = info.y1, y2 = info.y2;
-        let isExtendable = c => !c.isnull && (!id.has(c) || typeof (id.get(c)) !== "number" || id.get(c) === i);
-        if (cell.qnum === CQNUM.none) { continue; }
-        if (cell.qnum === CQNUM.quesmark) {
-            for (let d = 0; d < 4; d++) {
-                let c = cell;
-                let maxn = Math.max(board.cols, board.rows);
-                let fn = function (c2) {
-                    let n = 0;
-                    while (isExtendable(offset(c2, 0, 1, d)) && !offset(c, 0, .5, d).qans && n < maxn) {
-                        c2 = offset(c2, 0, 1, d);
-                        add_n(c2, i);
-                        n++;
-                    }
-                    maxn = Math.min(maxn, n);
-                }
-                fn(c);
-                while (isExtendable(offset(c, 1, 0, d)) && !offset(c, .5, 0, d).qans) {
-                    c = offset(c, 1, 0, d);
-                    add_n(c, i);
-                    fn(c);
-                }
-            }
-            continue;
-        }
-        let list = null;
-        for (let h = Math.ceil(cell.qnum / board.cols); h <= Math.min(cell.qnum, board.rows); h++)
-            if (cell.qnum % h === 0) {
-                let w = cell.qnum / h;
-                for (let sx = Math.max(board.minbx + 1, x2 - (w - 1) * 2);
-                    sx <= Math.min(board.maxbx - 1, x1); sx += 2)
-                    for (let sy = Math.max(board.minby + 1, y2 - (h - 1) * 2);
-                        sy <= Math.min(board.maxby - 1, y1); sy += 2) {
-                        let tmp = fn(sx, sy, h, w, i);
-                        if (tmp === 0) { continue; }
-                        if (list === null) { list = tmp; }
-                        else { list = list.filter(c => tmp.includes(c)); }
-                    }
-            }
-        if (list !== null) {
-            list.forEach(c => id.set(c, i));
-        }
-    }
-    // apply cell with only one possibility
-    for (let i = 0; i < board.cell.length; i++) {
-        let cell = board.cell[i];
-        if (!id.has(cell)) { continue; }
-        let obj = id.get(cell);
-        if (typeof (obj) === "number" || obj.length !== 1) { continue; }
-        let info = id_info.get(obj[0]);
-        for (let x = Math.min(cell.bx, info.x1); x <= Math.max(cell.bx, info.x2); x += 2)
-            for (let y = Math.min(cell.by, info.y1); y <= Math.max(cell.by, info.y2); y += 2) {
-                id.set(board.getc(x, y), obj[0]);
-            }
-    }
-    // add link and side
-    for (let i = 0; i < board.cell.length; i++) {
-        let cell = board.cell[i];
-        if (!id.has(cell) || typeof (id.get(cell)) !== "number") { continue; }
-        fourside((nb, nc) => {
-            if (nc.isnull) { return; }
-            if (!id.has(nc) || typeof (id.get(nc)) !== "number") { return; }
-            if (id.get(cell) === id.get(nc)) {
-                add_link(nb);
-            }
-            if (id.get(cell) !== id.get(nc)) {
-                add_side(nb);
-            }
-        }, cell.adjborder, cell.adjacent);
-    }
 }
 
 function SquareJamAssist() {
@@ -1529,6 +1393,7 @@ function SquareJamAssist() {
             if (c === undefined) { return true; }
             for (let i = 0; i < w; i++) {
                 for (let j = 0; j < h; j++) {
+                    if (offset(c, i, j).qnum > 0 && sc === null) { sc = offset(c, i, j); }
                     if (offset(c, i, j).qnum > 0 && offset(c, i, j).qnum !== sc.qnum) { return false; }
                 }
             }
