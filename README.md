@@ -21,7 +21,7 @@ Currently enhanced genre:
 * Castle Wall
 * Cave
 * Choco Banana
-* Circles and Squares (AG)
+* Circles and Squares
 * Creek
 * Guide Arrow
 * Heyawake
@@ -35,6 +35,7 @@ Currently enhanced genre:
 * Masyu
 * Moon or Sun
 * Norinori
+* Norinuri
 * No Three
 * Nuribou
 * Nurikabe
