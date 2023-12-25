@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.12.15.1
+// @version      23.12.25.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -145,6 +145,7 @@ const GENRELIST = [
     ["Slitherlink", SlitherlinkAssist],
     ["Square Jam", SquareJamAssist],
     ["Star Battle", StarbattleAssist],
+    ["Sudoku", SudokuAssist],
     ["Tapa", TapaAssist],
     ["Tasquare", TasquareAssist],
     ["Tatamibari", TatamibariAssist],
@@ -321,6 +322,7 @@ function No2x2Green() {
 function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
     isLinked = (c, nb, nc) => isShaded(c) && isShaded(nc),
     isNotPassable = (c, nb, nc) => false,
+    cantDivideShade = n => n > 0,
     OutsideAsShaded = false,
     OnlyOneConnected = true } = {}) {
     // use tarjan to find cut vertex
@@ -340,7 +342,7 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
         const cellset = new Set();
         if (!c.isnull) {
             let linkdfs = function (c) {
-                if (c.isnull || cellset.has(c)) { return; }
+                if (c.isnull || cellset.has(c) || isUnshaded(c)) { return; }
                 cellset.add(c);
                 fourside((nb, nc) => {
                     if (isLinked(c, nb, nc)) {
@@ -356,7 +358,7 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
         }
         let fn = function (nc, nb) {
             if (isNotPassable(c, nb, nc)) { return; }
-            if (nc === f || isUnshaded(nc)) { return; }
+            if (nc === f || f !== null && ord.get(f) === ord.get(nc) || isUnshaded(nc)) { return; }
             if (nc.isnull && !OutsideAsShaded) { return; }
             if (ord.get(c) === ord.get(nc)) { return; }
             if (ord.has(nc)) {
@@ -368,7 +370,7 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
             let ordnc = ord.get(nc);
             low.set(ordc, Math.min(low.get(ordc), low.get(ordnc)));
             shdn.set(ordc, shdn.get(ordc) + shdn.get(ordnc));
-            if (ordc <= low.get(ordnc) && shdn.get(ordnc) > 0) {
+            if (ordc <= low.get(ordnc) && cantDivideShade(shdn.get(ordnc))) {
                 cellset.forEach(c => shadelist.push(c));
             }
         };
@@ -1086,6 +1088,61 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function SudokuAssist() {
+    let add_candidate = function (c, l) {
+        if (c.isnull || c.anum !== -1) { return; }
+        while (l.length < 4) { l.push(-1); }
+        if (c.snum.join(',') === l.join(',')) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        [0, 1, 2, 3].forEach(n => c.setSnum(n, l[n]));
+        c.draw();
+    }
+    let add_number = function (c, n) {
+        if (c.isnull || c.anum !== -1) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        [0, 1, 2, 3].forEach(n => c.setSnum(n, -1));
+        c.setAnum(n);
+        c.draw();
+    }
+    let size = board.rows;
+    ForEachCell(cell => {
+        if (cell.qnum !== CQNUM.none) {
+            add_number(cell, cell.qnum);
+        }
+    });
+    ForEachCell(cell => {
+        if (cell.anum !== -1) { return; }
+        let arr = () => Array(size).fill().map((_, i) => i + 1);
+        let cand = arr(), row = arr(), col = arr(), box = arr();
+        ForEachCell(c => {
+            if (cell === c) { return; }
+            let b = c.anum === -1 && c.snum.every(n => n === -1);
+            if (cell.bx === c.bx) { col = b ? [] : col.filter(n => n !== c.anum && !c.snum.includes(n)); }
+            if (cell.by === c.by) { row = b ? [] : row.filter(n => n !== c.anum && !c.snum.includes(n)); }
+            if (cell.room === c.room) { box = b ? [] : box.filter(n => n !== c.anum && !c.snum.includes(n)); }
+            if (c.anum === -1) { return; }
+            if (cell.bx === c.bx || cell.by === c.by || cell.room === c.room) {
+                cand = cand.filter(n => n !== c.anum);
+            }
+        });
+        if (col.length === 1) { add_number(cell, col[0]); return; }
+        if (row.length === 1) { add_number(cell, row[0]); return; }
+        if (box.length === 1) { add_number(cell, box[0]); return; }
+        if (cell.snum.some(n => n !== -1)) {
+            add_candidate(cell, cell.snum.filter(n => cand.includes(n)).sort((a, b) => (a - b)));
+        }
+        if (cell.snum.filter(n => n !== -1).length === 1) {
+            add_number(cell, cell.snum.find(n => n !== -1));
+            return;
+        }
+        if (cell.snum.every(n => n === -1) && cand.length <= 4) {
+            add_candidate(cell, cand);
+        }
+    });
+}
+
 function CirclesAndSquaresAssist() {
     ForEachCell(c => { if (c.qnum === CQNUM.wcir) add_green(c); });
     ForEachCell(c => { if (c.qnum === CQNUM.bcir) add_black(c); });
@@ -3184,6 +3241,25 @@ function NuriMazeAssist() {
         add_unshaded: () => { },
         isLinked: (c, nb, nc) => c.room === nc.room,
     });
+    CellConnected({
+        isShaded: c => {
+            let startcell = board.getc(board.startpos.bx, board.startpos.by);
+            let goalcell = board.getc(board.goalpos.bx, board.goalpos.by);
+            if (c === startcell || c === goalcell) { return c.lcnt === 0; }
+            return c.lcnt == 1;
+        },
+        isUnshaded: c => {
+            let startcell = board.getc(board.startpos.bx, board.startpos.by);
+            let goalcell = board.getc(board.goalpos.bx, board.goalpos.by);
+            if (c === startcell || c === goalcell) { return c.lcnt === 1; }
+            return c.lcnt === 2 || isBlack(c) || c.ques === CQUES.tri;
+        },
+        add_shaded: add_green,
+        add_unshaded: () => { },
+        isLinked: (c, nb, nc) => c.room === nc.room,
+        cantDivideShade: n => n % 2 === 1,
+        OnlyOneConnected: false,
+    });
     let startcell = board.getc(board.startpos.bx, board.startpos.by);
     let goalcell = board.getc(board.goalpos.bx, board.goalpos.by);
     let circnt = 0;
@@ -3796,7 +3872,7 @@ function ShakashakaAssist() {
         // check if all ～s can be part of a diagonal rectangle.
         // ～～
         // ◣～
-        if (isNotDiagRect(offset(c, +1, +0, ndir)) || isNotDiagRect(offset(c, +0, -1, ndir))) { return false; }
+        if (isEdge(offset(c, +1, +0, ndir), ndir) || isEdge(offset(c, +0, -1, ndir), ndir + 1)) { return false; }
         if (isNotDiagRect(offset(c, +1, -1, ndir))) { return false; }
         // ＿＿＿    ＿◥＿    ＿＿＿    ＿＿＿    ＿＿＿    ＿＿＿
         // ＿◣◥ or ＿◣＿ or ◣◣＿ or ◤◣＿ or ＿◣＿ or ＿◣＿

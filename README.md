@@ -50,6 +50,7 @@ Currently enhanced genre:
 * Slitherlink
 * Square Jam
 * Star Battle
+* Sudoku
 * Tapa
 * Tasquare
 * Tatamibari
