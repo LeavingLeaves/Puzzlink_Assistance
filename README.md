@@ -34,6 +34,7 @@ Currently enhanced genre:
 * LITS
 * Masyu
 * Moon or Sun
+* Nonogram
 * Norinori
 * Norinuri
 * No Three

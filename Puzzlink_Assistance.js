@@ -129,6 +129,7 @@ const GENRELIST = [
     ["LITS", LitsAssist],
     ["Masyu", MasyuAssist],
     ["Moon or Sun", MoonOrSunAssist],
+    ["Nonogram", NonogramAssist],
     ["Norinori", NorinoriAssist],
     ["Norinuri", NorinuriAssist],
     ["No Three", NothreeAssist],
@@ -978,8 +979,9 @@ function ForEachCell(f = c => { }) {
     }
 }
 
+// see all checks from ui.puzzle.pzpr.common.AnsCheck.prototype
+// see used checks from ui.puzzle.checker.checklist_normal
 function GeneralAssist() {
-    // see all checks from ui.puzzle.pzpr.common.AnsCheck.prototype
     const checklist = ui.puzzle.checker.checklist_normal;
     const numberRemainsUnshaded = ui.puzzle.board.cell[0].numberRemainsUnshaded;
     let isGreen = c => !c.isnull && c.qsub === CQSUB.green;;
@@ -1088,6 +1090,62 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function NonogramAssist() {
+    // deduce each clue
+    let f = function (nl, cl) {
+        let len = cl.length;
+        let ll = new Array(nl.length);
+        ll[ll.length - 1] = len - nl[ll.length - 1];
+        for (let i = ll.length - 2; i >= 0; i--) {
+            ll[i] = ll[i + 1] - nl[i] - 1;
+        }
+        let dcnt = new Array(len);
+        let bcnt = new Array(len);
+        for (let i = 0; i < len; i++) {
+            dcnt[i] = (i > 0 ? dcnt[i - 1] : 0) + (cl[i].qsub === CQSUB.dot ? 1 : 0);
+            bcnt[i] = (i > 0 ? bcnt[i - 1] : 0) + (cl[i].qans ? 1 : 0);
+        }
+        let res = [];
+        let gen = function (n = 0, l = []) {
+            if (n === nl.length) {
+                if (l.length > len) { l = l.slice(0, len); }
+                if (l.length > 0 && bcnt[len - 1] > bcnt[l.length - 1]) { return; }
+                if (l.length < len) { l = [...l, ...Array(len - l.length).fill(0)]; }
+                res.push(l);
+                return;
+            }
+            for (let i = l.length; i <= ll[n]; i++) {
+                if (i + nl[n] < len && cl[i + nl[n]].qans) { continue; }
+                if ((i > 0 ? bcnt[i - 1] : 0) !== (l.length > 0 ? bcnt[l.length - 1] : 0)) { continue; }
+                if (dcnt[i + nl[n] - 1] > (i > 0 ? dcnt[i - 1] : 0)) { continue; }
+                gen(n + 1, [...l, ...Array(i - l.length).fill(0), ...Array(nl[n]).fill(1), 0]);
+            }
+        };
+        gen();
+        if (res.length === 0) { return; }
+        for (let i = 0; i < len; i++) {
+            if (res.every(l => l[i] === res[0][i])) {
+                if (res[0][i] === 0) { add_dot(cl[i]); }
+                if (res[0][i] === 1) { add_black(cl[i]); }
+            }
+        }
+    };
+    for (let i = 0; i < board.rows; i++) {
+        let nl = [], cl = [];
+        for (let j = board.minbx + 1; j <= -1; j += 2) { nl.push(board.getex(j, i * 2 + 1).qnum); }
+        for (let j = 0; j < board.cols; j++) { cl.push(board.getc(j * 2 + 1, i * 2 + 1)); }
+        nl = nl.filter(n => n >= 0);
+        f(nl, cl);
+    }
+    for (let i = 0; i < board.cols; i++) {
+        let nl = [], cl = [];
+        for (let j = board.minby + 1; j <= -1; j += 2) { nl.push(board.getex(i * 2 + 1, j).qnum); }
+        for (let j = 0; j < board.rows; j++) { cl.push(board.getc(i * 2 + 1, j * 2 + 1)); }
+        nl = nl.filter(n => n >= 0);
+        f(nl, cl);
+    }
+}
+
 function SudokuAssist() {
     let add_candidate = function (c, l) {
         if (c.isnull || c.anum !== -1) { return; }
