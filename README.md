@@ -43,6 +43,7 @@ Currently enhanced genre:
 * Nuri-Maze
 * Nurimisaki
 * Pencils
+* Ring-ring
 * Shakashaka
 * Shikaku
 * Simple Loop

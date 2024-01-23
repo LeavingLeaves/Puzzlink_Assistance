@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      23.12.25.1
+// @version      24.1.23.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -138,6 +138,7 @@ const GENRELIST = [
     ["Nuri-Maze", NuriMazeAssist],
     ["Nurimisaki", NurimisakiAssist],
     ["Pencils", PencilsAssist],
+    ["Ring-ring", RingringAssist],
     ["Shakashaka", ShakashakaAssist],
     ["Shikaku", ShikakuAssist],
     ["Simple Loop", SimpleloopAssist],
@@ -178,7 +179,18 @@ ui.puzzle.on('ready', function () {
         if (event.key === 'q' || (event.key === 'Q')) { assist(); }
         if (event.key === 'w' || (event.key === 'W')) { assiststep(); }
     });
+    window.parent.postMessage("Ready to Assist", "*");
 }, false);
+// for postMessage
+window.addEventListener(
+    "message",
+    (event) => {
+        if (event.data === "assist") {
+            assist();
+        }
+    },
+    false,
+);
 function assiststep() {
     step = true;
     assist();
@@ -196,6 +208,7 @@ function assist() {
     }
     ui.puzzle.redraw();
     console.log('Assisted.');
+    window.parent.postMessage(ui.puzzle.check().complete ? "Solved" : "Not Solved", "*");
 }
 
 let isBlack = c => !c.isnull && c.qans === CQANS.black;
@@ -1090,6 +1103,107 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function RingringAssist() {
+    let isWall = c => c.ques === 1;
+    let isNotPathable = b => b.isnull || b.qsub === BQSUB.cross;
+    ForEachCell(cell => {
+        if (isWall(cell)) {
+            fourside(add_cross, cell.adjborder);
+        }
+        if (cell.lcnt === 3) {
+            fourside(add_line, cell.adjborder);
+        }
+        if (cell.lcnt === 2 && adjlist(cell.adjborder).some(b => isNotPathable(b))) {
+            fourside(add_cross, cell.adjborder);
+        }
+        let templist = adjlist(cell.adjborder, cell.adjacent);
+        templist = templist.filter(([nb, nc]) => !(nc.isnull || isWall(nc) || nb.qsub === BQSUB.cross));
+        if (templist.length === 2) {
+            templist.forEach(([nb, nc]) => add_line(nb));
+        }
+    });
+    // make the right turning
+    ForEachCell(cell => {
+        for (let d = 0; d < 4; d++) {
+            if (!offset(cell, 0, -.5, d).line || !offset(cell, -.5, 0, d).line) { continue; }
+            if (!isNotPathable(offset(cell, 0, .5, d))) { continue; }
+            let pcell = cell;
+            while (offset(pcell, 0, -.5, d).line) {
+                pcell = offset(pcell, 0, -1, d);
+                if (isNotPathable(offset(pcell, 0, -.5, d))) {
+                    add_line(offset(pcell, -.5, 0, d));
+                    add_cross(offset(pcell, .5, 0, d));
+                    break;
+                }
+                if (offset(pcell, .5, 0, d).line) {
+                    fourside(add_line, pcell.adjborder);
+                }
+            }
+        }
+        for (let d = 0; d < 4; d++) {
+            if (!offset(cell, 0, -.5, d).line || !offset(cell, .5, 0, d).line) { continue; }
+            if (!isNotPathable(offset(cell, 0, .5, d))) { continue; }
+            let pcell = cell;
+            while (offset(pcell, 0, -.5, d).line) {
+                pcell = offset(pcell, 0, -1, d);
+                if (isNotPathable(offset(pcell, 0, -.5, d))) {
+                    add_line(offset(pcell, .5, 0, d));
+                    add_cross(offset(pcell, -.5, 0, d));
+                    break;
+                }
+                if (offset(pcell, -.5, 0, d).line) {
+                    fourside(add_line, pcell.adjborder);
+                }
+            }
+        }
+    });
+    ForEachCell(cell => {
+        for (let d = 0; d < 4; d++) {
+            if (!offset(cell, 0, .5, d).line || !offset(cell, .5, 0, d).line) { continue; }
+            if (!isNotPathable(offset(cell, 0, -.5, d)) && !isNotPathable(offset(cell, -.5, 0, d))) { continue; }
+            let h = 1, w = 1;
+            while (offset(cell, 0, h + .5, d).line) { h++; }
+            while (offset(cell, w + .5, 0, d).line) { w++; }
+            let fg = false;
+            do {
+                fg = false;
+                for (let i = 1; i <= h; i++) {
+                    while (isWall(offset(cell, w, i, d)) || offset(cell, w, i - .5, d).qsub === BQSUB.cross) {
+                        add_line(offset(cell, w + .5, 0, d));
+                        w++;
+                        fg = true;
+                    }
+                }
+                for (let i = 1; i <= w; i++) {
+                    while (isWall(offset(cell, i, h, d)) || offset(cell, i - .5, h, d).qsub === BQSUB.cross) {
+                        add_line(offset(cell, 0, h + .5, d));
+                        h++;
+                        fg = true;
+                    }
+                }
+            } while (fg);
+            if (isNotPathable(offset(cell, w + .5, 0, d))) {
+                for (let i = 1; i <= h; i++) {
+                    add_line(offset(cell, w, i - .5, d));
+                }
+                if (isNotPathable(offset(cell, 0, h + .5, d)) || isNotPathable(offset(cell, w, h + .5, d))) {
+                    add_cross(offset(cell, 0, h + .5, d));
+                    add_cross(offset(cell, w, h + .5, d));
+                }
+            }
+            if (isNotPathable(offset(cell, 0, h + .5, d))) {
+                for (let i = 1; i <= w; i++) {
+                    add_line(offset(cell, i - .5, h, d));
+                }
+                if (isNotPathable(offset(cell, w + .5, 0, d)) || isNotPathable(offset(cell, w + .5, h, d))) {
+                    add_cross(offset(cell, w + .5, 0, d));
+                    add_cross(offset(cell, w + .5, h, d));
+                }
+            }
+        }
+    });
+}
+
 function NonogramAssist() {
     // deduce each clue
     let f = function (nl, cl) {
@@ -1106,7 +1220,9 @@ function NonogramAssist() {
             bcnt[i] = (i > 0 ? bcnt[i - 1] : 0) + (cl[i].qans ? 1 : 0);
         }
         let res = [];
+        const MAXSIT = 1000;
         let gen = function (n = 0, l = []) {
+            if (res.length > MAXSIT) { return; }
             if (n === nl.length) {
                 if (l.length > len) { l = l.slice(0, len); }
                 if (l.length > 0 && bcnt[len - 1] > bcnt[l.length - 1]) { return; }
@@ -1119,10 +1235,11 @@ function NonogramAssist() {
                 if ((i > 0 ? bcnt[i - 1] : 0) !== (l.length > 0 ? bcnt[l.length - 1] : 0)) { continue; }
                 if (dcnt[i + nl[n] - 1] > (i > 0 ? dcnt[i - 1] : 0)) { continue; }
                 gen(n + 1, [...l, ...Array(i - l.length).fill(0), ...Array(nl[n]).fill(1), 0]);
+                if (res.length > MAXSIT) { return; }
             }
         };
         gen();
-        if (res.length === 0) { return; }
+        if (res.length === 0 || res.length > MAXSIT) { return; }
         for (let i = 0; i < len; i++) {
             if (res.every(l => l[i] === res[0][i])) {
                 if (res[0][i] === 0) { add_dot(cl[i]); }
@@ -4748,6 +4865,16 @@ function SlitherlinkAssist() {
                 add_line(offset(cell, -.5, 0, d));
                 add_line(offset(cell, 1.5, 1, d));
                 add_line(offset(cell, 1, 1.5, d));
+            }
+            // ┏━╸ ·    ┏━╸ ·
+            // ┃3       ┃3   
+            // ╹ · · -> ╹ · ·
+            //    1        1×
+            // · · ·    · ·×·
+            if (cell.qnum === 3 && offset(cell, 1, 1, d).qnum === 1 &&
+                isLine(offset(cell, 0, -.5, d)) && isLine(offset(cell, -.5, 0, d))) {
+                add_cross(offset(cell, 1.5, 1, d));
+                add_cross(offset(cell, 1, 1.5, d));
             }
             //  × ×      × × 
             // ×· ·     ×· ╺━
