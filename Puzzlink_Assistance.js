@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.1.23.1
+// @version      24.1.29.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -138,6 +138,7 @@ const GENRELIST = [
     ["Nuri-Maze", NuriMazeAssist],
     ["Nurimisaki", NurimisakiAssist],
     ["Pencils", PencilsAssist],
+    ["Pipelink", PipelinkAssist],
     ["Ring-ring", RingringAssist],
     ["Shakashaka", ShakashakaAssist],
     ["Shikaku", ShikakuAssist],
@@ -1103,6 +1104,52 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function PipelinkAssist() {
+    ForEachCell(cell => {
+        // 11:╋; 12:┃; 13:━; 14:┗; 15:┛; 16:┓; 17:┏
+        const tmp = [   // ques, u, l, d, r
+            [11, 1, 1, 1, 1],
+            [12, 1, 0, 1, 0],
+            [13, 0, 1, 0, 1],
+            [14, 1, 0, 0, 1],
+            [15, 1, 1, 0, 0],
+            [16, 0, 1, 1, 0],
+            [17, 0, 0, 1, 1],
+        ];
+        if (cell.ques === CQUES.none) { return; }
+        adjlist(cell.adjborder).forEach((b, i) => tmp[cell.ques - 11][i + 1] === 1 ? add_line(b) : add_cross(b));
+    });
+    ForEachCell(cell => {
+        let list = adjlist(cell.adjborder);
+        let linecnt = list.filter(b => !b.isnull && b.line).length;
+        let crosscnt = list.filter(b => b.isnull || b.qsub === BQSUB.cross).length;
+        if (linecnt === 3 || crosscnt === 2) {
+            fourside(add_line, cell.adjborder);
+        }
+        if (linecnt === 2 && crosscnt === 1) {
+            fourside(add_cross, cell.adjborder);
+        }
+        for (let d = 0; d < 4; d++) {
+            if (!offset(cell, 0.5, 0, d).line || !offset(cell, 0, 0.5, d).line) { continue; }
+            if ((b => b.isnull || b.line || b.qsub === BQSUB.cross)(offset(cell, -.5, 0, d))) { continue; }
+            if ((b => b.isnull || b.line || b.qsub === BQSUB.cross)(offset(cell, 0, -.5, d))) { continue; }
+            let dd = d;
+            let pcell = offset(cell, 1, 0, dd);
+            while (pcell !== cell) {
+                if (!offset(pcell, 0.5, 0, dd).line) {
+                    if ((b => !b.isnull && b.qsub !== BQSUB.cross)(offset(pcell, .5, 0, dd))) { break; }
+                    if (!offset(pcell, .5, 0, dd - 1).line && !offset(pcell, .5, 0, dd + 1).line) { break; }
+                    dd = (offset(pcell, .5, 0, dd - 1).line ? dd + 3 : dd + 1) % 4;
+                }
+                pcell = offset(pcell, 1, 0, dd);
+            }
+            if (pcell === cell && board.linegraph.components.length > 1) {
+                fourside(add_line, cell.adjborder);
+            }
+        }
+    });
+}
+
 function RingringAssist() {
     let isWall = c => c.ques === 1;
     let isNotPathable = b => b.isnull || b.qsub === BQSUB.cross;
@@ -4611,7 +4658,7 @@ function YajilinAssist() {
         add_pass: add_dot,
     });
     let isPassable = c => !c.isnull && c.qnum === CQNUM.none && !isBlack(c);
-    let isEmpty = c => !c.isnull && c.qnum === CQNUM.none && c.qans !== CQANS.black && c.qsub !== CQSUB.dot && c.lcnt === 0;
+    let isEmpty = c => !c.isnull && c.qnum === CQNUM.none && !isBlack(c) && c.qsub !== CQSUB.dot && c.lcnt === 0;
     for (let i = 0; i < board.cell.length; i++) {
         let cell = board.cell[i];
         // check clue
@@ -4693,6 +4740,20 @@ function YajilinAssist() {
                 if (!isPassable(nc) || nb.qsub === BQSUB.cross) { return; }
                 add_dot(nc);
             }, cell.adjborder, cell.adjacent);
+        }
+        // prevent multiple loops
+        let list = adjlist(cell.adjborder, cell.adjacent);
+        list = list.filter(([b, c]) => isPassable(c) && b.qsub !== BQSUB.cross);
+        if (list.length === 0 || list[0][1].path !== undefined && list[0][1].path !== null && list.every(([b, c]) => c.path === list[0][1].path) && board.linegraph.components.length > 1) {
+            add_black(cell);
+        }
+        for (let d = 0; d < 4; d++) {
+            if (!isPassable(offset(cell, -1, 0, d))) { continue; }
+            if (!isPassable(offset(cell, 0, -1, d))) { continue; }
+            if (isPassable(offset(cell, -2, 0, d)) && offset(cell, -1.5, 0, d).qsub !== BQSUB.cross) { continue; }
+            if (isPassable(offset(cell, 0, -2, d)) && offset(cell, 0, -1.5, d).qsub !== BQSUB.cross) { continue; }
+            if (!offset(cell, -1, -1.5, d).line && !offset(cell, -1.5, -1, d).line) { continue; }
+            add_dot(cell);
         }
     }
 }
