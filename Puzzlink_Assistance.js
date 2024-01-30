@@ -341,73 +341,89 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
     OutsideAsShaded = false,
     OnlyOneConnected = true } = {}) {
     // use tarjan to find cut vertex
-    // Maximum call stack size exceeded sometimes for big puzzle
     let n = 0;
     let ord = new Map();
     let low = new Map();
     let shdn = new Map();
+    let fth = new Map();
     let shadelist = [];
-    let dfs = function (c, f = null) {
-        if (!c.isnull && isUnshaded(c) || ord.has(c)) { return; }
-        if (c.isnull && !OutsideAsShaded) { return; }
-        ord.set(c, n);
-        low.set(n, n);
-        shdn.set(n, 0);
-        n++;
-        const cellset = new Set();
-        if (!c.isnull) {
-            let linkdfs = function (c) {
-                if (c.isnull || cellset.has(c) || isUnshaded(c)) { return; }
-                cellset.add(c);
-                fourside((nb, nc) => {
-                    if (isLinked(c, nb, nc)) {
-                        linkdfs(nc);
+    // to avoid Maximum call stack size exceeded, manually use a stack to track the cells
+    let dfs = function (sc) {
+        let stack = [{ cell: sc, father: null, visited: false }];
+        while (stack.length > 0) {
+            let cur = stack[stack.length - 1];
+            let c = cur.cell;
+            let f = cur.father;
+            let v = cur.visited;
+            if (!v) {
+                if (!c.isnull && isUnshaded(c) || ord.has(c)) { stack.pop(); continue; }
+                if (c.isnull && !OutsideAsShaded) { stack.pop(); continue; }
+                ord.set(c, n);
+                low.set(n, n);
+                shdn.set(n, 0);
+                fth.set(c, f);
+                n++;
+                stack[stack.length - 1] = { cell: c, father: f, visited: true };
+            } else {
+                stack.pop();
+            }
+            if (!c.isnull) {
+                const cellset = new Set();
+                let linkdfs = function (c) {
+                    if (c.isnull || cellset.has(c) || isUnshaded(c)) { return; }
+                    cellset.add(c);
+                    fourside((nb, nc) => {
+                        if (isLinked(c, nb, nc)) {
+                            linkdfs(nc);
+                        }
+                    }, c.adjborder, c.adjacent);
+                }
+                linkdfs(c);
+                if (!v) {
+                    cellset.forEach(cl => {
+                        ord.set(cl, ord.get(c));
+                        shdn.set(ord.get(cl), shdn.get(ord.get(cl)) + isShaded(cl));
+                        fth.set(cl, f);
+                    });
+                }
+                let fn = function (nc, nb) {
+                    if (isNotPassable(c, nb, nc)) { return; }
+                    if (nc === f || f !== null && ord.get(f) === ord.get(nc) || isUnshaded(nc)) { return; }
+                    if (nc.isnull && !OutsideAsShaded) { return; }
+                    if (ord.get(c) === ord.get(nc)) { return; }
+                    if (ord.has(nc) && ord.get(nc) < ord.get(c)) {
+                        low.set(ord.get(c), Math.min(low.get(ord.get(c)), ord.get(nc)));
+                        return;
                     }
-                }, c.adjborder, c.adjacent);
+                    if (!v) {
+                        stack.push({ cell: nc, father: c, visited: false });
+                    }
+                    if (v && c === fth.get(nc)) {
+                        let ordc = ord.get(c);
+                        let ordnc = ord.get(nc);
+                        low.set(ordc, Math.min(low.get(ordc), low.get(ordnc)));
+                        shdn.set(ordc, shdn.get(ordc) + shdn.get(ordnc));
+                        if (ordc <= low.get(ordnc) && cantDivideShade(shdn.get(ordnc))) {
+                            cellset.forEach(c => shadelist.push(c));
+                        }
+                    }
+                };
+                for (let c of cellset) {
+                    fourside(fn, c.adjacent, c.adjborder);
+                };
             }
-            linkdfs(c);
-            cellset.forEach(cl => {
-                ord.set(cl, ord.get(c));
-                shdn.set(ord.get(cl), shdn.get(ord.get(cl)) + isShaded(cl));
-            });
-        }
-        let fn = function (nc, nb) {
-            if (isNotPassable(c, nb, nc)) { return; }
-            if (nc === f || f !== null && ord.get(f) === ord.get(nc) || isUnshaded(nc)) { return; }
-            if (nc.isnull && !OutsideAsShaded) { return; }
-            if (ord.get(c) === ord.get(nc)) { return; }
-            if (ord.has(nc)) {
-                low.set(ord.get(c), Math.min(low.get(ord.get(c)), ord.get(nc)));
-                return;
-            }
-            dfs(nc, c);
-            let ordc = ord.get(c);
-            let ordnc = ord.get(nc);
-            low.set(ordc, Math.min(low.get(ordc), low.get(ordnc)));
-            shdn.set(ordc, shdn.get(ordc) + shdn.get(ordnc));
-            if (ordc <= low.get(ordnc) && cantDivideShade(shdn.get(ordnc))) {
-                cellset.forEach(c => shadelist.push(c));
-            }
-        };
-        if (!c.isnull) {
-            for (let c of cellset) {
-                // expand Fourside to avoid Maximum call stack size exceeded
-                fn(c.adjacent.top, c.adjborder.top);
-                fn(c.adjacent.bottom, c.adjborder.bottom);
-                fn(c.adjacent.left, c.adjborder.left);
-                fn(c.adjacent.right, c.adjborder.right);
-            };
-        } else if (c.isnull) {
-            for (let i = 0; i < board.cols; i++) {
-                dfs(board.getc(2 * i + 1, board.minby + 1), c);
-                dfs(board.getc(2 * i + 1, board.maxby - 1), c);
-            }
-            for (let i = 0; i < board.rows; i++) {
-                dfs(board.getc(board.minbx + 1, 2 * i + 1), c);
-                dfs(board.getc(board.maxbx - 1, 2 * i + 1), c);
+            if (!v && c.isnull) {
+                for (let i = 0; i < board.cols; i++) {
+                    stack.push({ cell: board.getc(2 * i + 1, board.minby + 1), father: c, visited: false });
+                    stack.push({ cell: board.getc(2 * i + 1, board.maxby - 1), father: c, visited: false });
+                }
+                for (let i = 0; i < board.rows; i++) {
+                    stack.push({ cell: board.getc(board.minbx + 1, 2 * i + 1), father: c, visited: false });
+                    stack.push({ cell: board.getc(board.maxbx - 1, 2 * i + 1), father: c, visited: false });
+                }
             }
         }
-    };
+    }
     if (OutsideAsShaded) {
         dfs(board.getc(0, 0));
     } else {
