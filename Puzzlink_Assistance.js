@@ -128,6 +128,7 @@ const GENRELIST = [
     ["Light and Shadow", LightandShadowAssist],
     ["LITS", LitsAssist],
     ["Masyu", MasyuAssist],
+    ["Mid-loop", MidloopAssist],
     ["Moon or Sun", MoonOrSunAssist],
     ["Nonogram", NonogramAssist],
     ["Norinori", NorinoriAssist],
@@ -158,11 +159,15 @@ const GENRELIST = [
 ];
 
 // main entrance
-ui.puzzle.on('ready', function () {
-    if (document.querySelector("#assist") !== null) { return; }
-    console.log("Assistance running...");
+let initDone = false;
+let main = function () {
     GENRENAME = ui.puzzle.info.en;
+    if (initDone || GENRENAME === undefined) { return; }
+    initDone = true;
+    if (document.querySelector("#assist") !== null) { return; }
     console.log(`Puzzle Genre Name: ${GENRENAME}`);
+    console.log(`Puzzle Link: ${window.location.href}`);
+    console.log("Assistance running...");
     let btnName = "Assist";
     let btn2Name = "Assist Step";
     if (!GENRELIST.some(g => g[0] === GENRENAME)) {
@@ -181,7 +186,16 @@ ui.puzzle.on('ready', function () {
         if (event.key === 'w' || (event.key === 'W')) { assiststep(); }
     });
     window.parent.postMessage("Ready to Assist", "*");
-}, false);
+};
+ui.puzzle.on('ready', main, false);
+let initTimer = setInterval(() => {
+    if (initDone) {
+        clearInterval(initTimer);
+        return;
+    }
+    console.log("Puzz.link Assistance didn't launch. Relaunching...");
+    main();
+}, 1000);
 // for postMessage
 window.addEventListener(
     "message",
@@ -198,6 +212,7 @@ function assiststep() {
     step = false;
 }
 function assist() {
+    console.time("Assisted. Elapsed Time");
     flg = true;
     board = ui.puzzle.board;
     for (let loop = 0; loop < (step ? 1 : MAXLOOP); loop++) {
@@ -208,7 +223,7 @@ function assist() {
         } else { GeneralAssist(); }
     }
     ui.puzzle.redraw();
-    console.log('Assisted.');
+    console.timeEnd("Assisted. Elapsed Time");
     window.parent.postMessage(ui.puzzle.check().complete ? "Solved" : "Not Solved", "*");
 }
 
@@ -616,7 +631,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => b.qsub !==
                 // extend i/o through cross/line
                 (() => {
                     if (ncr.isnull) { return; }
-                    if (b.isnull || b.qsub === BQSUB.cross || b.sidecell[0].qnum !== CQNUM.none || b.sidecell[1].qnum !== CQNUM.none) {
+                    if (b.isnull || b.qsub === BQSUB.cross) {
                         add_inout(ncr, cr.qsub);
                     }
                     if (!b.isnull && b.line) {
@@ -1150,6 +1165,69 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function MidloopAssist() {
+    SingleLoopInCell({
+        isPass: c => c.qnum === CQNUM.bcir,
+    });
+    let isDot = c => !c.isnull && c.qnum === CQNUM.bcir;
+    let add_inout = function (cr, qsub) {
+        if (cr.isnull || cr.qsub !== 0) { return; }
+        cr.setQsub(qsub);
+    }
+    ForEachCell(cell => {
+        for (let d = 0; d < 4; d++) {
+            if (isDot(cell) && offset(cell, .5, .5, d).qsub !== 0) {
+                add_inout(offset(cell, -.5, -.5, d), 3 - offset(cell, .5, .5, d).qsub);
+            }
+        }
+    });
+    for (let i = board.minbx + 1; i <= board.maxbx - 1; i++) {
+        for (let j = board.minby + 1; j <= board.maxby - 1; j++) {
+            let obj = board.getobj(i, j);
+            if (!isDot(obj)) { continue; }
+            let d, b1, b2;
+            if (i % 2 === 0 && j % 2 === 0) { continue; }
+            if (i % 2 === 0 || j % 2 === 0) {
+                add_line(obj);
+                d = (i % 2 === 0 ? 0 : 1);
+                b1 = b2 = obj;
+            }
+            if (i % 2 === 1 && j % 2 === 1) {
+                if (adjlist(obj.adjborder).every(b => !b.isnull && !b.line && b.qsub !== BQSUB.cross) &&
+                    [offset(obj, 0, -.5), offset(obj, 0, -1), offset(obj, 0, +.5), offset(obj, 0, +1),
+                    offset(obj, -.5, 0), offset(obj, -1, 0), offset(obj, +.5, 0), offset(obj, +1, 0),].every(obj => !isDot(obj))) { continue; }
+                if ([obj.adjborder.top, obj.adjborder.bottom].some(b => b.isnull || b.qsub === BQSUB.cross) ||
+                    [obj.adjborder.left, obj.adjborder.right].some(b => !b.isnull && b.line) ||
+                    [offset(obj, 0, -.5), offset(obj, 0, -1),
+                    offset(obj, 0, +.5), offset(obj, 0, +1),].some(obj => isDot(obj))) {
+                    d = 0;
+                    b1 = obj.adjborder.left;
+                    b2 = obj.adjborder.right;
+                } else {
+                    d = 1;
+                    b1 = obj.adjborder.top;
+                    b2 = obj.adjborder.bottom;
+                }
+                add_line(b1);
+                add_line(b2);
+            }
+            while (!b1.isnull && !b2.isnull && (b1.line || b2.line)) {
+                add_line(b1);
+                add_line(b2);
+                b1 = offset(b1, -1, 0, d);
+                b2 = offset(b2, +1, 0, d);
+                if (b1.qsub === BQSUB.cross || b2.qsub === BQSUB.cross ||
+                    b1.isnull || b2.isnull ||
+                    [offset(b1, -.5, 0, d), offset(b1, -1, 0, d),
+                    offset(b2, +.5, 0, d), offset(b2, +1, 0, d),].some(obj => isDot(obj))) {
+                    add_cross(b1);
+                    add_cross(b2);
+                }
+            }
+        }
+    }
+}
+
 function PipelinkAssist() {
     ForEachCell(cell => {
         // 11:╋; 12:┃; 13:━; 14:┗; 15:┛; 16:┓; 17:┏
@@ -4433,14 +4511,10 @@ function MasyuAssist() {
         cr.setQsub(qsub);
     }
     ForEachCell(cell => {
-        if (isWhite(cell)) {
-            for (let d = 0; d < 4; d++) {
-                if (offset(cell, .5, .5, d).qsub !== 0) {
-                    add_inout(offset(cell, -.5, -.5, d), INLOOP + OUTLOOP - offset(cell, .5, .5, d).qsub);
-                }
-            }
-        }
         for (let d = 0; d < 4; d++) {
+            if (isWhite(cell) && offset(cell, .5, .5, d).qsub !== 0) {
+                add_inout(offset(cell, -.5, -.5, d), INLOOP + OUTLOOP - offset(cell, .5, .5, d).qsub);
+            }
             //  +×+      +×+
             // ●   ● -> ●   ●
             //  + +      +×+

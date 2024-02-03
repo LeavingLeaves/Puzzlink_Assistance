@@ -33,6 +33,7 @@ Currently enhanced genre:
 * Light and Shadow
 * LITS
 * Masyu
+* Mid-loop
 * Moon or Sun
 * Nonogram
 * Norinori
