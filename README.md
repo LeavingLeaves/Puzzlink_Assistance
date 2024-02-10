@@ -29,6 +29,7 @@ Currently enhanced genre:
 * Icebarn
 * Inverse LITSO
 * Koburin
+* Kropki
 * Kurodoko
 * Light and Shadow
 * LITS
