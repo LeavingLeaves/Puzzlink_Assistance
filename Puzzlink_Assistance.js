@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.2.10.1
+// @version      24.2.13.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -240,29 +240,48 @@ function assist() {
     if (ui.puzzle.check().complete) { printBoard(); }
 }
 function printBoard() {
+    // only some genres are able (i.e. looks good) to show in text.
     let res = "";
-    forEachCell(cell => {
-        res += (() => {
-            if (isBlack(cell)) { return "█"; }
-            if (GENRENAME === "Sudoku" || GENRENAME === "Kropki") { return cell.anum; }
-            if (GENRENAME === "Masyu" || GENRENAME === "Yinyang") {
-                if (cell.qnum === CQNUM.bcir || cell.anum === CANUM.bcir) { return "●"; }
-                if (cell.qnum === CQNUM.wcir || cell.anum === CANUM.wcir) { return "○"; }
-            }
-            if (cell.lcnt > 0) {
-                let t;
-                t |= cell.adjborder.top.line << 0;
-                t |= cell.adjborder.left.line << 1;
-                t |= cell.adjborder.bottom.line << 2;
-                t |= cell.adjborder.right.line << 3;
-                return ".╹╸┛╻┃┓┫╺┗━┻┏┣┳╋"[t];
-            }
-            if (cell.qnum !== CQNUM.none) { return "#"; }
-            return ".";
-        })();
-        if (cell.bx === board.maxbx - 1) { res += '\n'; }
-    });
-    console.log("Solutions:\n" + res);
+    if (GENRENAME === "Slitherlink") {
+        for (let i = 0; i < board.cross.length; i++) {
+            let cross = board.cross[i];
+            let t;
+            t |= cross.adjborder.top.line << 0;
+            t |= cross.adjborder.left.line << 1;
+            t |= cross.adjborder.bottom.line << 2;
+            t |= cross.adjborder.right.line << 3;
+            res += "·╹╸┛╻┃┓┫╺┗━┻┏┣┳╋"[t];
+            if (cross.bx === board.maxbx) { res += '\n'; }
+        }
+    } else
+        forEachCell(cell => {
+            res += (() => {
+                if (GENRENAME === "Akari") {
+                    if (isBlack(cell)) { return "●"; }
+                    if (cell.qnum !== CQNUM.none) { return "█"; }
+                    return ".";
+                }
+                if (isBlack(cell) || [CQUES.bwall, CQUES.white, CQUES.black].includes(cell.ques)) { return "█"; }
+                if (GENRENAME === "Shakashaka" && cell.qans !== CQANS.none) { return "..◣◢◥◤"[cell.qans]; }
+                if (GENRENAME === "Sudoku" || GENRENAME === "Kropki") { return cell.anum; }
+                if (GENRENAME === "Masyu" || GENRENAME === "Yinyang") {
+                    if (cell.qnum === CQNUM.bcir || cell.anum === CANUM.bcir) { return "●"; }
+                    if (cell.qnum === CQNUM.wcir || cell.anum === CANUM.wcir) { return "○"; }
+                }
+                if (cell.lcnt > 0) {
+                    let t;
+                    t |= cell.adjborder.top.line << 0;
+                    t |= cell.adjborder.left.line << 1;
+                    t |= cell.adjborder.bottom.line << 2;
+                    t |= cell.adjborder.right.line << 3;
+                    return ".╹╸┛╻┃┓┫╺┗━┻┏┣┳╋"[t];
+                }
+                if (cell.qnum !== CQNUM.none) { return "#"; }
+                return ".";
+            })();
+            if (cell.bx === board.maxbx - 1) { res += '\n'; }
+        });
+    console.log("Solution:\n" + res);
 }
 
 let isBlack = c => !c.isnull && c.qans === CQANS.black;
@@ -494,7 +513,7 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
         }
     }
     if (OutsideAsShaded) {
-        dfs(board.getobj(0, 0));
+        dfs(board.getobj(-1, -1));
     } else {
         forEachObj(cell => {
             if (!isShaded(cell) || ord.has(cell)) { return; }
