@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.2.13.1
+// @version      24.2.13.2
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -4577,8 +4577,8 @@ function AkariAssist() {
             add_dot(cell);
         }
         // only one place can light
+        let emptycellList = [];
         if (cell.qnum === CQNUM.none && !cell.qlight) {
-            let emptycellList = [];
             if (cell.qsub !== CQSUB.dot) {
                 emptycellList.push(cell);
             }
@@ -4592,6 +4592,24 @@ function AkariAssist() {
             emptycellList = emptycellList.filter(c => c.qsub !== CQSUB.dot);
             if (emptycellList.length === 1) {
                 add_light(emptycellList[0]);
+            }
+        }
+        // only two cells can lit up this cell
+        if (cell.qsub === CQSUB.dot && !cell.qlight && emptycellList.length === 2) {
+            let [ec1, ec2] = emptycellList;
+            if (ec1.bx !== ec2.bx && ec1.by !== ec2.by) {
+                if (ec1.bx === cell.bx) { [ec1, ec2] = [ec2, ec1]; }
+                let oc = board.getc(ec1.bx, ec2.by);
+                let f = true;
+                for (let i = cell.bx; i !== ec1.bx; i += (ec1.bx > cell.bx ? 1 : -1)) {
+                    f &= board.getc(i, ec2.by).qnum === CQNUM.none;
+                }
+                for (let i = cell.by; i !== ec2.by; i += (ec2.by > cell.by ? 1 : -1)) {
+                    f &= board.getc(ec1.bx, i).qnum === CQNUM.none;
+                }
+                if (f && oc.qnum === CQNUM.none) {
+                    add_dot(oc);
+                }
             }
         }
         fourside(c => {
@@ -4616,33 +4634,56 @@ function AkariAssist() {
                 }
             }
         }
-        // 3 & 1
-        if (cell.qnum === 3) {
-            for (let d = 0; d < 4; d++) {
-                if (!offset(cell, 1, 1, d).isnull && offset(cell, 1, 1, d).qnum === 1) {
-                    add_light(offset(cell, -1, 0, d));
-                    add_light(offset(cell, 0, -1, d));
-                    add_dot(offset(cell, 1, 2, d));
-                    add_dot(offset(cell, 2, 1, d));
-                }
+        for (let d = 0; d < 4; d++) {
+            //             
+            //  22  => ●22●
+            //             
+            if (cell.qnum === 2 && offset(cell, 1, 0, d).qnum === 2) {
+                add_light(offset(cell, -1, 0, d));
+                add_light(offset(cell, 2, 0, d));
             }
-        }
-        // 2 & 1
-        if (cell.qnum === 2) {
-            for (let d = 0; d < 4; d++) {
-                if (!offset(cell, 1, 1, d).isnull && offset(cell, 1, 1, d).qnum === 1) {
-                    add_dot(offset(cell, -1, -1, d));
-                }
+            //
+            //  21· => ●21·
+            //             
+            if (cell.qnum === 2 && offset(cell, 1, 0, d).qnum === 1 && isNotLight(offset(cell, 2, 0, d))) {
+                add_light(offset(cell, -1, 0, d));
             }
-        }
-        // 1 & 1
-        if (cell.qnum === 1) {
-            for (let d = 0; d < 4; d++) {
-                if (!offset(cell, 1, 1, d).isnull && offset(cell, 1, 1, d).qnum === 1 &&
-                    isNotLight(offset(cell, 1, 2, d)) && isNotLight(offset(cell, 2, 1, d))) {
-                    add_dot(offset(cell, -1, 0, d));
-                    add_dot(offset(cell, 0, -1, d));
-                }
+            //          ●  
+            //  3   => ●3  
+            //   1       1·
+            //           · 
+            if (cell.qnum === 3 && offset(cell, 1, 1, d).qnum === 1) {
+                add_light(offset(cell, -1, 0, d));
+                add_light(offset(cell, 0, -1, d));
+                add_dot(offset(cell, 1, 2, d));
+                add_dot(offset(cell, 2, 1, d));
+            }
+            //         ·   
+            //  2   =>  2  
+            //   1       1 
+            //             
+            if (cell.qnum === 2 && offset(cell, 1, 1, d).qnum === 1) {
+                add_dot(offset(cell, -1, -1, d));
+            }
+            //          ●
+            // ·2   => ·2
+            //   1       1·
+            //           · 
+            if (cell.qnum === 2 && offset(cell, 1, 1, d).qnum === 1 &&
+                (isNotLight(offset(cell, -1, 0, d)) || isNotLight(offset(cell, 0, -1, d)))) {
+                add_light(offset(cell, -1, 0, d));
+                add_light(offset(cell, 0, -1, d));
+                add_dot(offset(cell, 1, 2, d));
+                add_dot(offset(cell, 2, 1, d));
+            }
+            //          ·
+            //  1   => ·1
+            //   1·      1·
+            //   ·       · 
+            if (cell.qnum === 1 && offset(cell, 1, 1, d).qnum === 1 &&
+                isNotLight(offset(cell, 1, 2, d)) && isNotLight(offset(cell, 2, 1, d))) {
+                add_dot(offset(cell, -1, 0, d));
+                add_dot(offset(cell, 0, -1, d));
             }
         }
     });
