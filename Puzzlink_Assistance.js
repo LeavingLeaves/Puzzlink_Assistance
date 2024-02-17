@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.2.15.1
+// @version      24.2.17.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -512,7 +512,7 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
         }
     }
     if (OutsideAsShaded) {
-        dfs({ isnull: true });
+        dfs(board.getc(0, 0));
     } else {
         forEachObj(cell => {
             if (!isShaded(cell) || ord.has(cell)) { return; }
@@ -5069,28 +5069,26 @@ function SlitherlinkAssist() {
         add_shaded: add_bg_inner_color,
         add_unshaded: add_bg_outer_color,
     });
-    // // use qsub for each cross to track what it can be
-    // forEachCross(cross => {
-    //     if (cross.qsub === 0 || cross.qsub.length === 0) {
-    //         let qsub = [[]];
-    //         let list = adjlist(cross.adjborder);
-    //         for (let i = 0; i < 4; i++) {
-    //             for (let j = i + 1; j < 4; j++) {
-    //                 qsub.push([list[i], list[j]]);
-    //             }
-    //         }
-    //         cross.setQsub(qsub);
-    //     }
-    //     cross.setQsub(cross.qsub.filter(s => s.every(b => !b.isnull && b.qsub !== BQSUB.cross)));
-    //     adjlist(cross.adjborder).forEach(b => {
-    //         if (b.line) { cross.setQsub(cross.qsub.filter(s => s.includes(b))); }
-    //     });
-    //     adjlist(cross.adjborder).forEach(b => {
-    //         if (cross.qsub.every(s => s.includes(b))) { add_line(b); }
-    //         if (cross.qsub.every(s => !s.includes(b))) { add_cross(b); }
-    //     });
-    // });
-    // counting this due to some small loop joke
+    // use qsub for each cross to track what it can be
+    forEachCross(cross => {
+        if (cross.qsub === 0 || cross.qsub.length === 0) {
+            let qsub = [[]];
+            let list = adjlist(cross.adjborder);
+            for (let i = 0; i < 4; i++) {
+                for (let j = i + 1; j < 4; j++) {
+                    qsub.push([list[i], list[j]]);
+                }
+            }
+            cross.setQsub(qsub);
+        }
+        cross.setQsub(cross.qsub.filter(s => s.every(b => !b.isnull && b.qsub !== BQSUB.cross)));
+        fourside(b => {
+            if (b.line) { cross.setQsub(cross.qsub.filter(s => s.includes(b))); }
+            if (cross.qsub.every(s => s.includes(b))) { add_line(b); }
+            if (cross.qsub.every(s => !s.includes(b))) { add_cross(b); }
+        }, cross.adjborder);
+    });
+    // counting this due to some small loop jokes
     let twocnt = 0;
     let threecnt = 0;
     forEachCell(cell => {
@@ -5106,107 +5104,31 @@ function SlitherlinkAssist() {
             blist.forEach(b => add_line(b));
         }
         // deduce single clue
-        // if (cell.qnum >= 0) {
-        //     let list = [offset(cell, -.5, -.5), offset(cell, .5, -.5), offset(cell, -.5, .5), offset(cell, .5, .5)];
-        //     let sum = list.map(cr => cr.qsub.length).reduce((a, b) => a + b, 0);
-        //     let comblist = list.map(cr => cr.qsub);
-        //     comblist = comblist.reduce((a, b) => a.flatMap(x => b.map(y => [...x, y])), [[]]);
-        //     comblist = comblist.filter(comb => adjlist(cell.adjborder).every(b => comb.flat().filter(bb => bb === b).length % 2 === 0));
-        //     comblist = comblist.filter(comb => adjlist(cell.adjborder).filter(b => comb.flat().includes(b)).length === cell.qnum);
-        //     list.forEach((cr, i) => { cr.setQsub(cr.qsub.filter(s => comblist.some(comb => comb[i] === s))); });
-        //     if (list.map(cr => cr.qsub.length).reduce((a, b) => a + b, 0) < sum) { flg2 = true; }
-        // }
-        //  1
-        // 2·3·
-        //  4c5
-        //  ·6·
-        let fn = function (c, b1, b2, b3, b4, b5, b6) {
-            //  ×       ×  
-            // ×· · -> ×·×·
-            //   1      ×1 
-            //  · ·     · ·
-            if (c.qnum === 1 && isCross(b1) && isCross(b2)) {
-                add_cross(b3);
-                add_cross(b4);
-            }
-            //  ×       × 
-            // ×· · -> ×┏━╸
-            //   3      ┃3 
-            //  · ·     ╹ ·
-            if (c.qnum === 3 && isCross(b1) && isCross(b2)) {
-                add_line(b3);
-                add_line(b4);
-            }
-            //  ×       ×  
-            // ━╸ ·    ━╸ ·
-            //   1  ->   1×
-            //  · ·     ·×·
-            if (c.qnum === 1 && (isCross(b1) && isLine(b2) || isLine(b1) && isCross(b2))) {
-                add_cross(b5);
-                add_cross(b6);
-            }
-            //          ×       ┃  
-            //  · ·    ━╸ ·    ×╹ ·
-            //   1× ->   1× or   1×
-            //  ·×·     ·×·     ·×·
-            if (c.qnum === 1 && isCross(b5) && isCross(b6)) {
-                add_oneline(b1, b2);
-            }
-            //          ×  
-            // ━╸ ·    ━╸ ╻
-            //   3  ->   3┃
-            //  · ·     ╺━┛
-            if (c.qnum === 3 && (isLine(b1) || isLine(b2))) {
-                add_cross(b1);
-                add_cross(b2);
-                add_line(b5);
-                add_line(b6);
-            }
-            //          ×       ┃  
-            //  · ╻    ━╸ ╻    ×╹ ╻
-            //   3┃ ->   3┃ or   3┃
-            //  ╺━┛     ╺━┛     ╺━┛
-            if (c.qnum === 3 && isLine(b5) && isLine(b6)) {
-                add_oneline(b1, b2);
-            }
-            //  ×       ×  
-            // ×· ╻    ×·×╻
-            //   2┃ ->  ×2┃
-            //  · ╹     ╺━┛
-            if (c.qnum === 2 && isCross(b1) && isCross(b2) && (isLine(b5) || isLine(b6))) {
-                add_cross(b3);
-                add_cross(b4);
-                add_line(b5);
-                add_line(b6);
-            }
-            //  ×       ×  
-            // ×· ·    ×┏━╸
-            //   2× ->  ┃2×
-            //  · ·     ╹×·
-            if (c.qnum === 2 && isCross(b1) && isCross(b2) && (isCross(b5) || isCross(b6))) {
-                add_line(b3);
-                add_line(b4);
-                add_cross(b5);
-                add_cross(b6);
-            }
-            //          ×  
-            // ━╸ ·    ━╸ ·
-            //   2× ->   2×
-            //  · ·     ╺━╸
-            if (c.qnum === 2 && (isLine(b1) || isLine(b2)) && (isCross(b5) || isCross(b6))) {
-                add_cross(b1);
-                add_cross(b2);
-                add_line(b5);
-                add_line(b6);
-            }
-            //          ×       ┃  
-            //  · ·    ━╸ ·    ×╹ ·
-            //   2× ->   2× or   2×
-            //  ╺━╸     ╺━╸     ╺━╸
-            if (c.qnum === 2 && (isLine(b5) && isCross(b6) || isCross(b5) && isLine(b6))) {
-                add_oneline(b1, b2);
-            }
-        };
+        if (cell.qnum >= 0) {
+            let list = [offset(cell, -.5, -.5), offset(cell, .5, -.5), offset(cell, -.5, .5), offset(cell, .5, .5)];
+            let sum = list.map(cr => cr.qsub.length).reduce((a, b) => a + b, 0);
+            let comblist = [];
+            list[0].qsub.forEach(q0 => {
+                if (adjlist(cell.adjborder).filter(b => [].concat(q0).includes(b)).length > cell.qnum) { return; }
+                if (2 - adjlist(cell.adjborder).filter(b => [].concat(q0).includes(b)).length > 4 - cell.qnum) { return; }
+                list[1].qsub.forEach(q1 => {
+                    if (adjlist(cell.adjborder).filter(b => [].concat(q0, q1).includes(b)).length > cell.qnum) { return; }
+                    if (3 - adjlist(cell.adjborder).filter(b => [].concat(q0, q1).includes(b)).length > 4 - cell.qnum) { return; }
+                    if (q0.includes(offset(cell, 0, -.5)) ^ q1.includes(offset(cell, 0, -.5))) { return; }
+                    list[2].qsub.forEach(q2 => {
+                        if (q0.includes(offset(cell, -.5, 0)) ^ q2.includes(offset(cell, -.5, 0))) { return; }
+                        list[3].qsub.forEach(q3 => {
+                            if (q2.includes(offset(cell, 0, .5)) ^ q3.includes(offset(cell, 0, .5))) { return; }
+                            if (q1.includes(offset(cell, .5, 0)) ^ q3.includes(offset(cell, .5, 0))) { return; }
+                            if (adjlist(cell.adjborder).filter(b => [].concat(q0, q1, q2, q3).includes(b)).length !== cell.qnum) { return; }
+                            comblist.push([q0, q1, q2, q3]);
+                        });
+                    });
+                });
+            });
+            list.forEach((cr, i) => { cr.setQsub(cr.qsub.filter(s => comblist.some(comb => comb[i] === s))); });
+            if (list.map(cr => cr.qsub.length).reduce((a, b) => a + b, 0) < sum) { flg2 = true; }
+        }
         for (let d = 0; d < 4; d++) {
             //            ×  
             // · · ·    ╻ ╻ ╻
@@ -5230,95 +5152,6 @@ function SlitherlinkAssist() {
                 };
                 fn(offset(cell, 0, 1, d), offset(cell, 0, -1, d));
                 fn(offset(cell, 0, -1, d), offset(cell, 0, 1, d));
-            }
-            fn(cell, offset(cell, -1, -.5, d), offset(cell, -.5, -1, d),
-                offset(cell, 0, -.5, d), offset(cell, -.5, 0, d),
-                offset(cell, .5, 0, d), offset(cell, 0, .5, d),);
-            // · · ·    ┏━╸ ·
-            //  3       ┃3   
-            // · · · -> ╹ · ╻
-            //    3        3┃
-            // · · ·    · ╺━┛
-            if (cell.qnum === 3 && offset(cell, 1, 1, d).qnum === 3) {
-                add_line(offset(cell, 0, -.5, d));
-                add_line(offset(cell, -.5, 0, d));
-                add_line(offset(cell, 1.5, 1, d));
-                add_line(offset(cell, 1, 1.5, d));
-            }
-            // ┏━╸ ·    ┏━╸ ·
-            // ┃3       ┃3   
-            // ╹ · · -> ╹ · ·
-            //    1        1×
-            // · · ·    · ·×·
-            if (cell.qnum === 3 && offset(cell, 1, 1, d).qnum === 1 &&
-                isLine(offset(cell, 0, -.5, d)) && isLine(offset(cell, -.5, 0, d))) {
-                add_cross(offset(cell, 1.5, 1, d));
-                add_cross(offset(cell, 1, 1.5, d));
-            }
-            //  × ×      × × 
-            // ×· ·     ×· ╺━
-            //   2   ->   2  
-            // ━╸ ·     ━╸ · 
-            //           ×   
-            if (cell.qnum === 2 &&
-                isCross(offset(cell, -.5, -1, d)) && isCross(offset(cell, -1, -.5, d))) {
-                add_oneline(offset(cell, .5, -1, d), offset(cell, 1, -.5, d));
-                add_oneline(offset(cell, -1, .5, d), offset(cell, -.5, 1, d));
-            }
-            //  ×        ×   
-            // ×· ·     ×· · 
-            //   2   ->   2  
-            //  · ·×     · ·×
-            //             × 
-            if (cell.qnum === 2 &&
-                isCross(offset(cell, -.5, -1, d)) && isCross(offset(cell, -1, -.5, d)) &&
-                (isCross(offset(cell, 1, .5, d)) || isCross(offset(cell, .5, 1, d)))) {
-                add_cross(offset(cell, 1, .5, d));
-                add_cross(offset(cell, .5, 1, d));
-            }
-            //  ×        ×   
-            // ×· ·     ×┏━╸ 
-            //   2   ->  ┃2× 
-            //  · ╺━     ╹×┏━
-            //             ┃ 
-            if (cell.qnum === 2 &&
-                isCross(offset(cell, -.5, -1, d)) && isCross(offset(cell, -1, -.5, d)) &&
-                (isLine(offset(cell, 1, .5, d)) || isLine(offset(cell, .5, 1, d)))) {
-                add_line(offset(cell, 0, -.5, d));
-                add_line(offset(cell, -.5, 0, d));
-                add_cross(offset(cell, .5, 0, d));
-                add_cross(offset(cell, 0, .5, d));
-                add_line(offset(cell, 1, .5, d));
-                add_line(offset(cell, .5, 1, d));
-            }
-            //            ×  
-            // · · ·    · · ╻
-            // ×2 3  -> ×2 3┃
-            // · · ·    · · ╹
-            //            ×  
-            if (cell.qnum === 2 && offset(cell, 1, 0, d).qnum === 3 && isCross(offset(cell, -.5, 0, d))) {
-                add_line(offset(cell, 1.5, 0, d));
-                add_cross(offset(cell, .5, -1, d));
-                add_cross(offset(cell, .5, 1, d));
-            }
-            //   ×        ×  
-            // · · ·    · ╺━╸
-            //  1 3  -> ×1 3 
-            // · · ·    ·×· ·
-            if (cell.qnum === 1 && offset(cell, 1, 0, d).qnum === 3 && isCross(offset(cell, .5, -1, d))) {
-                add_line(offset(cell, 1, -.5, d));
-                add_cross(offset(cell, -.5, 0, d));
-                add_cross(offset(cell, 0, .5, d));
-            }
-            // ·×· ·    ·×· ·
-            // ×1       ×1   
-            // · · · -> · · ·
-            //    1        1×
-            // · · ·    · ·×·
-            if (cell.qnum === 1 && offset(cell, 1, 1, d).qnum === 1 &&
-                isCross(offset(cell, 0, -.5, d)) && isCross(offset(cell, -.5, 0, d))) {
-                add_cross(offset(cell, 1.5, 1, d));
-                add_cross(offset(cell, 1, 1.5, d));
             }
         }
     });
