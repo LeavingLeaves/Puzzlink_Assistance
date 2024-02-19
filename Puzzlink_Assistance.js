@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.2.18.1
+// @version      24.2.19.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -5190,7 +5190,7 @@ function SlitherlinkAssist() {
             // ×2 3  -> ×2 3┃
             // · · ·    · · ╹
             //            ×  
-            if (cell.qnum === 2 && offset(cell, 1, 0, d).qnum === 3) {
+            if (cell.qnum === 2 && offset(cell, 1, 0, d).qnum === 3 && offset(cell, -.5, 0, d).qsub === BQSUB.cross) {
                 add_line(offset(cell, 1.5, 0, d));
                 add_cross(offset(cell, .5, -1, d));
                 add_cross(offset(cell, .5, 1, d));
