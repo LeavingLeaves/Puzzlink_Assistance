@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.2.19.1
+// @version      24.2.20.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -1360,7 +1360,7 @@ function MidloopAssist() {
     let isDot = c => !c.isnull && c.qnum === CQNUM.bcir;
     forEachCell(cell => {
         for (let d = 0; d < 4; d++) {
-            if (isDot(cell) && offset(cell, .5, .5, d).qsub !== 0) {
+            if (isDot(cell) && offset(cell, .5, .5, d).qsub !== CRQSUB.none) {
                 add_inout(offset(cell, -.5, -.5, d), offset(cell, .5, .5, d).qsub ^ 1);
             }
         }
@@ -4781,7 +4781,7 @@ function MasyuAssist() {
     let isPathable = b => !b.isnull && b.qsub !== BQSUB.cross;
     forEachCell(cell => {
         for (let d = 0; d < 4; d++) {
-            if (isWhite(cell) && offset(cell, .5, .5, d).qsub !== 0) {
+            if (isWhite(cell) && offset(cell, .5, .5, d).qsub !== CRQSUB.none) {
                 add_inout(offset(cell, -.5, -.5, d), offset(cell, .5, .5, d).qsub ^ 1);
             }
             //  +×+      +×+
