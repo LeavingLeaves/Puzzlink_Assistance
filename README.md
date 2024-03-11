@@ -17,6 +17,7 @@ Currently enhanced genre:
 * Aqre
 * Aquapelago
 * Ayeheya
+* Barns
 * Canal View
 * Castle Wall
 * Cave

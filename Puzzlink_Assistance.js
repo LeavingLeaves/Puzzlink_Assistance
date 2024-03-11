@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.2.20.1
+// @version      24.3.11.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -122,6 +122,7 @@ const GENRELIST = [
     ["Aqre", AqreAssist],
     ["Aquapelago", AquapelagoAssist],
     ["Ayeheya", AyeheyaAssist],
+    ["Barns", BarnsAssist],
     ["Canal View", CanalViewAssist],
     ["Castle Wall", CastleWallAssist],
     ["Cave", CaveAssist],
@@ -659,17 +660,20 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => b.qsub !==
             for (let d = 0; d < 4; d++) {
                 let ncell = dir(cell.adjacent, d);
                 while (isIce(ncell)) { ncell = dir(ncell.adjacent, d); }
-                if (cell.path === ncell.path && board.linegraph.components.length > 1) {
+                if (cell.lcnt === 1 && ncell.lcnt === 1 && cell.path === ncell.path && board.linegraph.components.length > 1) {
                     add_notpath(dir(cell.adjborder, d));
                 }
             }
         }
         if (!isIce(cell) && linecnt === 0) {
             let list = [];
-            fourside((nb, nc) => {
-                if (nb.isnull || nc.isnull || nb.qsub === BQSUB.cross) { return; }
+            for (let d = 0; d < 4; d++) {
+                let nb = dir(cell.adjborder, d);
+                let nc = dir(cell.adjacent, d);
+                while (isIce(nc)) { nc = dir(nc.adjacent, d); }
+                if (nb.isnull || nc.isnull || nb.qsub === BQSUB.cross) { continue; }
                 list.push(nc);
-            }, cell.adjborder, cell.adjacent);
+            }
             if (list.length > 0 && list[0].path !== null && list.every(c => c.path === list[0].path && board.linegraph.components.length > 1)) {
                 fourside(add_notpath, cell.adjborder);
             }
@@ -677,7 +681,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => b.qsub !==
         if (isIce(cell)) {
             let fn = (b1, b2) => {
                 if (b1.line) { add_line(b2); }
-                if (b1.qsub === BQSUB.cross) { add_cross(b2) };
+                if (b1.qsub === BQSUB.cross || b1.isnull) { add_cross(b2) };
             }
             for (let d = 0; d < 4; d++) {
                 fn(offset(cell, .5, 0, d), offset(cell, -.5, 0, d));
@@ -693,7 +697,9 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => b.qsub !==
             }, cell.adjacent, cell.adjborder);
             if (list.length === 3) {
                 let fn = function (a, b, c) {
-                    if (a[0].path !== null && a[0].path === b[0].path && board.linegraph.components.length > 1) {
+                    if (a[0].path !== null && a[0].path === b[0].path &&
+                        !isIce(a[0]) && !isIce(b[0]) &&
+                        board.linegraph.components.length > 1) {
                         add_path(c[1]);
                     }
                 }
@@ -1284,6 +1290,13 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function BarnsAssist() {
+    SingleLoopInCell({
+        isPass: c => true,
+        isPathable: b => !b.isnull && !b.ques && b.qsub !== BQSUB.cross,
+    });
+}
+
 function KropkiAssist() {
     let add_candidate = function (c, l) {
         if (c.isnull || c.anum !== -1) { return; }
@@ -4052,6 +4065,7 @@ function IcebarnAssist() {
             }
         }
     });
+    // used to avoid all in/out arrow region
     CellConnected({
         isShaded: c => !has_out(c) && has_in(c),
         isUnshaded: c => has_out(c),
@@ -4784,6 +4798,14 @@ function MasyuAssist() {
             if (isWhite(cell) && offset(cell, .5, .5, d).qsub !== CRQSUB.none) {
                 add_inout(offset(cell, -.5, -.5, d), offset(cell, .5, .5, d).qsub ^ 1);
             }
+            if (isBlack(cell) && isWhite(offset(cell, -1, -1, d)) && isWhite(offset(cell, 1, 1, d)) &&
+                offset(cell, .5, .5, d).qsub !== CRQSUB.none) {
+                add_inout(offset(cell, -.5, -.5, d), offset(cell, .5, .5, d).qsub);
+            }
+            if (isBlack(cell) && isWhite(offset(cell, -1, -1, d)) && isWhite(offset(cell, 1, 1, d)) &&
+                offset(cell, -.5, .5, d).qsub !== CRQSUB.none) {
+                add_inout(offset(cell, .5, -.5, d), offset(cell, -.5, .5, d).qsub ^ 1);
+            }
             //  +×+      +×+
             // ●   ● -> ●   ●
             //  + +      +×+
@@ -5080,7 +5102,7 @@ function SlitherlinkAssist() {
     }
     CellConnected({
         isShaded: isGreen,
-        isUnshaded: c => isYellow(c) || c.qsub === CQSUB.none && c.qnum === 3,
+        isUnshaded: isYellow,
         add_shaded: add_bg_inner_color,
         add_unshaded: add_bg_outer_color,
         isLinked: (c, nb, nc) => nb.qsub === BQSUB.cross,
@@ -5088,6 +5110,23 @@ function SlitherlinkAssist() {
     });
     CellConnected({
         isShaded: isYellow,
+        isUnshaded: isGreen,
+        add_shaded: add_bg_outer_color,
+        add_unshaded: add_bg_inner_color,
+        isLinked: (c, nb, nc) => nb.qsub === BQSUB.cross,
+        isNotPassable: (c, nb, nc) => nb.line,
+        OutsideAsShaded: true,
+    });
+    CellConnected({
+        isShaded: c => isGreen(c) && c.qnum !== 3,
+        isUnshaded: c => isYellow(c) || c.qsub === CQSUB.none && c.qnum === 3,
+        add_shaded: add_bg_inner_color,
+        add_unshaded: add_bg_outer_color,
+        isLinked: (c, nb, nc) => nb.qsub === BQSUB.cross,
+        isNotPassable: (c, nb, nc) => nb.line,
+    });
+    CellConnected({
+        isShaded: c => isYellow(c) && c.qnum !== 3,
         isUnshaded: c => isGreen(c) || c.qsub === CQSUB.none && c.qnum === 3,
         add_shaded: add_bg_outer_color,
         add_unshaded: add_bg_inner_color,
