@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.3.11.1
+// @version      24.3.31.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -215,6 +215,12 @@ window.addEventListener(
         if (event.data === "assist") {
             assist();
         }
+        if (event.data === "undo") {
+            ui.puzzle.undo();
+        }
+        if (event.data === "redo") {
+            ui.puzzle.redo();
+        }
     },
     false,
 );
@@ -253,7 +259,9 @@ function printBoard() {
             res += "·╹╸┛╻┃┓┫╺┗━┻┏┣┳╋"[t];
             if (cross.bx === board.maxbx) { res += '\n'; }
         }
-    } else
+    } else {
+        let hasNum = false;
+        forEachCell(cell => hasNum ||= cell.qnum !== 0);
         forEachCell(cell => {
             res += (() => {
                 if (GENRENAME === "Akari") {
@@ -262,6 +270,7 @@ function printBoard() {
                     return ".";
                 }
                 if (isBlack(cell) || [CQUES.bwall, CQUES.white, CQUES.black].includes(cell.ques)) { return "█"; }
+                if (GENRENAME === "No Three") { return "."; }
                 if (GENRENAME === "Shakashaka" && cell.qans !== CQANS.none) { return "..◣◢◥◤"[cell.qans]; }
                 if (GENRENAME === "Sudoku" || GENRENAME === "Kropki") { return cell.anum; }
                 if (GENRENAME === "Masyu" || GENRENAME === "Yinyang") {
@@ -276,17 +285,24 @@ function printBoard() {
                     t |= cell.adjborder.right.line << 3;
                     return ".╹╸┛╻┃┓┫╺┗━┻┏┣┳╋"[t];
                 }
-                if (cell.qnum !== CQNUM.none) { return "#"; }
+                if (hasNum && cell.qnum !== CQNUM.none) {
+                    if (cell.qnum === CQNUM.quesmark) return "?";
+                    if (cell.qnum >= 0 && cell.qnum < 10) return cell.qnum.toString();
+                    if (cell.qnum >= 10 && cell.qnum < 10 + 26) return String.fromCharCode(cell.qnum - 10 + 65);
+                    return "#";
+                }
                 return ".";
             })();
             if (cell.bx === board.cols * 2 - 1) { res += '\n'; }
         });
+    }
     console.log("Solution:\n" + res);
 }
 
 let isBlack = c => !c.isnull && c.qans === CQANS.black;
 let isGreen = c => !c.isnull && c.qsub === CQSUB.green;
 let isIce = c => !c.isnull && c.ques === CQUES.ice;
+let isInside = c => c.bx >= 0 && c.by >= 0 && c.bx <= board.cols * 2 && c.by <= board.rows * 2;
 // set val
 let offset = function (c, dx, dy, dir = 0) {
     dir = (dir % 4 + 4) % 4;
@@ -442,7 +458,7 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
             if (!c.isnull) {
                 const cellset = new Set();
                 let linkdfs = function (c) {
-                    if (c.isnull || cellset.has(c) || isUnshaded(c)) { return; }
+                    if (c.isnull || !isInside(c) || cellset.has(c) || isUnshaded(c)) { return; }
                     cellset.add(c);
                     for (let d = 0; d < 4; d++) {
                         let nb = offset(c, .5, 0, d);
@@ -1212,6 +1228,24 @@ function GeneralAssist() {
             add_shaded: add_black,
             add_unshaded: add_green,
             OutsideAsShaded: true,
+        });
+    }
+    if (checklist.some(f => f.name === "checkConnectUnshadeOutside")) {
+        CellConnected({
+            isShaded: isGreen,
+            isUnshaded: isBlack,
+            add_shaded: add_green,
+            add_unshaded: add_black,
+            OutsideAsShaded: true,
+        });
+    }
+    if (checklist.some(f => f.name === "checkConnectShade") &&
+        checklist.some(f => f.name === "checkConnectUnshadeRB" || f.name === "checkConnectUnshade" || f.name === "checkConnectUnshadeOutside")) {
+        NoCheckerCell({
+            isShaded: isBlack,
+            isUnshaded: isGreen,
+            add_shaded: add_black,
+            add_unshaded: add_green,
         });
     }
     if (checklist.some(f => f.name === "checkAdjacentShadeCell")) {
