@@ -36,7 +36,9 @@ Currently enhanced genre:
 * LITS
 * Masyu
 * Mid-loop
+* Minarism
 * Moon or Sun
+* Nawabari
 * Nonogram
 * Norinori
 * Norinuri

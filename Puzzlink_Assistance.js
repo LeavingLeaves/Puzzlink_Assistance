@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.3.31.1
+// @version      24.4.11.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -141,7 +141,9 @@ const GENRELIST = [
     ["LITS", LitsAssist],
     ["Masyu", MasyuAssist],
     ["Mid-loop", MidloopAssist],
+    ["Minarism", MinarismAssist],
     ["Moon or Sun", MoonOrSunAssist],
+    ["Nawabari", NawabariAssist],
     ["Nonogram", NonogramAssist],
     ["Norinori", NorinoriAssist],
     ["Norinuri", NorinuriAssist],
@@ -248,6 +250,8 @@ function assist() {
 function printBoard() {
     // only some genres are able (i.e. looks good) to show in text.
     let res = "";
+    let hasSide = false;
+    forEachCell(cell => fourside(b => hasSide ||= (!b.isnull && b.qans), cell.adjborder));
     if (GENRENAME === "Slitherlink") {
         for (let i = 0; i < board.cross.length; i++) {
             let cross = board.cross[i];
@@ -259,39 +263,60 @@ function printBoard() {
             res += "·╹╸┛╻┃┓┫╺┗━┻┏┣┳╋"[t];
             if (cross.bx === board.maxbx) { res += '\n'; }
         }
+    } else if (hasSide) {
+        for (let i = 0; i < board.cross.length; i++) {
+            let cross = board.cross[i];
+            let t = 0;
+            t |= (cross.by > board.minby && (cross.bx === board.minbx || cross.bx === board.maxbx)) << 0;
+            t |= (cross.bx > board.minbx && (cross.by === board.minby || cross.by === board.maxby)) << 1;
+            t |= (cross.by < board.maxby && (cross.bx === board.minbx || cross.bx === board.maxbx)) << 2;
+            t |= (cross.bx < board.maxbx && (cross.by === board.minby || cross.by === board.maxby)) << 3;
+            t |= (cross.adjborder.top.qans) << 0;
+            t |= (cross.adjborder.left.qans) << 1;
+            t |= (cross.adjborder.bottom.qans) << 2;
+            t |= (cross.adjborder.right.qans) << 3;
+            res += "·╹╸┛╻┃┓┫╺┗━┻┏┣┳╋"[t];
+            if (cross.bx === board.maxbx) { res += '\n'; }
+        }
     } else {
         let hasNum = false;
         forEachCell(cell => hasNum ||= cell.qnum !== 0);
         forEachCell(cell => {
             res += (() => {
                 if (GENRENAME === "Akari") {
-                    if (isBlack(cell)) { return "●"; }
+                    if (isBlack(cell)) { return "○"; }
                     if (cell.qnum !== CQNUM.none) { return "█"; }
-                    return ".";
+                    return "·";
                 }
                 if (isBlack(cell) || [CQUES.bwall, CQUES.white, CQUES.black].includes(cell.ques)) { return "█"; }
-                if (GENRENAME === "No Three") { return "."; }
-                if (GENRENAME === "Shakashaka" && cell.qans !== CQANS.none) { return "..◣◢◥◤"[cell.qans]; }
-                if (GENRENAME === "Sudoku" || GENRENAME === "Kropki") { return cell.anum; }
-                if (GENRENAME === "Masyu" || GENRENAME === "Yinyang") {
-                    if (cell.qnum === CQNUM.bcir || cell.anum === CANUM.bcir) { return "●"; }
-                    if (cell.qnum === CQNUM.wcir || cell.anum === CANUM.wcir) { return "○"; }
-                }
                 if (cell.lcnt > 0) {
                     let t;
                     t |= cell.adjborder.top.line << 0;
                     t |= cell.adjborder.left.line << 1;
                     t |= cell.adjborder.bottom.line << 2;
                     t |= cell.adjborder.right.line << 3;
-                    return ".╹╸┛╻┃┓┫╺┗━┻┏┣┳╋"[t];
+                    return "·╹╸┛╻┃┓┫╺┗━┻┏┣┳╋"[t];
                 }
-                if (hasNum && cell.qnum !== CQNUM.none) {
-                    if (cell.qnum === CQNUM.quesmark) return "?";
-                    if (cell.qnum >= 0 && cell.qnum < 10) return cell.qnum.toString();
+                if (GENRENAME === "No Three") { return "·"; }
+                if (GENRENAME === "Shakashaka" && cell.qnum !== CQNUM.none) { return "█"; }
+                if (GENRENAME === "Shakashaka" && cell.qans !== CQANS.none) { return "··◣◢◥◤"[cell.qans]; }
+                if (cell.anum !== -1) {
+                    if (cell.anum === CQNUM.quesmark) return "？";
+                    if (cell.anum >= 0 && cell.anum < 10) return "０１２３４５６７８９".split('')[cell.anum];
+                    if (cell.anum >= 10 && cell.anum < 10 + 26) return String.fromCharCode(cell.anum - 10 + 65);
+                    return "＃";
+                }
+                if (GENRENAME === "Masyu" || GENRENAME === "Yinyang") {
+                    if (cell.qnum === CQNUM.bcir || cell.anum === CANUM.bcir) { return "●"; }
+                    if (cell.qnum === CQNUM.wcir || cell.anum === CANUM.wcir) { return "○"; }
+                }
+                if (hasNum && cell.qnum !== CQNUM.none && GENRENAME !== "Heyawake") {
+                    if (cell.qnum === CQNUM.quesmark) return "？";
+                    if (cell.qnum >= 0 && cell.qnum < 10) return "０１２３４５６７８９".split('')[cell.qnum];
                     if (cell.qnum >= 10 && cell.qnum < 10 + 26) return String.fromCharCode(cell.qnum - 10 + 65);
-                    return "#";
+                    return "＃";
                 }
-                return ".";
+                return "·";
             })();
             if (cell.bx === board.cols * 2 - 1) { res += '\n'; }
         });
@@ -336,6 +361,37 @@ let dir = function (c, d) {
 }
 let qdirRemap = function (qdir) {
     return [-1, 0, 2, 1, 3][qdir];
+}
+let getShape = function (clist) {
+    let minx = board.maxbx, miny = board.maxby, maxx = board.minbx, maxy = board.minby;
+    for (let i = 0; i < clist.length; i++) {
+        minx = Math.min(minx, clist[i].bx);
+        miny = Math.min(miny, clist[i].by);
+        maxx = Math.max(maxx, clist[i].bx);
+        maxy = Math.max(maxy, clist[i].by);
+    }
+    let s = [[], [], [], [], [], [], [], []];
+    for (let y = 0; y <= maxy - miny; y += 2) {
+        for (let x = 0; x <= maxx - minx; x += 2) {
+            s[0].push(clist.includes(board.getc(minx + x, miny + y)) ? 1 : 0);
+            s[1].push(clist.includes(board.getc(minx + x, maxy - y)) ? 1 : 0);
+        }
+    }
+    for (let x = 0; x <= maxx - minx; x += 2) {
+        for (let y = 0; y <= maxy - miny; y += 2) {
+            s[4].push(clist.includes(board.getc(minx + x, miny + y)) ? 1 : 0);
+            s[5].push(clist.includes(board.getc(minx + x, maxy - y)) ? 1 : 0);
+        }
+    }
+    s[2] = s[1].concat().reverse();
+    s[3] = s[0].concat().reverse();
+    s[6] = s[5].concat().reverse();
+    s[7] = s[4].concat().reverse();
+    for (var h = 0; h < 8; h++) {
+        s[h] = (h < 4 ? (maxx - minx) / 2 + 1 : (maxy - miny) / 2 + 1) + ":" + s[h].join("");
+    }
+    s = s.sort();
+    return s[0];
 }
 function forEachCell(f = c => { }) { for (let i = 0; i < board.cell.length; i++) { f(board.cell[i]); } }
 function forEachCross(f = c => { }) { for (let i = 0; i < board.cross.length; i++) { f(board.cross[i]); } }
@@ -1321,13 +1377,118 @@ function GeneralAssist() {
             NoUnshadedNum: false,
         });
     }
+    if (checklist.some(f => f.name === "checkSideAreaShadeCell")) {
+        forEachCell(c => {
+            if (!isBlack(c)) { return; }
+            for (let d = 0; d < 4; d++) {
+                let nb = offset(c, 0.5, 0, d);
+                let nc = offset(c, 1, 0, d)
+                if (!nb.isnull && nb.ques) {
+                    add_green(nc);
+                }
+            }
+        });
+    }
+
 }
 
 // assist for certain genre
+function NawabariAssist() {
+    RectRegion_Border({
+        isSizeAble: (w, h, sc, c) => {
+            for (let i = 0; i < w; i++) {
+                for (let j = 0; j < h; j++) {
+                    if (offset(c, i, j).qnum === CQNUM.none) { continue; }
+                    if (sc !== null && sc !== offset(c, i, j)) { return false; }
+                    sc = offset(c, i, j);
+                }
+            }
+            if (sc === null) { return false; }
+            let sn = 0;
+            sn += (c.bx === sc.bx ? 1 : 0);
+            sn += (c.by === sc.by ? 1 : 0);
+            sn += (c.bx + (w - 1) * 2 === sc.bx ? 1 : 0);
+            sn += (c.by + (h - 1) * 2 === sc.by ? 1 : 0);
+            return sc.qnum === CQNUM.quesmark || sc.qnum === sn;
+        }
+    });
+}
+
 function BarnsAssist() {
     SingleLoopInCell({
         isPass: c => true,
         isPathable: b => !b.isnull && !b.ques && b.qsub !== BQSUB.cross,
+    });
+}
+
+function MinarismAssist() {
+    let add_candidate = function (c, l) {
+        if (c.isnull || c.anum !== -1) { return; }
+        while (l.length < 4) { l.push(-1); }
+        if (c.snum.join(',') === l.join(',')) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        [0, 1, 2, 3].forEach(n => c.setSnum(n, l[n]));
+        c.draw();
+    }
+    let add_number = function (c, n) {
+        if (c.isnull || c.anum !== -1) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        [0, 1, 2, 3].forEach(n => c.setSnum(n, -1));
+        c.setAnum(n);
+        c.draw();
+    }
+    let size = board.rows;
+    forEachCell(cell => {
+        if (cell.qnum !== CQNUM.none) {
+            add_number(cell, cell.qnum);
+        }
+    });
+    forEachCell(cell => {
+        if (cell.anum !== -1) { return; }
+        let arr = () => Array(size).fill().map((_, i) => i + 1);
+        let cand = arr(), row = arr(), col = arr();
+        forEachCell(c => {
+            if (cell === c) { return; }
+            let b = c.anum === -1 && c.snum.every(n => n === -1);
+            if (cell.bx === c.bx) { col = b ? [] : col.filter(n => n !== c.anum && !c.snum.includes(n)); }
+            if (cell.by === c.by) { row = b ? [] : row.filter(n => n !== c.anum && !c.snum.includes(n)); }
+            if (c.anum === -1) { return; }
+            if (cell.bx === c.bx || cell.by === c.by) {
+                cand = cand.filter(n => n !== c.anum);
+            }
+        });
+        if (col.length === 1) { add_number(cell, col[0]); return; }
+        if (row.length === 1) { add_number(cell, row[0]); return; }
+        if (cell.snum.some(n => n !== -1)) {
+            add_candidate(cell, cell.snum.filter(n => cand.includes(n)).sort((a, b) => (a - b)));
+            cand = cand.filter(n => cell.snum.includes(n));
+        }
+        if (cell.snum.filter(n => n !== -1).length === 1) {
+            add_number(cell, cell.snum.find(n => n !== -1));
+            return;
+        }
+        for (let d = 0; d < 4; d++) {
+            if (offset(cell, .5, 0, d).isnull) { continue; }
+            let ncell = offset(cell, 1, 0, d);
+            let nlist = arr();
+            if (ncell.snum.some(n => n !== -1)) { nlist = ncell.snum.filter(n => n !== -1); }
+            if (ncell.anum !== -1) { nlist = [ncell.anum]; }
+            if (offset(cell, .5, 0, d).qnum !== BQNUM.none) {
+                let dt = offset(cell, .5, 0, d).qnum;
+                cand = cand.filter(n => nlist.includes(n - dt) || nlist.includes(n + dt));
+            }
+            if ([4, 1, 3, 2][d] === offset(cell, .5, 0, d).qdir) {
+                cand = cand.filter(n => nlist.some(m => n > m));
+            }
+            if ([3, 2, 4, 1][d] === offset(cell, .5, 0, d).qdir) {
+                cand = cand.filter(n => nlist.some(m => n < m));
+            }
+        }
+        if (cand.length <= 4) {
+            add_candidate(cell, cand);
+        }
     });
 }
 
@@ -1383,7 +1544,7 @@ function KropkiAssist() {
             if (offset(cell, .5, 0, d).isnull) { continue; }
             let ncell = offset(cell, 1, 0, d);
             let nlist = arr();
-            if (ncell.snum.some(n => n !== -1)) { nlist = ncell.snum; }
+            if (ncell.snum.some(n => n !== -1)) { nlist = ncell.snum.filter(n => n !== -1); }
             if (ncell.anum !== -1) { nlist = [ncell.anum]; }
             if (offset(cell, .5, 0, d).qnum === BQNUM.wcir) {
                 cand = cand.filter(n => nlist.includes(n - 1) || nlist.includes(n + 1));
@@ -1400,6 +1561,7 @@ function KropkiAssist() {
         }
     });
 }
+
 function MidloopAssist() {
     SingleLoopInCell({
         isPass: c => c.qnum === CQNUM.bcir,
@@ -4191,46 +4353,92 @@ function LitsAssist() {
     BlackConnected();
     BlackConnected_InRegion();
     No2x2Black();
+    const LITS = [
+        [[0, 0], [1, 0], [2, 0], [0, 1]],// L
+        [[0, 0], [1, 0], [2, 0], [2, 1]],
+        [[0, 0], [0, 1], [1, 1], [2, 1]],
+        [[0, 0], [0, 1], [-1, 1], [-2, 1]],
+        [[0, 0], [1, 0], [0, 1], [0, 2]],
+        [[0, 0], [1, 0], [1, 1], [1, 2]],
+        [[0, 0], [0, 1], [0, 2], [1, 2]],
+        [[0, 0], [0, 1], [0, 2], [-1, 2]],
+        [[0, 0], [1, 0], [2, 0], [3, 0]],// I
+        [[0, 0], [0, 1], [0, 2], [0, 3]],
+        [[0, 0], [1, 0], [2, 0], [1, 1]],// T
+        [[0, 0], [1, 0], [2, 0], [1, -1]],
+        [[0, 0], [0, 1], [0, 2], [1, 1]],
+        [[0, 0], [0, 1], [0, 2], [-1, 1]],
+        [[0, 0], [1, 0], [1, 1], [2, 1]],// S
+        [[0, 0], [1, 0], [1, -1], [2, -1]],
+        [[0, 0], [0, 1], [1, 1], [1, 2]],
+        [[0, 0], [0, 1], [-1, 1], [-1, 2]],
+    ];
+    const CANDMAX = 10;
     for (let i = 0; i < board.roommgr.components.length; i++) {
         let room = board.roommgr.components[i];
-        let templist = [];
+        let clist = [], bclist = [];
         for (let j = 0; j < room.clist.length; j++) {
-            templist.push(room.clist[j]);
+            if (room.clist[j].qsub === CQSUB.dot) { continue; }
+            if (isBlack(room.clist[j])) { bclist.push(room.clist[j]); }
+            clist.push(room.clist[j]);
         }
-        if (templist.filter(c => c.qsub !== CQSUB.dot).length === 4) {
-            templist.forEach(c => add_black(c));
-        }
-        if (templist.filter(c => isBlack(c)).length === 4) {
-            templist.forEach(c => add_dot(c));
-        }
-        for (let j = 0; j < room.clist.length; j++) {
-            let cell = room.clist[j];
-            if (cell.qsub === CQSUB.dot) { continue; }
-            // clean out region lower than 4
-            let templist2 = [];
-            let fn = function (c) {
-                if (c.room !== room || c.qsub === CQSUB.dot || templist2.includes(c)) { return; }
-                templist2.push(c);
-                fourside(fn, c.adjacent);
+        let clistSet = new Set(clist);
+        let cand = [];
+        for (let j = 0; j < clist.length; j++) {
+            let list = LITS;
+            list = list.map(l => l.map(([dx, dy]) => offset(clist[j], dx, dy)));
+            list = list.filter(l => !l.some(c => !clistSet.has(c)));
+            if (bclist.length > 0) {
+                list = list.filter(l => bclist.every(c => l.includes(c)));
             }
-            fn(cell);
-            if (templist2.length < 4) {
-                templist2.forEach(c => add_dot(c));
-            }
-            if (cell.qans !== CQANS.black) { continue; }
-            // out of reach in 3 steps
-            templist2 = [];
-            let fn2 = function (c, step = 0) {
-                if (step > 3 || c.room !== room) { return; }
-                templist2.push(c);
-                fourside(nc => fn2(nc, step + 1), c.adjacent);
-            }
-            fn2(cell);
-            templist.forEach(c => {
-                if (!templist2.includes(c)) {
-                    add_dot(c);
-                }
+            list = list.filter(l => {
+                let nlist = [], con = false;
+                l.forEach(c => {
+                    fourside(nc => {
+                        if (isBlack(nc) && nc.room !== room) {
+                            nlist.push(nc);
+                        }
+                        if (!nc.isnull && !isGreen(nc) && nc.room !== room) {
+                            con = true;
+                        }
+                    }, c.adjacent);
+                });
+                // connectivity
+                if (!con && board.roommgr.components.length > 1) { return false; }
+                // no 2*2
+                let no2x2 = true;
+                l.forEach(c => {
+                    if (no2x2 === false) { return; }
+                    for (let d = 0; d < 4; d++) {
+                        if ([c, offset(c, 1, 0, d), offset(c, 0, 1, d), offset(c, 1, 1, d)].every(cc => nlist.includes(cc) || l.includes(cc))) {
+                            no2x2 = false;
+                            return;
+                        }
+                    }
+                });
+                if (no2x2 === false) { return false; }
+                // no same shape
+                let cshape = getShape(l);
+                nlist = nlist.map(c => {
+                    let clist = [];
+                    for (let i = 0; i < c.room.clist.length; i++) {
+                        if (isBlack(c.room.clist[i])) { clist.push(c.room.clist[i]); }
+                    }
+                    return getShape(clist);
+                });
+                return !nlist.includes(cshape);
             });
+            cand.push(...list);
+            if (cand.length > CANDMAX) { break; }
+        }
+        if (cand.length > CANDMAX) { continue; }
+        for (let j = 0; j < clist.length; j++) {
+            if (cand.every(l => l.includes(clist[j]))) {
+                add_black(clist[j]);
+            }
+            if (cand.every(l => !l.includes(clist[j]))) {
+                add_dot(clist[j]);
+            }
         }
     }
 }
