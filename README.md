@@ -24,6 +24,7 @@ Currently enhanced genre:
 * Choco Banana
 * Circles and Squares
 * Creek
+* Fillomino
 * Guide Arrow
 * Heyawake
 * Hitori
@@ -37,6 +38,7 @@ Currently enhanced genre:
 * Masyu
 * Mid-loop
 * Minarism
+* Myopia
 * Moon or Sun
 * Nawabari
 * Nonogram
@@ -49,6 +51,7 @@ Currently enhanced genre:
 * Nurimisaki
 * Pencils
 * Pipelink
+* Putteria
 * Ring-ring
 * Shakashaka
 * Shikaku
