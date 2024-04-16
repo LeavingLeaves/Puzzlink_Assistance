@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.4.14.1
+// @version      24.4.16.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
 // @match        https://pzplus.tck.mn/p*/*
+// @match        https://pzprxs.vercel.app/p*/*
 // @match        http://pzv.jp/p*/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=puzz.link
 // @grant        none
@@ -129,6 +130,7 @@ const GENRELIST = [
     ["Choco Banana", ChocoBananaAssist],
     ["Circles and Squares", CirclesAndSquaresAssist],
     ["Creek", CreekAssist],
+    ["Double Choco", DoubleChocoAssist],
     ["Fillomino", FillominoAssist],
     ["Guide Arrow", GuideArrowAssist],
     ["Heyawake", HeyawakeAssist],
@@ -307,12 +309,14 @@ function printBoard() {
             if (color !== undefined && color[cell.room.id] !== undefined) {
                 res += palette[color[cell.room.id]];
             }
+            if (isIce(cell)) { res += "\x1b[106m"; }
             res += (() => {
                 if (GENRENAME === "Akari") {
                     if (isBlack(cell)) { return "○"; }
                     if (cell.qnum !== CQNUM.none) { return "█"; }
                     return "·";
                 }
+                if (isBlack(cell) && GENRENAME === "Star Battle") { return "★" };
                 if (isBlack(cell) || [CQUES.bwall, CQUES.white, CQUES.black].includes(cell.ques)) { return "█"; }
                 if (cell.lcnt > 0) {
                     let t;
@@ -352,6 +356,7 @@ function printBoard() {
                 }
                 return "·";
             })();
+            if (isIce(cell)) { res += "\x1b[49m"; }
             if (cell.bx === board.cols * 2 - 1) { res += '\n'; }
         });
     }
@@ -360,6 +365,7 @@ function printBoard() {
 
 let isBlack = c => !c.isnull && c.qans === CQANS.black;
 let isGreen = c => !c.isnull && c.qsub === CQSUB.green;
+let isDot = isGreen;
 let isIce = c => !c.isnull && c.ques === CQUES.ice;
 let isInside = c => c.bx >= 0 && c.by >= 0 && c.bx <= board.cols * 2 && c.by <= board.rows * 2;
 // set val
@@ -499,6 +505,47 @@ let add_number = function (c, n) {
 };
 
 // single rule deduction
+function NoDeadendBorder() {
+    forEachCross(cross => {
+        let list = adjlist(cross.adjborder);
+        if (list.some(b => b.isnull)) { return; }
+        if (list.filter(b => b.qans).length === 1 &&
+            list.filter(b => b.qsub !== BQSUB.link).length === 2) {
+            list.forEach(b => add_side(b));
+        }
+        if (list.filter(b => b.qsub !== BQSUB.link).length === 1) {
+            list.forEach(b => add_link(b));
+        }
+    });
+}
+function NoCrossingBorder() {
+    for (let i = 0; i < board.cross.length; i++) {
+        let cross = board.cross[i];
+        let list = adjlist(cross.adjborder);
+        if (list.filter(b => !b.isnull && b.qans).length === 3) {
+            list.forEach(b => add_link(b));
+        }
+    }
+}
+function RoomPassOnce() {
+    forEachRoom(room => {
+        let list = [];
+        for (let j = 0; j < room.clist.length; j++) {
+            let cell = room.clist[j];
+            fourside((nb, nc) => {
+                if (!nc.isnull && nc.room !== room) {
+                    list.push(nb);
+                }
+            }, cell.adjborder, cell.adjacent);
+        }
+        if (list.filter(b => b.line).length === 2) {
+            list.forEach(b => add_cross(b));
+        }
+        if (list.filter(b => b.qsub !== BQSUB.cross).length === 2) {
+            list.forEach(b => add_line(b));
+        }
+    });
+}
 function No2x2Cell({ isShaded, add_unshaded } = {}) {
     forEachCell(cell => {
         let templist = [cell, offset(cell, 1, 0), offset(cell, 0, 1), offset(cell, 1, 1)];
@@ -1068,7 +1115,7 @@ function SightNumber({ isShaded, isUnshaded, add_shaded, add_unshaded } = {}) {
     });
 }
 function SizeRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, OneNumPerRegion = true, NoUnshadedNum = true } = {}) {
-    // maybe rewrite this someday        
+    // TODO: maybe rewrite this someday
     forEachCell(cell => {
         // don't block region exit
         let templist = [offset(cell, -1, -1), offset(cell, -1, 0), offset(cell, -1, 1), offset(cell, 0, -1),
@@ -1171,7 +1218,11 @@ function SizeRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, OneNu
         }
     });
 }
-function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnull, OneNumPerRegion = false } = {}) {
+function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnull,
+    isSideable = (c, nb, nc) => !nb.isnull && !nc.isnull,
+    OneNumPerRegion = false } = {}) {
+    // TODO: maybe rewrite this someday        
+    NoDeadendBorder();
     forEachCell(cell => {
         if (cell.qnum === CQNUM.none || cell.qnum === CQNUM.quesmark) { return; }
         let clist = [], eclist = [];
@@ -1180,16 +1231,16 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
             clist.push(c);
             fourside((nb, nc) => {
                 if (nb.isnull || nc.isnull) { return; }
-                if (new Set([CQNUM.quesmark, CQNUM.none, cell.qnum, nc.qnum]).size === 4) {
+                if (new Set([CQNUM.quesmark, CQNUM.none, cell.qnum, nc.qnum]).size === 4 && isSideable(c, nb, nc)) {
                     add_side(nb);
                 }
-                if (OneNumPerRegion && nc.qnum !== CQNUM.none) {
+                if (OneNumPerRegion && nc.qnum !== CQNUM.none && isSideable(c, nb, nc)) {
                     add_side(nb);
                 }
-                if (nb.qsub === BQSUB.link) {
+                if (nb.qsub === BQSUB.link && isLinkable(c, nb, nc)) {
                     dfs(nc);
                 }
-                if (nb.qsub !== BQSUB.link && !nb.qans) {
+                if (nb.qsub !== BQSUB.link && !nb.qans && isLinkable(c, nb, nc)) {
                     eclist.push([c, nb, nc]);
                 }
             }, c.adjborder, c.adjacent);
@@ -1214,7 +1265,7 @@ function StripRegion_cell({ isShaded, add_unshaded } = {}) {
         }
     });
 }
-function RectRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, isSquare = false } = {}) {
+function RectRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, isSizeAble = (w, h, sc, c) => true } = {}) {
     forEachCell(cell => {
         if (isShaded(cell) || isUnshaded(cell)) { return; }
         // can't be exactly 3 shades in each 2*2
@@ -1231,63 +1282,81 @@ function RectRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, isSqu
             fn([offset(cell, 1, 0, d), offset(cell, 0, 1, d), offset(cell, 1, 1, d)]);
         }
     });
-    if (!isSquare) { return; }
-    let shadelist = [];
+    // record the (un)shade count in (0,0) to (a,b)
+    let scnt = Array.from(new Array(board.rows), () => new Array(board.cols).fill(0));
+    let ucnt = Array.from(new Array(board.rows), () => new Array(board.cols).fill(0));
+    for (let i = 0; i < board.rows; i++) {
+        for (let j = 0; j < board.cols; j++) {
+            scnt[i][j] = (b => isShaded(b) ? 1 : 0)(board.getc(2 * j + 1, 2 * i + 1));
+            scnt[i][j] += (i > 0 ? scnt[i - 1][j] : 0) + (j > 0 ? scnt[i][j - 1] : 0) - (i > 0 && j > 0 ? scnt[i - 1][j - 1] : 0);
+            ucnt[i][j] = (b => isUnshaded(b) ? 1 : 0)(board.getc(2 * j + 1, 2 * i + 1));
+            ucnt[i][j] += (i > 0 ? ucnt[i - 1][j] : 0) + (j > 0 ? ucnt[i][j - 1] : 0) - (i > 0 && j > 0 ? ucnt[i - 1][j - 1] : 0);
+        }
+    }
+    // check if there can be a rectangle exactly between c1 and c2
+    let isRectAble = function (c1, c2) {
+        if (c1.isnull || c2.isnull) { return 0; }
+        let [x1, x2] = [(c1.bx - 1) / 2, (c2.bx - 1) / 2].sort((x, y) => x - y);
+        let [y1, y2] = [(c1.by - 1) / 2, (c2.by - 1) / 2].sort((x, y) => x - y);
+        let f = (a, b) => a < 0 || b < 0 ? 0 : ucnt[Math.min(a, board.rows - 1)][Math.min(b, board.cols - 1)];
+        return f(y2, x2) - f(y1 - 1, x2) - f(y2, x1 - 1) + f(y1 - 1, x1 - 1) === 0;
+    }
+    let isRectAble2 = function (c1, c2, dir = ['L', 'U', 'R', 'D']) {
+        if (c1.isnull || c2.isnull) { return 0; }
+        let [x1, x2] = [(c1.bx - 1) / 2, (c2.bx - 1) / 2].sort((x, y) => x - y);
+        let [y1, y2] = [(c1.by - 1) / 2, (c2.by - 1) / 2].sort((x, y) => x - y);
+        let f = (a, b) => a < 0 || b < 0 ? 0 : scnt[Math.min(a, board.rows - 1)][Math.min(b, board.cols - 1)];
+        if (dir.includes('L') && f(y2, x1 - 1) - f(y2, x1 - 2) - f(y1 - 1, x1 - 1) + f(y1 - 1, x1 - 2) !== 0) { return false; }
+        if (dir.includes('U') && f(y1 - 1, x2) - f(y1 - 2, x2) - f(y1 - 1, x1 - 1) + f(y1 - 2, x1 - 1) !== 0) { return false; }
+        if (dir.includes('R') && f(y2, x2 + 1) - f(y2, x2) - f(y1 - 1, x2 + 1) + f(y1 - 1, x2) !== 0) { return false; }
+        if (dir.includes('D') && f(y2 + 1, x2) - f(y2, x2) - f(y2 + 1, x1 - 1) + f(y2, x1 - 1) !== 0) { return false; }
+        return true;
+    }
     forEachCell(cell => {
-        if (!isShaded(cell)) { return; }
-        //  █  ->  █ 
-        // · ·    ···
-        for (let d = 0; d < 4; d++) {
-            if ([offset(cell, -1, 1, d), offset(cell, 1, 1, d)].every(c => c.isnull || isUnshaded(c))) {
-                add_unshaded(offset(cell, 0, 1, d));
-            }
-        }
-        if ((c => !c.isnull && isShaded(c))(offset(cell, 0, -1))) { return; }
-        if ((c => !c.isnull && isShaded(c))(offset(cell, -1, 0))) { return; }
-        let height = 1, width = 1;
-        while ((c => !c.isnull && isShaded(c))(offset(cell, 0, height - 1))) { height++; }
-        while ((c => !c.isnull && isShaded(c))(offset(cell, width - 1, 0))) { width++; }
-        height--;
-        width--;
-        // finished square
-        if (width === height) {
-            // 123
-            // 0 4
-            // 765
-            let list = [offset(cell, -1, 0), offset(cell, -1, -1),
-            offset(cell, 0, -1), offset(cell, width, -1),
-            offset(cell, width, 0), offset(cell, width, height),
-            offset(cell, 0, height), offset(cell, -1, height)];
-            let list2 = [[0, 4], [2, 6], [0, 2, 5], [1, 3, 6], [2, 4, 7], [3, 5, 0], [4, 6, 1], [5, 7, 2], [6, 0, 3], [7, 1, 4], [1, 3, 5, 7]];
-            if (list2.some(arr => arr.every(n => list[n].isnull || isUnshaded(list[n])))) {
-                [0, 2, 4, 6].forEach(n => add_unshaded(list[n]));
-            }
-        }
-        // extend square
-        if (height > width) {
-            for (let j = 0; j < height; j++) {
-                let c = offset(cell, 0, j);
-                let l = 0, r = 0;
-                while ((c => !c.isnull && !isUnshaded(c))(offset(c, l, 0)) && l > width - height - 1) { l--; }
-                while ((c => !c.isnull && !isUnshaded(c))(offset(c, r, 0)) && r < height) { r++; }
-                for (let k = r - height; k <= l + height; k++) {
-                    shadelist.push(offset(c, k, 0));
+        if (!isShaded(cell) && cell.qnum <= 0) { return; }
+        if (isShaded(cell.adjborder.top)) { return; }
+        if (isShaded(cell.adjborder.left)) { return; }
+        let wid = 1, hei = 1;
+        while (isShaded(offset(cell, wid, 0))) { wid++; }
+        while (isShaded(offset(cell, 0, hei))) { hei++; }
+        let sc = null;
+        for (let dx = 0; dx < wid; dx++) {
+            for (let dy = 0; dy < hei; dy++) {
+                if (offset(cell, dx, dy).qnum >= 0) {
+                    sc = offset(cell, dx, dy);
                 }
             }
         }
-        if (height < width) {
-            for (let j = 0; j < width; j++) {
-                let c = offset(cell, j, 0);
-                let l = 0, r = 0;
-                while ((c => !c.isnull && !isUnshaded(c))(offset(c, 0, l)) && l > height - width - 1) { l--; }
-                while ((c => !c.isnull && !isUnshaded(c))(offset(c, 0, r)) && r < width) { r++; }
-                for (let k = r - width; k <= l + width; k++) {
-                    shadelist.push(offset(c, 0, k));
+        let rectlist = [];
+        for (let dl = 0; isRectAble(offset(cell, dl, 0), offset(cell, 0, 0)); dl--) {
+            if (!isRectAble2(offset(cell, dl, 0), offset(cell, 0, 0), ['L'])) { continue; }
+            for (let dr = wid - 1; isRectAble(offset(cell, dl, 0), offset(cell, dr, 0)); dr++) {
+                if (!isRectAble2(offset(cell, dl, 0), offset(cell, dr, 0), ['L', 'R'])) { continue; }
+                for (let du = 0; isRectAble(offset(cell, dl, du), offset(cell, dr, 0)); du--) {
+                    if (!isRectAble2(offset(cell, dl, du), offset(cell, dr, 0), ['L', 'R', 'U'])) { continue; }
+                    for (let dd = hei - 1; isRectAble(offset(cell, dl, du), offset(cell, dr, dd)); dd++) {
+                        if (!isRectAble2(offset(cell, dl, du), offset(cell, dr, dd))) { continue; }
+                        if (!isSizeAble(dr - dl + 1, dd - du + 1, sc, offset(cell, dl, du))) { continue; }
+                        rectlist.push({ dl: dl, du: du, dr: dr, dd: dd });
+                    }
                 }
             }
         }
+        if (!isShaded(cell) && rectlist.length === 0) {
+            add_unshaded(cell);
+        }
+        if (!isShaded(cell) || rectlist.length === 0) { return; }
+        let ml = rectlist.reduce((m, obj) => Math.max(m, obj.dl), -board.cols);
+        let mu = rectlist.reduce((m, obj) => Math.max(m, obj.du), -board.rows);
+        let mr = rectlist.reduce((m, obj) => Math.min(m, obj.dr), +board.cols);
+        let md = rectlist.reduce((m, obj) => Math.min(m, obj.dd), +board.rows);
+        for (let j = ml; j <= mr; j++) { add_shaded(offset(cell, j, 0)); }
+        for (let j = mu; j <= md; j++) { add_shaded(offset(cell, 0, j)); }
+        if (rectlist.every(obj => obj.dl === ml)) { add_unshaded(offset(cell, ml - 1, 0)); }
+        if (rectlist.every(obj => obj.dr === mr)) { add_unshaded(offset(cell, mr + 1, 0)); }
+        if (rectlist.every(obj => obj.du === mu)) { add_unshaded(offset(cell, 0, mu - 1)); }
+        if (rectlist.every(obj => obj.dd === md)) { add_unshaded(offset(cell, 0, md + 1)); }
     });
-    shadelist.forEach(c => add_shaded(c));
 }
 function RectRegion_Border({ doTrial = true, isSizeAble = (w, h, sc, c) => true } = {}) {
     let isLink = b => !b.isnull && b.qsub === BQSUB.link;
@@ -1415,34 +1484,6 @@ function RectRegion_Border({ doTrial = true, isSizeAble = (w, h, sc, c) => true 
         if (rectlist.every(obj => obj.dd === md)) { add_side(offset(cell, 0, md + .5)); }
     });
 }
-function NoCrossingBorder() {
-    for (let i = 0; i < board.cross.length; i++) {
-        let cross = board.cross[i];
-        let list = adjlist(cross.adjborder);
-        if (list.filter(b => !b.isnull && b.qans).length === 3) {
-            list.forEach(b => add_link(b));
-        }
-    }
-}
-function RoomPassOnce() {
-    forEachRoom(room => {
-        let list = [];
-        for (let j = 0; j < room.clist.length; j++) {
-            let cell = room.clist[j];
-            fourside((nb, nc) => {
-                if (!nc.isnull && nc.room !== room) {
-                    list.push(nb);
-                }
-            }, cell.adjborder, cell.adjacent);
-        }
-        if (list.filter(b => b.line).length === 2) {
-            list.forEach(b => add_cross(b));
-        }
-        if (list.filter(b => b.qsub !== BQSUB.cross).length === 2) {
-            list.forEach(b => add_line(b));
-        }
-    });
-}
 
 // see all checks from ui.puzzle.pzpr.common.AnsCheck.prototype
 // see used checks from ui.puzzle.checker.checklist_normal
@@ -1533,7 +1574,7 @@ function GeneralAssist() {
             isUnshaded: isBlack,
             add_shaded: add_green,
             add_unshaded: add_black,
-            isSquare: true,
+            isSizeAble: (w, h, sc, c) => w === h,
         })
     }
     if (checklist.some(f => f.name === "checkBorderCross")) {
@@ -1586,6 +1627,13 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function DoubleChocoAssist() {
+    SizeRegion_Border({
+        isLinkable: (c, nb, nc) => c.ques === nc.ques,
+        isSideable: (c, nb, nc) => c.ques === nc.ques,
+    });
+}
+
 function MyopiaAssist() {
     SingleLoopInBorder();
     forEachCell(cell => {
@@ -2269,7 +2317,7 @@ function CirclesAndSquaresAssist() {
         isUnshaded: isBlack,
         add_shaded: add_green,
         add_unshaded: add_black,
-        isSquare: true,
+        isSizeAble: (w, h, sc, c) => w === h,
     })
 }
 
@@ -2633,7 +2681,7 @@ function TasquareAssist() {
         isUnshaded: c => isGreen(c) || c.qnum !== CQNUM.none,
         add_shaded: add_black,
         add_unshaded: add_dot,
-        isSquare: true,
+        isSizeAble: (w, h, sc, c) => w === h,
     });
     CellConnected({
         isShaded: c => c.qsub === CQSUB.dot || c.qnum !== CQNUM.none,
@@ -3320,47 +3368,120 @@ function SlalomAssist() {
 }
 
 function StarbattleAssist() {
+    let isCircle = b => !b.isnull && b.qsub === 1;
+    let starcount = board.starCount.count;
+    let add_star = add_black;
     let add_cir = function (b) {
         if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none) { return; }
         if (step && flg) { return; }
+        if (b.bx % 2 === 0 && b.by % 2 === 0) {
+            if (adjlist(b.adjborder).some(b => isCircle(b))) { return; }
+        }
+        if (b.bx === board.minbx) { b = offset(b, +.5, 0); }
+        if (b.bx === board.maxbx) { b = offset(b, -.5, 0); }
+        if (b.by === board.minby) { b = offset(b, 0, +.5); }
+        if (b.by === board.maxby) { b = offset(b, 0, -.5); }
+        if (b.bx % 2 === 1 && b.by % 2 === 1) {
+            add_star(b);
+            return;
+        }
         b.setQsub(1);
         b.draw();
-        flg |= b.qsub === BQSUB.cross;
+        flg |= b.qsub === 1;
     };
-    let starcount = board.starCount.count;
-    let add_star = add_black;
     forEachRoom(room => {
-        let cellList = [];
+        let clist = [];
         for (let j = 0; j < room.clist.length; j++) {
-            cellList.push(room.clist[j]);
+            if (!isDot(room.clist[j])) {
+                clist.push(room.clist[j]);
+            }
         }
         // finish room
-        if (cellList.filter(c => c.qans === CQANS.star).length === starcount) {
-            cellList.forEach(c => add_dot(c));
+        if (clist.filter(c => c.qans === CQANS.star).length === starcount) {
+            clist.forEach(c => add_dot(c));
         }
-        if (cellList.filter(c => c.qsub !== CQSUB.dot).length === starcount) {
-            cellList.forEach(c => add_star(c));
+        if (clist.filter(c => c.qsub !== CQSUB.dot).length === starcount) {
+            clist.forEach(c => add_star(c));
+        }
+        // try covering with 2*2
+        if (clist.filter(c => c.qsub !== CQSUB.dot).length <= starcount * 4) {
+            let fg = false;
+            let dfs = function (list = [], dlist = []) {
+                if (list.filter(c => clist.includes(c)).length + (starcount - dlist.length) * 4 < clist.length) { return; }
+                if (dlist.length === starcount) {
+                    dlist.forEach(b => add_cir(b));
+                    list.forEach(c => {
+                        if (c.room !== room) {
+                            add_dot(c);
+                        }
+                    });
+                    fg = true;
+                }
+                if (fg) { return; }
+                for (let j = 0; j < clist.length; j++) {
+                    let c = clist[j];
+                    for (let d = 0; d < 4; d++) {
+                        let l = [c, offset(c, 1, 0, d), offset(c, 0, 1, d), offset(c, 1, 1, d)].filter(cc => !c.isnull);
+                        if (l.some(cc => list.includes(cc))) { continue; }
+                        dfs([...list, ...l], [...dlist, offset(c, .5, .5, d)]);
+                        if (fg) { return; }
+                    }
+                }
+            };
+            dfs();
         }
     });
     for (let i = 0; i < board.rows; i++) {
         let hcellList = [];
         let vcellList = [];
         for (let j = 0; j < board.cols; j++) {
-            hcellList.push(board.getc(2 * i + 1, 2 * j + 1));
-            vcellList.push(board.getc(2 * j + 1, 2 * i + 1));
+            hcellList.push(board.getc(2 * j + 1, 2 * i + 1));
+            vcellList.push(board.getc(2 * i + 1, 2 * j + 1));
         }
+        hcellList = hcellList.filter(c => !isDot(c));
+        vcellList = vcellList.filter(c => !isDot(c));
         // finish row/col
-        if (hcellList.filter(c => c.qans === CQANS.star).length === starcount) {
-            hcellList.forEach(c => add_dot(c));
+        if (hcellList.filter(c => c.qans === CQANS.star || isCircle(c.adjborder.right)).length === starcount) {
+            hcellList.forEach(c => !isCircle(c.adjborder.left) && !isCircle(c.adjborder.right) && add_dot(c));
         }
-        if (hcellList.filter(c => c.qsub !== CQSUB.dot).length === starcount) {
-            hcellList.forEach(c => add_star(c));
+        if (vcellList.filter(c => c.qans === CQANS.star || isCircle(c.adjborder.bottom)).length === starcount) {
+            vcellList.forEach(c => !isCircle(c.adjborder.top) && !isCircle(c.adjborder.bottom) && add_dot(c));
         }
-        if (vcellList.filter(c => c.qans === CQANS.star).length === starcount) {
-            vcellList.forEach(c => add_dot(c));
+        for (let j = 0; j < hcellList.length; j++) {
+            if (hcellList[j].adjacent.right === hcellList[j + 1]) {
+                hcellList[j] = [hcellList[j], hcellList[j + 1]];
+                hcellList.splice(j + 1, 1);
+            } else {
+                hcellList[j] = [hcellList[j]];
+            }
         }
-        if (vcellList.filter(c => c.qsub !== CQSUB.dot).length === starcount) {
-            vcellList.forEach(c => add_star(c));
+        if (hcellList.length === starcount) {
+            hcellList.forEach(l => {
+                if (l.length === 1) {
+                    add_star(l[0]);
+                }
+                if (l.length === 2) {
+                    add_cir(l[0].adjborder.right);
+                }
+            });
+        }
+        for (let j = 0; j < vcellList.length; j++) {
+            if (vcellList[j].adjacent.bottom === vcellList[j + 1]) {
+                vcellList[j] = [vcellList[j], vcellList[j + 1]];
+                vcellList.splice(j + 1, 1);
+            } else {
+                vcellList[j] = [vcellList[j]];
+            }
+        }
+        if (vcellList.length === starcount) {
+            vcellList.forEach(l => {
+                if (l.length === 1) {
+                    add_star(l[0]);
+                }
+                if (l.length === 2) {
+                    add_cir(l[0].adjborder.bottom);
+                }
+            });
         }
     }
     forEachCell(cell => {
@@ -3372,6 +3493,7 @@ function StarbattleAssist() {
             }
         }
     });
+    // adjust circle
     for (let i = 0; i < board.cross.length; i++) {
         let cross = board.cross[i];
         if (cross.qsub !== 1) { continue; }
@@ -3399,7 +3521,7 @@ function StarbattleAssist() {
             add_dot(offset(border, +1, -.5));
             add_dot(offset(border, +1, +.5));
         }
-        for (let j = 0; j <= 1; j++) {
+        for (let j = 0; j < 2; j++) {
             if (border.sidecell[j].qsub === CQSUB.dot) {
                 add_star(border.sidecell[1 - j]);
             }
@@ -3781,6 +3903,14 @@ function ChocoBananaAssist() {
         isUnshaded: isGreen,
         add_shaded: add_black,
         add_unshaded: add_green,
+        isSizeAble: (w, h, sc, c) => {
+            for (let i = 0; i < w; i++) {
+                for (let j = 0; j < h; j++) {
+                    if (offset(c, i, j).qnum > 0 && offset(c, i, j).qnum !== w * h) { return false; }
+                }
+            }
+            return true;
+        },
     });
     forEachCell(cell => {
         if (cell.qnum === 1 || cell.qnum === 2) {

@@ -24,6 +24,7 @@ Currently enhanced genre:
 * Choco Banana
 * Circles and Squares
 * Creek
+* Double Choco
 * Fillomino
 * Guide Arrow
 * Heyawake
