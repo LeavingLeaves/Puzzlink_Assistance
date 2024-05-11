@@ -55,6 +55,7 @@ Currently enhanced genre:
 * Pipelink
 * Putteria
 * Ring-ring
+* School Trip
 * Shakashaka
 * Shikaku
 * Simple Loop

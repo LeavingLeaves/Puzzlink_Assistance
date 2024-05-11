@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.4.25.1
+// @version      24.5.11.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -161,6 +161,7 @@ const GENRELIST = [
     ["Pipelink", PipelinkAssist],
     ["Putteria", PutteriaAssist],
     ["Ring-ring", RingringAssist],
+    ["School Trip", SchoolTripAssist],
     ["Shakashaka", ShakashakaAssist],
     ["Shikaku", ShikakuAssist],
     ["Simple Loop", SimpleloopAssist],
@@ -1157,6 +1158,9 @@ function SightNumber({ isShaded, isUnshaded, add_shaded, add_unshaded } = {}) {
 function SizeRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, OneNumPerRegion = true, NoUnshadedNum = true } = {}) {
     // TODO: maybe rewrite this someday
     forEachCell(cell => {
+        if (OneNumPerRegion && adjlist(cell.adjacent).every(c => c.isnull || isUnshaded(c))) {
+            add_unshaded(cell);
+        }
         // don't block region exit
         let templist = [offset(cell, -1, -1), offset(cell, -1, 0), offset(cell, -1, 1), offset(cell, 0, -1),
         offset(cell, 0, 1), offset(cell, 1, -1), offset(cell, 1, 0), offset(cell, 1, 1)];
@@ -1260,8 +1264,21 @@ function SizeRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, OneNu
 }
 function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnull,
     isSideable = (c, nb, nc) => !nb.isnull && !nc.isnull,
-    OneNumPerRegion = false } = {}) {
+    OneNumPerRegion = false,
+    scell = null } = {}) {
     NoDeadendBorder();
+    if (scell === null) {
+        forEachCell(cell => {
+            if (cell.qnum === CQNUM.none || cell.qnum === CQNUM.quesmark) { return; }
+            SizeRegion_Border({
+                isLinkable: isLinkable,
+                isSideable: isSideable,
+                OneNumPerRegion: OneNumPerRegion,
+                scell: cell,
+            });
+        });
+    }
+    let isNear = c => !c.isnull && (scell === null || Math.abs(c.bx - scell.bx) + Math.abs(c.by - scell.by) <= 2 * scell.qnum - 2);
     // use tarjan to find cut vertex
     let n = 0;
     let ord = new Map();
@@ -1272,7 +1289,6 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
     let clt = new Map();
     let fth = new Map();
     let vst = new Set();
-    let acl, an;
     let linklist = [], sidelist = [];
     // to avoid Maximum call stack size exceeded, manually use a stack to track the cells
     let dfs = function (sc) {
@@ -1310,6 +1326,15 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
                 }
             }
             linkdfs(c);
+            if (Array.from(cellset).some(c => {
+                if (!isNear(c)) { return true; }
+                if (scell !== null && c.qnum !== CQNUM.none && c.qnum !== CQNUM.quesmark && scell.qnum !== c.qnum) { return true; }
+                if (scell !== null && c.qnum !== CQNUM.none && c.qnum !== CQNUM.quesmark && OneNumPerRegion) { return true; }
+                return false;
+            })) {
+                ord.set(c, -1);
+                continue;
+            }
             if (!v) {
                 cellset.forEach(cl => {
                     ord.set(cl, ord.get(c));
@@ -1324,7 +1349,8 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
             }
             let fn = function (c, nb, nc) {
                 if (nc.isnull || isSide(nb)) { return; }
-                if (!isLink(nb) && clg.get(ord.get(c)).includes(cellset.size)) {
+                if (ord.has(nc) && ord.get(nc) === -1) { return; }
+                if (!isLink(nb) && clg.get(ord.get(c)).includes(cellset.size) && isSideable(c, nb, nc)) {
                     sidelist.push(nb);
                     return;
                 }
@@ -1362,32 +1388,7 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
                         vst.add(ordnc);
                     }
                     if (ordc < low.get(ordnc)) {
-                        let siz = function (cl) {
-                            if (OneNumPerRegion) {
-                                cl = cl.map(n => n === CQNUM.quesmark ? 1 : n);
-                            }
-                            if (!OneNumPerRegion) {
-                                cl = cl.filter(n => n !== CQNUM.quesmark);
-                                cl = Array.from(new Set(cl));
-                            }
-                            return cl.reduce((a, b) => a + b, 0);
-                        }
-                        let cl = clt.get(ordnc);
-                        if (siz(cl) > ctn.get(ordnc)) {
-                            linklist.push(nb);
-                        }
-                        let ocl = [];
-                        acl.forEach(n => {
-                            if (cl.includes(n)) {
-                                cl.splice(cl.indexOf(n), 1);
-                            }
-                            else {
-                                ocl.push(n);
-                            }
-                        });
-                        if (siz(ocl) > an - ctn.get(ordnc)) {
-                            linklist.push(nb);
-                        }
+                        linklist.push([c, nb, nc]);
                     }
                 }
             };
@@ -1402,27 +1403,44 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
     }
     forEachCell(cell => {
         if (ord.has(cell)) { return; }
-        acl = [];
-        an = 0;
-        let cset = new Set();
-        let fn = function (c) {
-            if (cset.has(c)) { return; }
-            cset.add(c);
-            an++;
-            if (c.qnum !== CQNUM.none) {
-                acl.push(c.qnum);
-            }
-            fourside((nb, nc) => {
-                if (nb.isnull || nc.isnull) { return; }
-                if (isSide(nb) || !isLinkable(c, nb, nc)) { return; }
-                fn(nc);
-            }, c.adjborder, c.adjacent);
-        };
-        fn(cell);
+        if (scell !== null && scell !== cell) { return; }
+        sidelist = [];
+        linklist = [];
         dfs(cell);
+        sidelist.forEach(b => add_side(b));
+        linklist.forEach(([c, nb, nc]) => {
+            let ordc = ord.get(c);
+            let ordnc = ord.get(nc);
+            let siz = function (cl) {
+                if (OneNumPerRegion) {
+                    cl = cl.map(n => n === CQNUM.quesmark ? 1 : n);
+                }
+                if (!OneNumPerRegion) {
+                    cl = cl.filter(n => n !== CQNUM.quesmark);
+                    cl = Array.from(new Set(cl));
+                }
+                return cl.reduce((a, b) => a + b, 0);
+            }
+            let cl = clt.get(ordnc);
+            if (scell === null && siz(cl) > ctn.get(ordnc)) {
+                add_link(nb);
+            }
+            let acl = clt.get(ord.get(cell));
+            let an = ctn.get(ord.get(cell));
+            let ocl = [];
+            acl.forEach(n => {
+                if (cl.includes(n)) {
+                    cl.splice(cl.indexOf(n), 1);
+                }
+                else {
+                    ocl.push(n);
+                }
+            });
+            if (siz(ocl) > an - ctn.get(ordnc)) {
+                add_link(nb);
+            }
+        });
     });
-    sidelist.forEach(b => add_side(b));
-    linklist.forEach(b => add_link(b));
 }
 function StripRegion_cell({ isShaded, add_unshaded } = {}) {
     forEachCell(cell => {
@@ -1796,6 +1814,88 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function SchoolTripAssist() {
+    let add_bed = function (c, d) { // NUDLR = 01234
+        if (c === undefined || c.isnull || c.qnum !== CQNUM.none || ![CQANS.none, 41, 46].includes(c.qans)) { return; }
+        if (d === 5 && c.qans === 41) { return; }
+        if (step && flg) { return; }
+        flg |= (41 + d) !== c.qans;
+        c.setQans(41 + d);
+        if (d > 0 && d <= 4) {
+            let nc = [null, offset(c, 0, -1), offset(c, 0, 1), offset(c, -1, 0), offset(c, 1, 0)][d];
+            let nd = [null, 2, 1, 4, 3][d];
+            nc.setQans(46 + nd);
+        }
+        c.draw();
+    };
+    let add_black = function (c) {
+        if (c.qnum !== CQNUM.none || c.qnums.length > 0) { return; }
+        if (c === undefined || c.isnull || c.lcnt !== 0 || c.qans !== CQANS.none) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setQans(CQANS.black);
+        if (c.qsub === CQSUB.dot) {
+            c.setQsub(CQSUB.none);
+        }
+        c.draw();
+    };
+    let isEmpty = c => !c.isnull && c.qans === CQANS.none && c.qnum === CQNUM.none;
+    CellConnected({
+        isShaded: isBlack,
+        isUnshaded: c => c.isnull || c.qans > 1 || c.qnum !== CQNUM.none,
+        add_shaded: add_black,
+        add_unshaded: c => add_bed(c, 5),
+    });
+    No2x2Cell({
+        isShaded: isBlack,
+        add_unshaded: c => add_bed(c, 5),
+    });
+    forEachCell(cell => {
+        if (cell.qnum !== CQNUM.none && cell.qnum !== CQNUM.quesmark) {
+            let fn = c => [41, 42, 43, 44, 45].includes(c.qans) || (isEmpty(c) || c.qans === 46) && !isDot(c) &&
+                [offset(c, 1, 0), offset(c, 0, -1), offset(c, -1, 0)].some(c => isEmpty(c) || c.qans === 46);
+            if (adjlist(cell.adjacent).filter(c => fn(c)).length === cell.qnum) {
+                adjlist(cell.adjacent).filter(c => fn(c)).forEach(c => add_bed(c, 0));
+            }
+            if (adjlist(cell.adjacent).filter(c => [41, 42, 43, 44, 45].includes(c.qans)).length === cell.qnum) {
+                fourside(add_dot, cell.adjacent);
+            }
+        }
+        if (isEmpty(cell) || cell.qans === 41 || cell.qans === 46) {
+            let tmp = [
+                [cell, offset(cell, 1, 0), 4],
+                [cell, offset(cell, 0, -1), 1],
+                [cell, offset(cell, -1, 0), 3],
+                [offset(cell, -1, 0), cell, 4],
+                [offset(cell, 0, 1), cell, 1],
+                [offset(cell, 1, 0), cell, 3],
+            ].filter(([hc, bc, d]) => {
+                if (hc.isnull || bc.isnull) { return false; }
+                if (!isEmpty(hc) && hc.qans !== 41 && hc.qans !== 46) { return false; }
+                if (!isEmpty(bc) && bc.qans !== 46) { return false; }
+                if (isDot(hc)) { return false; }
+                return true;
+            });
+            if (tmp.every(([hc, bc, d]) => hc !== cell)) {
+                add_dot(cell);
+            }
+            if (tmp.length === 0) {
+                add_black(cell);
+            }
+            if ((cell.qans === 41 || cell.qans === 46) && tmp.length === 1) {
+                add_bed(tmp[0][0], tmp[0][2]);
+            }
+        }
+        for (let d = 0; d < 4; d++) {
+            if ([45, 42, 44, 43][d] !== cell.qans) { continue; }
+            let tmp = [[-1, 0], [2, 0], [0, 1], [0, -1], [1, 1], [1, -1],].map(([x, y]) => offset(cell, x, y, d));
+            if (tmp.filter(c => isBlack(c) || isEmpty(c)).length === 1) {
+                tmp.forEach(c => add_black(c));
+            }
+        }
+    });
+}
+
 function AntMillAssist() {
     BlackDomino();
     const squ = 1, crs = 2;
@@ -2049,6 +2149,13 @@ function FillominoAssist() {
                     }, cell.adjborder, cell.adjacent);
                 }
             })
+        }
+        if (adjlist(cell.adjborder).every(b => b.isnull || isSide(b))) {
+            add_number(cell, 1);
+        }
+        if (adjlist(cell.adjborder).filter(b => b.isnull || isSide(b)).length === 3 &&
+            adjlist(cell.adjacent).some(c => !c.isnull && c.qnum === 1)) {
+            fourside(b => add_link(b), cell.adjborder);
         }
     });
 }
