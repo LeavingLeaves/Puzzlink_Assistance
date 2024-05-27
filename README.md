@@ -27,6 +27,7 @@ Currently enhanced genre:
 * Creek
 * Double Choco
 * Fillomino
+* FiveCells
 * Guide Arrow
 * Heyawake
 * Hitori
@@ -54,6 +55,7 @@ Currently enhanced genre:
 * Pencils
 * Pipelink
 * Putteria
+* Regional Yajilin
 * Ring-ring
 * School Trip
 * Shakashaka
