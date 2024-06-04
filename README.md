@@ -25,6 +25,7 @@ Currently enhanced genre:
 * Choco Banana
 * Circles and Squares
 * Creek
+* Dosun-Fuwari
 * Double Choco
 * Fillomino
 * FiveCells
@@ -43,6 +44,7 @@ Currently enhanced genre:
 * Minarism
 * Myopia
 * Moon or Sun
+* Nanameguri
 * Nawabari
 * Nonogram
 * Norinori
@@ -52,7 +54,9 @@ Currently enhanced genre:
 * Nurikabe
 * Nuri-Maze
 * Nurimisaki
+* One Room One Door
 * Pencils
+* Pentominous
 * Pipelink
 * Putteria
 * Regional Yajilin
@@ -71,5 +75,6 @@ Currently enhanced genre:
 * Tasquare
 * Tatamibari
 * Tentaisho
+* Tetrominous
 * Yajilin
 * Yin-Yang

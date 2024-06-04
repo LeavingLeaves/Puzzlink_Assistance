@@ -131,6 +131,7 @@ const GENRELIST = [
     ["Choco Banana", ChocoBananaAssist],
     ["Circles and Squares", CirclesAndSquaresAssist],
     ["Creek", CreekAssist],
+    ["Dosun-Fuwari", DosunFuwariAssist],
     ["Double Choco", DoubleChocoAssist],
     ["Fillomino", FillominoAssist],
     ["FiveCells", FiveCellsAssist],
@@ -149,6 +150,7 @@ const GENRELIST = [
     ["Minarism", MinarismAssist],
     ["Myopia", MyopiaAssist],
     ["Moon or Sun", MoonOrSunAssist],
+    ["Nanameguri", NanameguriAssist],
     ["Nawabari", NawabariAssist],
     ["Nonogram", NonogramAssist],
     ["Norinori", NorinoriAssist],
@@ -158,7 +160,9 @@ const GENRELIST = [
     ["Nurikabe", NurikabeAssist],
     ["Nuri-Maze", NuriMazeAssist],
     ["Nurimisaki", NurimisakiAssist],
+    ["One Room One Door", OneRoomOneDoorAssist],
     ["Pencils", PencilsAssist],
+    ["Pentominous", PentominousAssist],
     ["Pipelink", PipelinkAssist],
     ["Putteria", PutteriaAssist],
     ["Regional Yajilin", RegionalYajilinAssist],
@@ -177,6 +181,7 @@ const GENRELIST = [
     ["Tasquare", TasquareAssist],
     ["Tatamibari", TatamibariAssist],
     ["Tentaisho", TentaishoAssist],
+    ["Tetrominous", TetrominousAssist],
     ["Yajilin", YajilinAssist],
     ["Yin-Yang", YinyangAssist],
 ];
@@ -276,10 +281,11 @@ function printBoard() {
         for (let i = 0; i < board.cross.length; i++) {
             let cross = board.cross[i];
             let t = 0;
-            t |= (cross.by > board.minby && (cross.bx === board.minbx || cross.bx === board.maxbx)) << 0;
-            t |= (cross.bx > board.minbx && (cross.by === board.minby || cross.by === board.maxby)) << 1;
-            t |= (cross.by < board.maxby && (cross.bx === board.minbx || cross.bx === board.maxbx)) << 2;
-            t |= (cross.bx < board.maxbx && (cross.by === board.minby || cross.by === board.maxby)) << 3;
+            let fn = (c => c.isnull || c.ques === CQUES.wall);
+            t |= (fn(offset(cross, -.5, -.5)) ^ fn(offset(cross, +.5, -.5))) << 0;
+            t |= (fn(offset(cross, -.5, -.5)) ^ fn(offset(cross, -.5, +.5))) << 1;
+            t |= (fn(offset(cross, +.5, +.5)) ^ fn(offset(cross, -.5, +.5))) << 2;
+            t |= (fn(offset(cross, +.5, +.5)) ^ fn(offset(cross, +.5, -.5))) << 3;
             t |= (cross.adjborder.top.qans) << 0;
             t |= (cross.adjborder.left.qans) << 1;
             t |= (cross.adjborder.bottom.qans) << 2;
@@ -310,7 +316,7 @@ function printBoard() {
         let hasNum = false;
         forEachCell(cell => hasNum ||= cell.qnum !== 0);
         forEachCell(cell => {
-            if (color !== undefined && color[cell.room.id] !== undefined) {
+            if (color !== undefined && cell.room !== null && color[cell.room.id] !== undefined) {
                 res += palette[color[cell.room.id]];
             }
             if (isIce(cell)) { res += "\x1b[106m"; }
@@ -445,6 +451,7 @@ function forEachCell(f = cell => { }) { for (let i = 0; i < board.cell.length; i
 function forEachBorder(f = border => { }) { for (let i = 0; i < board.border.length; i++) { f(board.border[i]); } }
 function forEachCross(f = cross => { }) { for (let i = 0; i < board.cross.length; i++) { f(board.cross[i]); } }
 function forEachRoom(f = room => { }) {
+    if (board.roommgr.components === undefined) { return; }
     for (let i = 0; i < board.roommgr.components.length; i++) { f(board.roommgr.components[i]); }
 }
 
@@ -500,7 +507,7 @@ let add_green = function (c) {
     c.draw();
 };
 let add_inout = function (cr, qsub) {
-    if (cr.isnull || cr.qsub !== CRQSUB.none) { return; }
+    if (cr.isnull || cr.qsub !== CRQSUB.none || ![CRQSUB.in, CRQSUB.out].includes(qsub)) { return; }
     flg2 = 1;
     cr.setQsub(qsub);
 }
@@ -582,6 +589,7 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
     cantDivideShade = n => n > 0,
     OutsideAsShaded = false,
     OnlyOneConnected = true,
+    ForceSearch = false,
     UnshadeEmpty = true,
     Obj = "cell" } = {}) {
     let forEachObj = (Obj === "cell" ? forEachCell : forEachCross);
@@ -622,6 +630,7 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
                         let nb = offset(c, .5, 0, d);
                         let nc = offset(c, 1, 0, d);
                         while (isIce(nc)) { nc = offset(nc, 1, 0, d); }
+                        if (isNotPassable(c, nb, nc)) { continue; }
                         if (nb.isnull || nc.isnull) { continue; }
                         if (isLinked(c, nb, nc)) {
                             linkdfs(nc);
@@ -656,22 +665,23 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
                             shdn.set(ordc, shdn.get(ordc) + shdn.get(ordnc));
                             vst.add(ordnc);
                         }
-                        if (ordc <= low.get(ordnc) && cantDivideShade(shdn.get(ordnc))) {
-                            cellset.forEach(c => {
-                                if (!isShaded(c) && !shadelist.includes(c)) {
-                                    shadelist.push(c);
-                                }
-                            });
+                        if (!cellset.has(sc) && ordc <= low.get(ordnc) && cantDivideShade(shdn.get(ordnc))) {
+                            cellset.forEach(c => shadelist.push(c));
                         }
                     }
                 };
+                let tmp = new Set();
                 for (let c of cellset) {
                     for (let d = 0; d < 4; d++) {
                         let nb = offset(c, .5, 0, d);
                         let nc = offset(c, 1, 0, d);
                         while (isIce(nc)) { nc = offset(nc, 1, 0, d); }
+                        if (fth.get(nc) === sc) { tmp.add(ord.get(nc)); }
                         fn(c, nb, nc);
                     }
+                }
+                if (v && c === sc && tmp.size > 1) {
+                    cellset.forEach(c => shadelist.push(c));
                 }
             }
             if (!v && c.isnull) {
@@ -692,7 +702,7 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
         dfs(board.emptycell);
     } else {
         forEachObj(cell => {
-            if (!isShaded(cell) || ord.has(cell)) { return; }
+            if (!ForceSearch && (!isShaded(cell) || ord.has(cell))) { return; }
             if (n > 0 && OnlyOneConnected) { return; }
             dfs(cell);
         });
@@ -962,7 +972,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => b.qsub !==
                 // extend i/o through cross/line
                 (() => {
                     if (ncr.isnull) { return; }
-                    if (b.isnull || b.qsub === BQSUB.cross) {
+                    if (b.isnull || !b.inside || b.qsub === BQSUB.cross) {
                         add_inout(ncr, cr.qsub);
                     }
                     if (!b.isnull && b.line && GENRENAME !== "Icebarn") {
@@ -1409,7 +1419,7 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
         }
     }
     forEachCell(cell => {
-        if (ord.has(cell)) { return; }
+        if (ord.has(cell) || cell.ques === CQUES.wall) { return; }
         if (scell !== null && scell !== cell) { return; }
         sidelist = [];
         linklist = [];
@@ -1429,22 +1439,26 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
                 return cl.reduce((a, b) => a + b, 0);
             }
             let cl = clt.get(ordnc);
-            if (scell === null && siz(cl) > ctn.get(ordnc)) {
-                add_link(nb);
+            if (scell === null && siz(cl) > ctn.get(ordnc)) { add_link(nb); }
+            if (scell === null && !cl.includes(CQNUM.quesmark) && OneNumPerRegion) {
+                if (siz(cl) === ctn.get(ordnc) && isSideable(c, nb, nc)) { add_side(nb); }
+                if (siz(cl) !== ctn.get(ordnc) && isLinkable(c, nb, nc)) { add_link(nb); }
+            }
+            if (allSize !== null) {
+                if (ctn.get(ordnc) % allSize === 0 && isSideable(c, nb, nc)) { add_side(nb); }
+                if (ctn.get(ordnc) % allSize !== 0 && isLinkable(c, nb, nc)) { add_link(nb); }
             }
             let acl = clt.get(ord.get(cell));
             let an = ctn.get(ord.get(cell));
             let ocl = [];
             acl.forEach(n => {
-                if (cl.includes(n)) {
-                    cl.splice(cl.indexOf(n), 1);
-                }
-                else {
-                    ocl.push(n);
-                }
+                if (cl.includes(n)) { cl.splice(cl.indexOf(n), 1); }
+                else { ocl.push(n); }
             });
-            if (siz(ocl) > an - ctn.get(ordnc)) {
-                add_link(nb);
+            if (siz(ocl) > an - ctn.get(ordnc)) { add_link(nb); }
+            if (scell === null && !ocl.includes(CQNUM.quesmark) && OneNumPerRegion) {
+                if (siz(ocl) === an - ctn.get(ordnc) && isSideable(c, nb, nc)) { add_side(nb); }
+                if (siz(ocl) !== an - ctn.get(ordnc) && isLinkable(c, nb, nc)) { add_link(nb); }
             }
         });
     });
@@ -1751,7 +1765,13 @@ function GeneralAssist() {
         checklist.some(f => f.name === "checkBranchLine") &&
         checklist.some(f => f.name === "checkCrossLine") &&
         checklist.some(f => f.name === "checkOneLoop")) {
-        SingleLoopInCell();
+        if (checklist.some(f => f.name === "checkNoLine")) {
+            SingleLoopInCell({
+                isPassable: c => c.ques !== CQUES.wall,
+                isPass: c => c.ques !== CQUES.wall,
+            });
+        }
+        else { SingleLoopInCell(); }
     }
     if (checklist.some(f => f.name === "checkRoomPassOnce")) {
         RoomPassOnce();
@@ -1821,6 +1841,329 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function NanameguriAssist() {
+    SingleLoopInCell();
+    // 31 = \ , 32 = /
+    // form1~5 : █ ◣ ◢ ◥ ◤
+    let roomdata = board.getDiagonalRegions();
+    roomdata.forEach(room => {
+        let edges = Array.from(room.edges);
+        if (edges.filter(b => isLine(b)).length === 2) {
+            edges.filter(b => !isLine(b)).forEach(b => add_cross(b));
+        }
+        if (edges.filter(b => !isCross(b) && b.inside).length === 2) {
+            edges.filter(b => !isCross(b) && b.inside).forEach(b => add_line(b));
+        }
+        if (edges.some(c => c.lcnt === 2) && edges.every(c => c.lcnt === 2)) {
+            Array.from(room.inner).forEach(b => add_cross(b));
+        }
+        let forms = [room.form1, room.form2, room.form3, room.form4, room.form5].map(o => Array.from(o ?? []));
+        edges.forEach(b => {
+            let [c1, c2] = b.sidecell;
+            if (!b.isvert && [0, 1, 2].some(n => forms[n].includes(c1)) && [0, 3, 4].some(n => forms[n].includes(c2))) {
+                add_cross(b);
+            }
+            if (b.isvert && [0, 2, 3].some(n => forms[n].includes(c1)) && [0, 1, 4].some(n => forms[n].includes(c2))) {
+                add_cross(b);
+            }
+        });
+    });
+    forEachCell(cell => {
+        if (cell.ques === 31 || cell.ques === 32) {
+            let fn = (b1, b2, b3, b4) => {
+                if ([b1, b2].some(b => !b.inside || isCross(b)) || [b3, b4].some(b => isLine(b))) {
+                    add_cross(b1);
+                    add_cross(b2);
+                    add_line(b3);
+                    add_line(b4);
+                }
+            };
+            let fn2 = (c1, c2) => {
+                if (c1.isnull || c2.isnull) { return false; }
+                if (c1.lcnt !== 1 || c2.lcnt !== 1) { return false; }
+                return c1.path === c2.path && board.linegraph.components.length > 1;
+            };
+            if (cell.ques === 31) {
+                fn(offset(cell, 0, -.5), offset(cell, .5, 0), offset(cell, 0, .5), offset(cell, -.5, 0));
+                fn(offset(cell, 0, .5), offset(cell, -.5, 0), offset(cell, 0, -.5), offset(cell, .5, 0));
+            }
+            if (cell.ques === 32) {
+                fn(offset(cell, .5, 0), offset(cell, 0, .5), offset(cell, -.5, 0), offset(cell, 0, -.5));
+                fn(offset(cell, -.5, 0), offset(cell, 0, -.5), offset(cell, .5, 0), offset(cell, 0, .5));
+            }
+            for (let d = 0; d < 4; d++) {
+                if (offset(cell, -.5, -.5, d).qsub !== CRQSUB.none) {
+                    add_inout(offset(cell, .5, .5, d), offset(cell, -.5, -.5, d).qsub ^ (d % 2 !== 0) ^ (cell.ques !== 31));
+                }
+                if (fn2(offset(cell, 0, -1, d), offset(cell, 1, 0, d)) && [31, 32, 31, 32][d] === cell.ques) {
+                    add_cross(offset(cell, 0, -.5, d));
+                    add_cross(offset(cell, .5, 0, d));
+                }
+            }
+        }
+    });
+}
+
+function OneRoomOneDoorAssist() {
+    BlackNotAdjacent();
+    GreenConnected();
+    CellConnected({
+        isShaded: isGreen,
+        isUnshaded: isBlack,
+        add_shaded: add_green,
+        add_unshaded: add_black,
+        isNotPassable: (c, nb, nc) => nb.ques === 1,
+        cantDivideShade: () => true,
+        OnlyOneConnected: false,
+        UnshadeEmpty: false,
+        ForceSearch: true,
+    });
+    let bset = new Set();
+    forEachBorder(border => {
+        if (border.ques && border.sidecell.every(c => isGreen(c))) {
+            bset.add(JSON.stringify(border.sidecell.map(c => c.room.top.id).sort()));
+        }
+    });
+    forEachBorder(border => {
+        if (border.ques && border.sidecell.some(c => isGreen(c)) &&
+            bset.has(JSON.stringify(border.sidecell.map(c => c.room.top.id).sort()))) {
+            border.sidecell.forEach(c => add_black(c));
+        }
+    });
+    forEachCell(cell => {
+        if (!isBlack(cell) && !isGreen(cell)) {
+            for (let d1 = 0; d1 < 4; d1++) {
+                if (!isGreen(offset(cell, 1, 0, d1)) || !offset(cell, .5, 0, d1).ques) { continue; }
+                for (let d2 = d1 + 1; d2 < 4; d2++) {
+                    if (!isGreen(offset(cell, 1, 0, d2)) || !offset(cell, .5, 0, d2).ques) { continue; }
+                    if (offset(cell, 1, 0, d1).room === offset(cell, 1, 0, d2).room) {
+                        add_black(cell);
+                    }
+                }
+            }
+            let list = adjlist(cell.adjacent).flatMap(c => adjlist(c.adjborder, c.adjacent).map(([nb, nc]) => [c, nb, nc]));
+            list = list.filter(([c, nb, nc]) => !c.isnull && !nb.isnull && !nc.isnull && nc !== cell && nb.ques && !isBlack(c) && !isGreen(c) && isGreen(nc));
+            list.forEach(([c, nb, nc]) => {
+                if (list.some(([oc, onb, onc]) => c.room === oc.room && onb !== nb && nc.room === onc.room)) {
+                    add_green(cell);
+                    return;
+                }
+            });
+        }
+    });
+    forEachRoom(room => {
+        if (room.top.qnum >= 0) {
+            let clist = Array.from(room.clist);
+            if (clist.filter(c => isBlack(c)).length === room.top.qnum) {
+                clist.forEach(c => add_green(c));
+            }
+            if (clist.filter(c => !isGreen(c)).length === room.top.qnum) {
+                clist.forEach(c => add_black(c));
+            }
+        }
+    });
+}
+
+function DosunFuwariAssist() {
+    let add_ball = function (c, t) {// 1 for balloon, 2 for iron ball
+        if (c === undefined || c.isnull || c.qsub === CQSUB.dot || c.qans !== CQANS.none) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setQans(t);
+        c.draw();
+    };
+    let nb = new Set(), ni = new Set();
+    for (let x = 0; x < board.cols; x++) {
+        let list = [];
+        for (let y = 0; y < board.rows; y++) {
+            let cell = board.cell[y * board.cols + x];
+            if (cell.ques === 1) { list = []; continue; }
+            if (isDot(cell) || cell.qans === 2) { list = null; }
+            if (list !== null && list.some(c => c.room === cell.room)) { list = null; }
+            if (Array.from(cell.room.clist).some(c => c !== cell && c.qans === 1)) { list = null; }
+            if (list === null) { nb.add(cell); }
+            else { list.push(cell); }
+            if ((c => !c.isnull && c.qans === 2)(offset(cell, 0, -1))) { add_ball(cell, 2); }
+        }
+        list = [];
+        for (let y = board.rows - 1; y >= 0; y--) {
+            let cell = board.cell[y * board.cols + x];
+            if (cell.ques === 1) { list = []; continue; }
+            if (isDot(cell) || cell.qans === 1) { list = null; }
+            if (list !== null && list.some(c => c.room === cell.room)) { list = null; }
+            if (Array.from(cell.room.clist).some(c => c !== cell && c.qans === 2)) { list = null; }
+            if (list === null) { ni.add(cell); }
+            else { list.push(cell); }
+            if ((c => !c.isnull && c.qans === 1)(offset(cell, 0, +1))) { add_ball(cell, 1); }
+            if (nb.has(cell) && ni.has(cell)) { add_dot(cell); }
+        }
+    }
+    forEachRoom(room => {
+        let clist = Array.from(room.clist);
+        if (clist.filter(c => !nb.has(c)).length === 1) {
+            add_ball(clist.filter(c => !nb.has(c))[0], 1);
+        }
+        if (clist.filter(c => !ni.has(c)).length === 1) {
+            add_ball(clist.filter(c => !ni.has(c))[0], 2);
+        }
+    });
+}
+
+function TetrominousAssist() {
+    const N = 4;
+    SizeRegion_Border({
+        isLinkable: (c, nb, nc) => !nb.isnull && !isSide(nb),
+        isSideable: (c, nb, nc) => !nb.isnull && !isLink(nb),
+        allSize: N,
+    });
+    forEachBorder(b => { if (b.ques === 1) { add_side(b); } });
+    const TETRO = [// 0~4 : ILOST
+        [[[0, 0], [1, 0], [2, 0], [3, 0]], 0],
+        [[[0, 0], [1, 0], [2, 0], [2, 1]], 1],
+        [[[0, 0], [0, 1], [1, 0], [1, 1]], 2],
+        [[[0, 0], [1, 0], [1, 1], [2, 1]], 3],
+        [[[0, 0], [1, 0], [1, 1], [2, 0]], 4],
+    ];
+    forEachCell(cell => {
+        if (cell.qnum >= 0) { add_number(cell, cell.qnum); }
+        for (let d = 0; d < 4; d++) {
+            if (cell.anum >= 0 && offset(cell, 1, 0, d).anum >= 0 && cell.anum === offset(cell, 1, 0, d).anum) {
+                add_link(offset(cell, .5, 0, d));
+            }
+            if (cell.anum >= 0 && offset(cell, 1, 0, d).anum >= 0 && cell.anum !== offset(cell, 1, 0, d).anum) {
+                add_side(offset(cell, .5, 0, d));
+            }
+            if (isLink(offset(cell, .5, 0, d)) && cell.anum !== CANUM.none) {
+                add_number(offset(cell, 1, 0, d), cell.anum);
+            }
+        }
+        if (cell.ques === CQUES.wall) { return; }
+        if (cell.anum >= 0 || adjlist(cell.adjborder).filter(b => b.isnull || isSide(b)).length === 3) {
+            let linklist = [], sidelist = [], namelist = [];
+            TETRO.forEach(([cl, t]) => {
+                if (cell.anum >= 0 && cell.anum !== t) { return; }
+                [[0, 1, 2, 3], [1, -1], [...Array(N).keys()]].reduce((a, b) => a.flatMap(i => b.flatMap(j => [[...i, j]])), [[]]).forEach(([d, f, o]) => {
+                    let clist = cl.map(([x, y]) => offset(cell, x - cl[o][0], (y - cl[o][1]) * f, d));
+                    if (clist.some(c => c.isnull || c.ques === CQUES.wall)) { return; }
+                    if (clist.some(c => c.anum >= 0 && c.anum !== t)) { return; }
+                    if (clist.some(c => adjlist(c.adjborder, c.adjacent).some(
+                        ([nb, nc]) => {
+                            if (nc.isnull || nc.ques === CQUES.wall) { return false; }
+                            if (isLink(nb) && !clist.includes(nc) || isSide(nb) && clist.includes(nc)) { return true; }
+                            if (clist.includes(nc)) { return false; }
+                            if (nc.anum >= 0 && nc.anum === t) { return true; }
+                            let nclist = [];
+                            let dfs = function (c) {
+                                if (nclist.includes(c)) { return; }
+                                nclist.push(c);
+                                adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+                                    if (isLink(nb)) { dfs(nc); }
+                                });
+                            };
+                            dfs(nc);
+                            return getShape(clist) === getShape(nclist);
+                        }))) { return; }
+                    let linkl = [], sidel = [];
+                    clist.forEach(c => adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+                        if (clist.includes(nc) && !linkl.includes(nb)) { linkl.push(nb); }
+                        if (!clist.includes(nc) && !sidel.includes(nb)) { sidel.push(nb); }
+                    }));
+                    linklist.push(linkl);
+                    sidelist.push(sidel);
+                    namelist.push(t);
+                });
+            });
+            if (linklist.length > 0) { linklist = linklist.reduce((a, b) => a.filter(i => b.includes(i))); }
+            if (sidelist.length > 0) { sidelist = sidelist.reduce((a, b) => a.filter(i => b.includes(i))); }
+            linklist.forEach(b => add_link(b));
+            sidelist.forEach(b => add_side(b));
+            namelist = Array.from(new Set(namelist));
+            if (namelist.length === 1) { add_number(cell, namelist[0]); }
+        }
+    });
+}
+
+function PentominousAssist() {
+    const N = 5;
+    SizeRegion_Border({
+        isLinkable: (c, nb, nc) => !nb.isnull && !isSide(nb),
+        isSideable: (c, nb, nc) => !nb.isnull && !isLink(nb),
+        allSize: N,
+    });
+    forEachBorder(b => { if (b.ques === 1) { add_side(b); } });
+    const PENTO = [// 0~11 : FILNPTUVWXYZ
+        [[[0, 0], [1, 0], [1, 1], [1, 2], [2, 1]], 0],
+        [[[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]], 1],
+        [[[0, 0], [1, 0], [2, 0], [3, 0], [3, 1]], 2],
+        [[[0, 0], [1, 0], [2, 0], [2, 1], [3, 1]], 3],
+        [[[0, 0], [1, 0], [2, 0], [1, 1], [2, 1]], 4],
+        [[[0, 0], [1, 0], [1, 1], [1, 2], [2, 0]], 5],
+        [[[0, 0], [0, 1], [1, 0], [2, 0], [2, 1]], 6],
+        [[[0, 0], [1, 0], [2, 0], [2, 1], [2, 2]], 7],
+        [[[0, 0], [1, 0], [1, 1], [2, 1], [2, 2]], 8],
+        [[[0, 0], [0, 1], [0, 2], [-1, 1], [1, 1]], 9],
+        [[[0, 0], [1, 0], [1, 1], [2, 0], [3, 0]], 10],
+        [[[0, 0], [1, 0], [1, 1], [1, 2], [2, 2]], 11],
+    ];
+    forEachCell(cell => {
+        if (cell.qnum >= 0) { add_number(cell, cell.qnum); }
+        for (let d = 0; d < 4; d++) {
+            if (cell.anum >= 0 && offset(cell, 1, 0, d).anum >= 0 && cell.anum === offset(cell, 1, 0, d).anum) {
+                add_link(offset(cell, .5, 0, d));
+            }
+            if (cell.anum >= 0 && offset(cell, 1, 0, d).anum >= 0 && cell.anum !== offset(cell, 1, 0, d).anum) {
+                add_side(offset(cell, .5, 0, d));
+            }
+            if (isLink(offset(cell, .5, 0, d)) && cell.anum !== CANUM.none) {
+                add_number(offset(cell, 1, 0, d), cell.anum);
+            }
+        }
+        if (cell.ques === CQUES.wall) { return; }
+        if (cell.anum >= 0 || adjlist(cell.adjborder).filter(b => b.isnull || isSide(b)).length === 3) {
+            let linklist = [], sidelist = [], namelist = [];
+            PENTO.forEach(([cl, t]) => {
+                if (cell.anum >= 0 && cell.anum !== t) { return; }
+                [[0, 1, 2, 3], [1, -1], [...Array(N).keys()]].reduce((a, b) => a.flatMap(i => b.flatMap(j => [[...i, j]])), [[]]).forEach(([d, f, o]) => {
+                    let clist = cl.map(([x, y]) => offset(cell, x - cl[o][0], (y - cl[o][1]) * f, d));
+                    if (clist.some(c => c.isnull || c.ques === CQUES.wall)) { return; }
+                    if (clist.some(c => c.anum >= 0 && c.anum !== t)) { return; }
+                    if (clist.some(c => adjlist(c.adjborder, c.adjacent).some(
+                        ([nb, nc]) => {
+                            if (nc.isnull || nc.ques === CQUES.wall) { return false; }
+                            if (isLink(nb) && !clist.includes(nc) || isSide(nb) && clist.includes(nc)) { return true; }
+                            if (clist.includes(nc)) { return false; }
+                            if (nc.anum >= 0 && nc.anum === t) { return true; }
+                            let nclist = [];
+                            let dfs = function (c) {
+                                if (nclist.includes(c)) { return; }
+                                nclist.push(c);
+                                adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+                                    if (isLink(nb)) { dfs(nc); }
+                                });
+                            };
+                            dfs(nc);
+                            return getShape(clist) === getShape(nclist);
+                        }))) { return; }
+                    let linkl = [], sidel = [];
+                    clist.forEach(c => adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+                        if (clist.includes(nc) && !linkl.includes(nb)) { linkl.push(nb); }
+                        if (!clist.includes(nc) && !sidel.includes(nb)) { sidel.push(nb); }
+                    }));
+                    linklist.push(linkl);
+                    sidelist.push(sidel);
+                    namelist.push(t);
+                });
+            });
+            if (linklist.length > 0) { linklist = linklist.reduce((a, b) => a.filter(i => b.includes(i))); }
+            if (sidelist.length > 0) { sidelist = sidelist.reduce((a, b) => a.filter(i => b.includes(i))); }
+            linklist.forEach(b => add_link(b));
+            sidelist.forEach(b => add_side(b));
+            namelist = Array.from(new Set(namelist));
+            if (namelist.length === 1) { add_number(cell, namelist[0]); }
+        }
+    });
+}
+
 function FiveCellsAssist() {
     SizeRegion_Border({
         isLinkable: (c, nb, nc) => !nb.isnull && !isSide(nb),
@@ -1843,6 +2186,14 @@ function FiveCellsAssist() {
             }
             if (cell.qnum === 3 && offset(cell, 1, 0, d).qnum === 3) {
                 add_side(offset(cell, .5, 0, d));
+            }
+            if (cell.qnum === 1 && isLink(offset(cell, 1, .5, d)) && isLink(offset(cell, .5, 1, d))) {
+                add_link(offset(cell, .5, 0, d));
+                add_link(offset(cell, 0, .5, d));
+            }
+            if (cell.qnum === 3 && isLink(offset(cell, 1, .5, d)) && isLink(offset(cell, .5, 1, d))) {
+                add_side(offset(cell, .5, 0, d));
+                add_side(offset(cell, 0, .5, d));
             }
         }
     });
