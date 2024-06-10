@@ -29,11 +29,13 @@ Currently enhanced genre:
 * Double Choco
 * Fillomino
 * FiveCells
+* FourCells
 * Guide Arrow
 * Heyawake
 * Hitori
 * Icebarn
 * Inverse LITSO
+* Kakuro
 * Koburin
 * Kropki
 * Kurodoko
@@ -55,6 +57,7 @@ Currently enhanced genre:
 * Nuri-Maze
 * Nurimisaki
 * One Room One Door
+* Paintarea
 * Pencils
 * Pentominous
 * Pipelink
@@ -70,6 +73,7 @@ Currently enhanced genre:
 * Slitherlink
 * Square Jam
 * Star Battle
+* Stostone
 * Sudoku
 * Tapa
 * Tasquare
