@@ -13,6 +13,7 @@ https://greasyfork.org/en/scripts/477117-puzz-link-assistance
 
 Currently enhanced genre:
 * Akari
+* Akichiwake
 * All or Nothing
 * Ant Mill
 * Aqre
@@ -25,6 +26,7 @@ Currently enhanced genre:
 * Choco Banana
 * Circles and Squares
 * Creek
+* Dominion
 * Dosun-Fuwari
 * Double Choco
 * Fillomino
@@ -52,6 +54,7 @@ Currently enhanced genre:
 * Norinori
 * Norinuri
 * No Three
+* Numberlink
 * Nuribou
 * Nurikabe
 * Nuri-Maze
@@ -64,6 +67,7 @@ Currently enhanced genre:
 * Putteria
 * Regional Yajilin
 * Ring-ring
+* Sashigane
 * School Trip
 * Shakashaka
 * Shikaku
@@ -75,10 +79,13 @@ Currently enhanced genre:
 * Star Battle
 * Stostone
 * Sudoku
+* Sukoro
 * Tapa
 * Tasquare
 * Tatamibari
 * Tentaisho
+* Tents
 * Tetrominous
 * Yajilin
+* Yajisan-Kazusan
 * Yin-Yang
