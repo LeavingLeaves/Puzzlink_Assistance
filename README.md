@@ -25,6 +25,7 @@ Currently enhanced genre:
 * Cave
 * Choco Banana
 * Circles and Squares
+* Country Road
 * Creek
 * Dominion
 * Dosun-Fuwari
@@ -33,6 +34,7 @@ Currently enhanced genre:
 * FiveCells
 * FourCells
 * Guide Arrow
+* Hashiwokakero
 * Heyawake
 * Hitori
 * Icebarn
@@ -42,12 +44,14 @@ Currently enhanced genre:
 * Kropki
 * Kurodoko
 * Light and Shadow
+* Litherslink
 * LITS
 * Masyu
 * Mid-loop
 * Minarism
-* Myopia
+* Mochikoro
 * Moon or Sun
+* Myopia
 * Nanameguri
 * Nawabari
 * Nonogram
