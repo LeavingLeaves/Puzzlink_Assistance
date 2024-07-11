@@ -29,6 +29,7 @@ Currently enhanced genre:
 * Creek
 * Dominion
 * Dosun-Fuwari
+* Double Back
 * Double Choco
 * Fillomino
 * FiveCells
@@ -85,6 +86,7 @@ Currently enhanced genre:
 * Sudoku
 * Sukoro
 * Tapa
+* Tapa-Like Loop
 * Tasquare
 * Tatamibari
 * Tentaisho
