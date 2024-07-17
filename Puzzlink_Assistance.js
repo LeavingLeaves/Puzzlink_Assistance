@@ -742,7 +742,64 @@ function RoomPassOnce({ LengthClue = false } = {}) {
             }
         }
     });
-    // TODO: Hamiltonian cycle
+    // Hamiltonian cycle 
+    if (board.roommgr.components.length > 2) {
+        let g = new Map();
+        let blist = [], lset = new Set();
+        let DSU = new Map(); // Disjoint Set Union
+        let DSUfind = function (n) {
+            if (DSU.get(n) !== n) { DSU.set(n, DSUfind(DSU.get(n))); }
+            return DSU.get(n);
+        };
+        forEachBorder(b => {
+            if (!isBound(b) || isCross(b) || b.sidecell[0].room === b.sidecell[1].room) { return; }
+            let [s, t] = b.sidecell.map(c => c.room.top.id);
+            if (!g.has(s)) { g.set(s, new Set()); DSU.set(s, s); }
+            if (!g.has(t)) { g.set(t, new Set()); DSU.set(t, t); }
+            g.get(s).add(t);
+            g.get(t).add(s);
+            blist.push(b);
+            if (isLine(b)) {
+                lset.add(JSON.stringify([s, t]));
+                lset.add(JSON.stringify([t, s]));
+                DSU.set(DSUfind(s), DSUfind(t));
+            }
+        });
+        let lflg = true;
+        while (lflg) {
+            lflg = false;
+            g.forEach((tset, s) => {
+                if (tset.size !== 2) { return; }
+                Array.from(tset).forEach(t => {
+                    if (!lset.has(JSON.stringify([s, t]))) {
+                        lflg = true;
+                        lset.add(JSON.stringify([s, t]));
+                        lset.add(JSON.stringify([t, s]));
+                        DSU.set(DSUfind(s), DSUfind(t));
+                    }
+                });
+            });
+            g.forEach((tset, s) => {
+                let tl = Array.from(tset).filter(t => !lset.has(JSON.stringify([s, t])));
+                tl.forEach(t => {
+                    if (tl.length === tset.size - 2 || DSUfind(s) === DSUfind(t) && Array.from(DSU.values()).some(n => DSUfind(n) !== DSUfind(0))) {
+                        lflg = true;
+                        g.get(s).delete(t);
+                        g.get(t).delete(s);
+                    }
+                });
+            });
+        }
+        blist.forEach(b => {
+            let [s, t] = b.sidecell.map(c => c.room.top.id);
+            if (!g.get(s).has(t)) { add_cross(b); }
+        });
+        lset.forEach(e => {
+            let l = blist.filter(b => JSON.stringify(b.sidecell.map(c => c.room.top.id).sort()) === e);
+            if (l.length === 1) { add_line(l[0]); }
+        });
+    }
+    // TODO: double bridge / size-2 cut
 }
 function NoFacingDoor() {
     forEachCell(cell => {
@@ -986,10 +1043,30 @@ function CellConnected_InRegion({ isShaded, isUnshaded, add_shaded, add_unshaded
         SizeInRegion: SizeClue,
     });
     if (SizeClue) {
-        // TODO: find shaded cell without given shaded cell
         forEachRoom(room => {
             if (room.top.qnum < 0) { return; }
             let clist = Array.from(room.clist);
+            // find shaded cell without given shaded cell
+            clist.forEach(c => {
+                if (isUnshaded(c) || isShaded(c)) { return; }
+                let fn = c => c.isnull || c.room !== room || c.qsub === CQSUB.cross;
+                if (!([0, 1, 2, 3].some(d => fn(offset(c, -1, 0, d)) && [-1, 0, 1].some(y => fn(offset(c, 1, y, d))) ||
+                    fn(offset(c, -1, -1, d)) && [[1, -1], [1, 0], [1, 1], [0, 1], [-1, 1]].some(([x, y]) => fn(offset(c, x, y, d)))))) { return; }
+                let cset;
+                let dfs = function (cc) {
+                    if (cc.isnull || cset.has(cc) || cc.room !== room || cc === c) { return; }
+                    cset.add(cc);
+                    fourside(dfs, cc.adjacent);
+                };
+                if (adjlist(c.adjacent).every(nc => {
+                    cset = new Set();
+                    dfs(nc);
+                    return cset.size < room.top.qnum;
+                })) {
+                    add_shaded(c);
+                }
+            });
+            // unshade blank parts smaller than clue
             let cset = new Set();
             clist.forEach(c => {
                 if (isUnshaded(c) || cset.has(c)) { return; }
@@ -998,13 +1075,14 @@ function CellConnected_InRegion({ isShaded, isUnshaded, add_shaded, add_unshaded
                     if (c.isnull || isUnshaded(c) || !clist.includes(c) || cset.has(c)) { return; }
                     cset.add(c);
                     list.push(c);
-                    adjlist(c.adjacent).forEach(nc => dfs(nc));
+                    fourside(dfs, c.adjacent);
                 };
                 dfs(c);
                 if (list.length < room.top.qnum) {
                     list.forEach(c => add_unshaded(c));
                 }
             });
+            // unshade cells out of reach
             if (clist.some(c => isShaded(c))) {
                 let cset = new Set();
                 let t = room.top.qnum - clist.filter(c => isShaded(c)).length;
@@ -5402,6 +5480,7 @@ function SlalomAssist() {
 }
 
 function StarbattleAssist() {
+    // TODO: check if there are exactly n dot/star in region/row/column
     let isCircle = b => !b.isnull && b.qsub === 1;
     let isStar = isBlack;
     let starcount = board.starCount.count;
