@@ -70,6 +70,7 @@ Currently enhanced genre:
 * Pentominous
 * Pipelink
 * Putteria
+* Rail Pool
 * Regional Yajilin
 * Ring-ring
 * Sashigane
