@@ -55,6 +55,7 @@ Currently enhanced genre:
 * Myopia
 * Nanameguri
 * Nawabari
+* Nondango
 * Nonogram
 * Norinori
 * Norinuri
@@ -78,6 +79,7 @@ Currently enhanced genre:
 * Shakashaka
 * Shikaku
 * Simple Loop
+* Skyscrapers
 * Slalom
 * Slant
 * Slitherlink
