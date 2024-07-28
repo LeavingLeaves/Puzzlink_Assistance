@@ -34,11 +34,13 @@ Currently enhanced genre:
 * Fillomino
 * FiveCells
 * FourCells
+* Goats and Wolves
 * Guide Arrow
 * Hashiwokakero
 * Heyawake
 * Hitori
 * Icebarn
+* Icelom
 * Inverse LITSO
 * Kakuro
 * Koburin
@@ -92,6 +94,7 @@ Currently enhanced genre:
 * Tapa-Like Loop
 * Tasquare
 * Tatamibari
+* Tawamurenga
 * Tentaisho
 * Tents
 * Tetrominous
