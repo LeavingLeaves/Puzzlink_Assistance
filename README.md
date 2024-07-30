@@ -37,6 +37,7 @@ Currently enhanced genre:
 * Goats and Wolves
 * Guide Arrow
 * Hashiwokakero
+* Heyablock
 * Heyawake
 * Hitori
 * Icebarn
@@ -52,6 +53,7 @@ Currently enhanced genre:
 * Masyu
 * Mid-loop
 * Minarism
+* Minesweeper
 * Mochikoro
 * Moon or Sun
 * Myopia
@@ -98,6 +100,7 @@ Currently enhanced genre:
 * Tentaisho
 * Tents
 * Tetrominous
+* Tilepaint
 * Yajilin
 * Yajisan-Kazusan
 * Yin-Yang

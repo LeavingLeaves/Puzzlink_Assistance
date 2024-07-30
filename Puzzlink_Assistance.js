@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.7.28.1
+// @version      24.7.30.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -144,6 +144,7 @@ const GENRELIST = [
     ["Goats and Wolves", GoatsAndWolvesAssist],
     ["Guide Arrow", GuideArrowAssist],
     ["Hashiwokakero", HashiwokakeroAssist],
+    ["Heyablock", HeyablockAssist],
     ["Heyawake", HeyawakeAssist],
     ["Hitori", HitoriAssist],
     ["Icebarn", IcebarnAssist],
@@ -159,6 +160,7 @@ const GENRELIST = [
     ["Masyu", MasyuAssist],
     ["Mid-loop", MidloopAssist],
     ["Minarism", MinarismAssist],
+    ["Minesweeper", MinesweeperAssist],
     ["Mochikoro", MochikoroAssist],
     ["Moon or Sun", MoonOrSunAssist],
     ["Myopia", MyopiaAssist],
@@ -205,6 +207,7 @@ const GENRELIST = [
     ["Tentaisho", TentaishoAssist],
     ["Tents", TentsAssist],
     ["Tetrominous", TetrominousAssist],
+    ["Tilepaint", TilepaintAssist],
     ["Yajilin", YajilinAssist],
     ["Yajisan-Kazusan", YajisanKazusanAssist],
     ["Yin-Yang", YinyangAssist],
@@ -2456,6 +2459,65 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function MinesweeperAssist() {
+    forEachCell(cell => {
+        if (cell.qnum >= 0) {
+            let clist = [];
+            for (let i = -1; i <= 1; i++) {
+                for (let j = -1; j <= 1; j++) {
+                    if (i !== 0 || j !== 0) {
+                        clist.push(offset(cell, i, j));
+                    }
+                }
+            }
+            NShadeInClist({
+                isShaded: isBlack,
+                isUnshaded: c => isDot(c) || isNum(c),
+                add_shaded: add_black,
+                add_unshaded: add_dot,
+                clist: clist,
+                n: cell.qnum,
+            });
+        }
+    });
+}
+
+function TilepaintAssist() {
+    let list = [...Array.from(board.cell), ...Array.from(board.excell)];
+    list = [...list.filter(c => c.qnum > 0).map(c => {
+        let pc = offset(c, 1, 0), clist = [];
+        while (!pc.isnull && pc.ques === CQUES.none) {
+            clist.push(pc);
+            pc = offset(pc, 1, 0);
+        }
+        return [c.qnum, clist];
+    }),
+    ...list.filter(c => c.qnum2 > 0).map(c => {
+        let pc = offset(c, 0, 1), clist = [];
+        while (!pc.isnull && pc.ques === CQUES.none) {
+            clist.push(pc);
+            pc = offset(pc, 0, 1);
+        }
+        return [c.qnum2, clist];
+    })];
+    list = list.filter(([n, l]) => l.length > 0);
+    list.forEach(([n, clist]) => {
+        n -= clist.filter(c => isBlack(c)).length;
+        clist = clist.filter(c => !isBlack(c) && !isDot(c));
+        let rlist = new Set();
+        clist.forEach(c => rlist.add(c.room));
+        rlist = Array.from(rlist).map(room => [room, clist.filter(c => c.room === room).length]);
+        rlist.forEach(([room, cnt]) => {
+            if (cnt > n) {
+                Array.from(room.clist).forEach(c => add_green(c));
+            }
+            if (clist.length - cnt < n) {
+                Array.from(room.clist).forEach(c => add_black(c));
+            }
+        });
+    });
+}
+
 function GoatsAndWolvesAssist() {
     CluePerRegion({
         isShaded: c => c.qnum !== CQNUM.none,
@@ -7697,6 +7759,14 @@ function AyeheyaAssist() {
         });
     });
     HeyawakeAssist();
+}
+
+function HeyablockAssist() {
+    GreenConnected();
+    BlackNotAdjacent_OverBorder();
+    NoFacingDoor();
+    BlackConnected_InRegion(true);
+    forEachRoom(room => NShadeInClist({ n: room.top.qnum, clist: Array.from(room.clist), AtLeastOne: room.top.qnum === CQNUM.none }));
 }
 
 function HeyawakeAssist() {
