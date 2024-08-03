@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.8.1.1
+// @version      24.8.3.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -1119,26 +1119,6 @@ function CellConnected_InRegion({ isShaded, isUnshaded, add_shaded, add_unshaded
         forEachRoom(room => {
             if (room.top.qnum < 0) { return; }
             let clist = Array.from(room.clist);
-            // find shaded cell without given shaded cell
-            clist.forEach(c => {
-                if (isUnshaded(c) || isShaded(c)) { return; }
-                let fn = c => c.isnull || c.room !== room || c.qsub === CQSUB.cross;
-                if (!([0, 1, 2, 3].some(d => fn(offset(c, -1, 0, d)) && [-1, 0, 1].some(y => fn(offset(c, 1, y, d))) ||
-                    fn(offset(c, -1, -1, d)) && [[1, -1], [1, 0], [1, 1], [0, 1], [-1, 1]].some(([x, y]) => fn(offset(c, x, y, d)))))) { return; }
-                let cset;
-                let dfs = function (cc) {
-                    if (cc.isnull || cset.has(cc) || cc.room !== room || cc === c) { return; }
-                    cset.add(cc);
-                    fourside(dfs, cc.adjacent);
-                };
-                if (adjlist(c.adjacent).every(nc => {
-                    cset = new Set();
-                    dfs(nc);
-                    return cset.size < room.top.qnum;
-                })) {
-                    add_shaded(c);
-                }
-            });
             // unshade blank parts smaller than clue
             let cset = new Set();
             clist.forEach(c => {
@@ -1168,6 +1148,26 @@ function CellConnected_InRegion({ isShaded, isUnshaded, add_shaded, add_unshaded
                 }
                 clist.forEach(c => !cset.has(c) ? add_unshaded(c) : null);
             }
+            // find shaded cell without given shaded cell
+            clist.forEach(c => {
+                if (isUnshaded(c) || isShaded(c)) { return; }
+                let fn = c => c.isnull || c.room !== room || isUnshaded(c);
+                if (!([0, 1, 2, 3].some(d => fn(offset(c, -1, 0, d)) && [-1, 0, 1].some(y => fn(offset(c, 1, y, d))) ||
+                    fn(offset(c, -1, -1, d)) && [[1, -1], [1, 0], [1, 1], [0, 1], [-1, 1]].some(([x, y]) => fn(offset(c, x, y, d)))))) { return; }
+                let cset;
+                let dfs = function (cc) {
+                    if (fn(cc) || cset.has(cc) || cc === c) { return; }
+                    cset.add(cc);
+                    fourside(dfs, cc.adjacent);
+                };
+                if (adjlist(c.adjacent).every(nc => {
+                    cset = new Set();
+                    dfs(nc);
+                    return cset.size < room.top.qnum;
+                })) {
+                    add_shaded(c);
+                }
+            });
         });
     }
 }
@@ -2955,7 +2955,7 @@ function SukoroAssist() {
     });
     let not1c = new Set();
     CellConnected({
-        isShaded: c => c.anum !== CANUM.none && c.anum !== 1 || c.qsub === CQSUB.circle,
+        isShaded: c => c.anum !== CANUM.none && c.anum !== 1,
         isUnshaded: c => c.qsub === CQSUB.cross || c.anum === 1,
         add_shaded: c => {
             not1c.add(c);
@@ -2992,6 +2992,15 @@ function SukoroAssist() {
                 add_Ocell(offset(cell, -1, 0, d));
                 add_Xcell(offset(cell, 1, 2, d));
                 add_Xcell(offset(cell, 2, 1, d));
+            }
+            let l = [offset(cell, 1, -1, d), offset(cell, 1, 1, d), offset(cell, 2, 0, d)];
+            if (cell.qsub === CQSUB.none && offset(cell, 1, 0, d).qsub === CQSUB.circle &&
+                l.every(c => c.isnull || c.qsub !== CQSUB.none || c.anum !== CANUM.none || c === cell) &&
+                l.filter(c => c.isnull || c.qsub === CQSUB.cross).length === 2 &&
+                adjlist(cell.adjacent).every(c => c.isnull || c.qsub !== CQSUB.none || c.anum !== CANUM.none) &&
+                adjlist(cell.adjacent).filter(c => c.isnull || c.qsub === CQSUB.cross).length === 2
+            ) {
+                add_Xcell(cell);
             }
         }
     });
@@ -4613,9 +4622,9 @@ function PencilsAssist() {
             // extend clue
             for (let d = 0; d < 2; d++) {
                 let ll = 0, rr = 0;
-                while ((b => !b.isnull && b.qsub === BQSUB.cross)(offset(cell, ll - .5, 0, d)) &&
+                while (isCross(offset(cell, ll - .5, 0, d)) &&
                     offset(cell, ll - 1, 0, d).qsub !== CQSUB.yellow) { ll--; }
-                while ((b => !b.isnull && b.qsub === BQSUB.cross)(offset(cell, rr + .5, 0, d)) &&
+                while (isCross(offset(cell, rr + .5, 0, d)) &&
                     offset(cell, rr + 1, 0, d).qsub !== CQSUB.yellow) { rr++; }
                 let lc = ll, rc = rr;
                 while ((c => !c.isnull && c.qsub !== CQSUB.yellow && (c.qnum < 0 || c.qnum === cell.qnum))(offset(cell, lc - 1, 0, d)) &&
@@ -6440,6 +6449,28 @@ function CreekAssist() {
                 add_black(offset(cross, 1.5, -.5, d));
                 add_black(offset(cross, 1.5, +.5, d));
             }
+            // + + + + +    + + + + +
+            //               █     █
+            // + 3 2 3 + -> + 3 2 3 +
+            //               █     █
+            // + + + + +    + + + + +
+            if (cross.qnum === 3 && offset(cross, 1, 0, d).qnum === 2 && offset(cross, 2, 0, d).qnum === 3) {
+                add_black(offset(cross, -.5, -.5, d));
+                add_black(offset(cross, -.5, +.5, d));
+                add_black(offset(cross, 2.5, -.5, d));
+                add_black(offset(cross, 2.5, +.5, d));
+            }
+            // + + + + +    + + + + +
+            //               ·     ·
+            // + 1 2 1 + -> + 1 2 1 +
+            //               ·     ·
+            // + + + + +    + + + + +
+            if (cross.qnum === 1 && offset(cross, 1, 0, d).qnum === 2 && offset(cross, 2, 0, d).qnum === 1) {
+                add_dot(offset(cross, -.5, -.5, d));
+                add_dot(offset(cross, -.5, +.5, d));
+                add_dot(offset(cross, 2.5, -.5, d));
+                add_dot(offset(cross, 2.5, +.5, d));
+            }
             // + + + +    + + + +
             //                   
             // + 3 + +    + 3 + +
@@ -6465,20 +6496,49 @@ function SlantAssist() {
     let isNotSide = function (c) {
         return c.bx > board.minbx && c.bx < board.maxbx && c.by > board.minby && c.by < board.maxby;
     }
-    for (let i = 0; i < board.cross.length; i++) {
-        let cross = board.cross[i];
-        let adjcellList = [[board.getc(cross.bx - 1, cross.by - 1), CQANS.rslash, CQANS.lslash],
-        [board.getc(cross.bx - 1, cross.by + 1), CQANS.lslash, CQANS.rslash],
-        [board.getc(cross.bx + 1, cross.by - 1), CQANS.lslash, CQANS.rslash],
-        [board.getc(cross.bx + 1, cross.by + 1), CQANS.rslash, CQANS.lslash]];
-        adjcellList = adjcellList.filter(c => !c[0].isnull);
+    // record the qnum count/sum in (0,0) to (a,b)
+    let scnt = Array.from(new Array(board.rows + 1), () => new Array(board.cols + 1).fill(0));
+    let ncnt = Array.from(new Array(board.rows + 1), () => new Array(board.cols + 1).fill(0));
+    for (let i = 0; i <= board.rows; i++) {
+        for (let j = 0; j <= board.cols; j++) {
+            let f = (arr, a, b) => a < 0 || b < 0 ? 0 : arr[a][b];
+            scnt[i][j] = Math.max(0, board.getobj(2 * j, 2 * i).qnum);
+            scnt[i][j] += f(scnt, i - 1, j) + f(scnt, i, j - 1) - f(scnt, i - 1, j - 1);
+            ncnt[i][j] = board.getobj(2 * j, 2 * i).qnum === CQNUM.none ? 0 : 1;
+            ncnt[i][j] += f(ncnt, i - 1, j) + f(ncnt, i, j - 1) - f(ncnt, i - 1, j - 1);;
+        }
+    }
+    // check the clue for the four corners of the corresponding rectangle
+    let getClue = function (cr1, cr2) {
+        if (cr1.isnull || cr2.isnull) { return 0; }
+        let [x1, x2] = [cr1.bx / 2, cr2.bx / 2].sort((x, y) => x - y);
+        let [y1, y2] = [cr1.by / 2, cr2.by / 2].sort((x, y) => x - y);
+        let f = (arr, a, b) => a < 0 || b < 0 ? 0 : arr[a][b];
+        let res = f(scnt, y2, x2) - f(scnt, y1 - 1, x2) - f(scnt, y2, x1 - 1) + f(scnt, y1 - 1, x1 - 1);
+        res -= (Math.min(x2 + 1, board.cols) - Math.max(x1 - 1, 0)) * (y2 - y1);
+        res -= (Math.min(y2 + 1, board.rows) - Math.max(y1 - 1, 0)) * (x2 - x1);
+        return [res, (x2 - x1 + 1) * (y2 - y1 + 1) - (f(ncnt, y2, x2) - f(ncnt, y1 - 1, x2) - f(ncnt, y2, x1 - 1) + f(ncnt, y1 - 1, x1 - 1))];
+    }
+    forEachCross(cross => {
         // finish clue
-        if (cross.qnum >= 0) {
-            if (adjcellList.filter(c => c[0].qans === c[1]).length === cross.qnum) {
-                adjcellList.forEach(c => add_slash(c[0], c[2]));
-            }
-            if (adjcellList.filter(c => c[0].qans !== c[2]).length === cross.qnum) {
-                adjcellList.forEach(c => add_slash(c[0], c[1]));
+        // clue can be grouped in a rectangle and look at only four corners
+        for (let dx = 0; getClue(cross, offset(cross, dx, 0))[1] <= 1; dx++) {
+            for (let dy = 0; getClue(cross, offset(cross, dx, dy))[1] <= 1; dy++) {
+                let [qnum, lckn] = getClue(cross, offset(cross, dx, dy));
+                // extreme value for one missing clue
+                if (lckn > 0 && qnum !== -4 * lckn && qnum !== 4) { continue; }
+                if (qnum < 0) { qnum = 0; }
+                let adjcellList = [[offset(cross, -.5, -.5), CQANS.rslash, CQANS.lslash],
+                [offset(cross, -.5, dy + .5), CQANS.lslash, CQANS.rslash],
+                [offset(cross, dx + .5, -.5), CQANS.lslash, CQANS.rslash],
+                [offset(cross, dx + .5, dy + .5), CQANS.rslash, CQANS.lslash]];
+                adjcellList = adjcellList.filter(c => !c[0].isnull);
+                if (adjcellList.filter(c => c[0].qans === c[1]).length === qnum) {
+                    adjcellList.forEach(c => add_slash(c[0], c[2]));
+                }
+                if (adjcellList.filter(c => c[0].qans !== c[2]).length === qnum) {
+                    adjcellList.forEach(c => add_slash(c[0], c[1]));
+                }
             }
         }
         for (let d = 0; d < 4; d++) {
@@ -6495,53 +6555,38 @@ function SlantAssist() {
                     add_slash(offset(cross, .5, .5, d), CQANS.lslash + d);
                 }
             }
-            // + + + +    + + + +
-            //             ╱   ╲ 
-            // + 1 1 + -> + 1 1 +
-            //             ╲   ╱ 
-            // + + + +    + + + +
-            if (cross.qnum === 1) {
-                if (offset(cross, 0, 1, d).isnull || offset(cross, 0, -1, d).isnull) { continue; }
-                if (!offset(cross, 1, 0, d).isnull && offset(cross, 1, 0, d).qnum === 1) {
-                    add_slash(offset(cross, -0.5, -.5, d), CQANS.lslash + d);
-                    add_slash(offset(cross, -0.5, +.5, d), CQANS.rslash + d);
-                    add_slash(offset(cross, +1.5, -.5, d), CQANS.rslash + d);
-                    add_slash(offset(cross, +1.5, +.5, d), CQANS.lslash + d);
+            // no loop for 2 or 3
+            if (offset(cross, .5, .5, d).qans === CQANS.none && offset(cross, 1, -1, d).path !== null && offset(cross, 1, -1, d).path === offset(cross, 1, 1, d).path) {
+                if (cross.qnum === 3 || cross.qnum === 2 &&
+                    (offset(cross, -.5, -.5, d).qans === (d % 2 === 0 ? CQANS.lslash : CQANS.rslash) ||
+                        offset(cross, -.5, +.5, d).qans === (d % 2 === 1 ? CQANS.lslash : CQANS.rslash))) {
+                    add_slash(offset(cross, -.5, -.5, d), CQANS.rslash + d);
+                    add_slash(offset(cross, -.5, +.5, d), CQANS.lslash + d);
                 }
             }
-            // + + + +    + + + +
-            //             ╲   ╱ 
-            // + 3 3 + -> + 3 3 +
-            //             ╱   ╲ 
-            // + + + +    + + + +
-            if (cross.qnum === 3) {
-                if (!offset(cross, 1, 0, d).isnull && offset(cross, 1, 0, d).qnum === 3 && isNotSide(offset(cross, 1, 0, d))) {
-                    add_slash(offset(cross, -0.5, -.5, d), CQANS.rslash + d);
-                    add_slash(offset(cross, -0.5, +.5, d), CQANS.lslash + d);
-                    add_slash(offset(cross, +1.5, -.5, d), CQANS.lslash + d);
-                    add_slash(offset(cross, +1.5, +.5, d), CQANS.rslash + d);
+            if (offset(cross, -.5, .5, d).qans === CQANS.none && offset(cross, 1, -1, d).path !== null && offset(cross, 1, -1, d).path === offset(cross, -1, 1, d).path) {
+                if (cross.qnum === 3 || cross.qnum === 2 &&
+                    (offset(cross, -.5, -.5, d).qans === (d % 2 === 0 ? CQANS.lslash : CQANS.rslash) ||
+                        offset(cross, +.5, +.5, d).qans === (d % 2 === 0 ? CQANS.lslash : CQANS.rslash))) {
+                    add_slash(offset(cross, -.5, -.5, d), CQANS.rslash + d);
+                    add_slash(offset(cross, +.5, +.5, d), CQANS.rslash + d);
                 }
             }
         }
-    }
+    });
     // no loop
     // + + +    + + +
     //  / \      / \ 
     // + + + -> + + +
-    //  \        \ \ 
+    //    /      / / 
     // + + +    + + +
     forEachCell(cell => {
         if (cell.qans !== CQANS.none) { return; }
-        let cross1, cross2;
-        cross1 = board.getobj(cell.bx - 1, cell.by - 1);
-        cross2 = board.getobj(cell.bx + 1, cell.by + 1);
-        if (cross1.path !== null && cross1.path === cross2.path) {
-            add_slash(cell, CQANS.lslash);
-        }
-        cross1 = board.getobj(cell.bx - 1, cell.by + 1);
-        cross2 = board.getobj(cell.bx + 1, cell.by - 1);
-        if (cross1.path !== null && cross1.path === cross2.path) {
-            add_slash(cell, CQANS.rslash);
+        for (let d = 0; d < 2; d++) {
+            let cross1 = offset(cell, -.5, -.5, d), cross2 = offset(cell, .5, .5, d);
+            if (cross1.path !== null && cross1.path === cross2.path) {
+                add_slash(cell, CQANS.lslash + d);
+            }
         }
     });
 }
