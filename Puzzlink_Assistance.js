@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.8.3.1
+// @version      24.8.4.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -596,26 +596,27 @@ let add_number = function (c, n) {
     c.setAnum(n);
     c.draw();
 };
-let add_candidate = function (c, l) {
-    if (c.isnull || c.anum !== -1) { return; }
-    l = l.filter(n => n !== -1).sort();
-    // i tried to add more number in snum but something weird keeps happening
-    if (l.length === 0 || l.length > 4) { return; }
-    while (l.length < 4) { l.push(-1); }
-    if (c.snum.join(',') === l.join(',')) { return; }
-    if (l.length > 4) { l = [-1, -1, -1, -1, ...l]; }
-    if (step && flg) { return; }
-    flg = true;
-    for (let i = l.length; i < c.snum.length; i++) { c.setSnum(i, -1); }
-    l.forEach((n, i) => c.setSnum(i, n));
-    c.draw();
-}
 let add_sudokunum = function (c, n) {
     if (c.isnull || c.anum !== -1) { return; }
     if (step && flg) { return; }
     flg = true;
     c.snum.forEach((_, i) => c.setSnum(i, -1));
     c.setAnum(n);
+    c.draw();
+}
+let add_candidate = function (c, l) {
+    if (c.isnull || c.anum !== -1) { return; }
+    l = Array.from(new Set(l.filter(n => n !== -1))).sort((a, b) => a - b);
+    // i tried to add more number in snum but something weird keeps happening
+    if (l.length === 0 || l.length > 4) { return; }
+    if (l.length === 1) { add_sudokunum(c, l[0]); return; }
+    while (l.length < 4) { l.push(-1); }
+    if (c.snum.join(',') === l.join(',')) { return; }
+    // if (l.length > 4) { l = [-1, -1, -1, -1, ...l]; }
+    if (step && flg) { return; }
+    flg = true;
+    for (let i = l.length; i < c.snum.length; i++) { c.setSnum(i, -1); }
+    l.forEach((n, i) => c.setSnum(i, n));
     c.draw();
 }
 let add_Ocell = function (c) {
@@ -2287,8 +2288,8 @@ function RectRegion_Border({ doTrial = true, isSizeAble = (w, h, sc, c) => true 
         if (rectlist.every(obj => obj.dd === md)) { add_side(offset(cell, 0, md + .5)); }
     });
 }
-function LatinSquare(hasBox = false) {
-    let size = board.rows;
+function LatinSquare({ hasBox = false, ext = (c, cand) => cand } = {}) {
+    let size = Math.max(board.rows, board.cols);
     forEachCell(cell => {
         if (cell.qnum !== CQNUM.none) {
             add_sudokunum(cell, cell.qnum);
@@ -2297,29 +2298,52 @@ function LatinSquare(hasBox = false) {
     forEachCell(cell => {
         if (cell.anum !== -1) { return; }
         let arr = () => Array(size).fill().map((_, i) => i + 1);
-        let cand = arr(), row = arr(), col = arr(), box = arr();
-        forEachCell(c => {
-            if (cell === c) { return; }
-            let b = c.anum === -1 && c.snum.every(n => n === -1);
-            if (cell.bx === c.bx) { col = b ? [] : col.filter(n => n !== c.anum && !c.snum.includes(n)); }
-            if (cell.by === c.by) { row = b ? [] : row.filter(n => n !== c.anum && !c.snum.includes(n)); }
-            if (hasBox && cell.room === c.room) { box = b ? [] : box.filter(n => n !== c.anum && !c.snum.includes(n)); }
-            if (c.anum === -1) { return; }
-            if (cell.bx === c.bx || cell.by === c.by || hasBox && cell.room === c.room) {
-                cand = cand.filter(n => n !== c.anum);
-            }
-        });
-        if (col.length === 1) { add_sudokunum(cell, col[0]); return; }
-        if (row.length === 1) { add_sudokunum(cell, row[0]); return; }
-        if (hasBox && box.length === 1) { add_sudokunum(cell, box[0]); return; }
-        if (cell.snum.some(n => n !== -1)) {
-            add_candidate(cell, cell.snum.filter(n => cand.includes(n)).sort((a, b) => (a - b)));
+        let cand = arr(), row = [], col = [];
+        if (cell.snum.some(n => n !== -1)) { cand = cell.snum.filter(n => n !== -1); }
+        for (let i = 0; i < size; i++) {
+            row.push(board.getc(i * 2 + 1, cell.by));
+            col.push(board.getc(cell.bx, i * 2 + 1));
         }
-        if (cell.snum.filter(n => n !== -1).length === 1) {
-            add_sudokunum(cell, cell.snum.find(n => n !== -1));
-        } else if (cell.snum.every(n => n === -1)) {
-            add_candidate(cell, cand);
+        let fn = function (clist) {
+            let a = arr();
+            clist.forEach((c, i) => {
+                if (cell === c || c.isnull) { return; }
+                let b = c.anum === -1 && c.snum.every(n => n === -1);
+                a = b ? [] : a.filter(n => n !== c.anum && !c.snum.includes(n));
+                if (c.anum !== -1) { cand = cand.filter(n => n !== c.anum); }
+                if (c.anum === -1 && c.snum.filter(n => n !== -1).length > 0) {
+                    for (let j = i + 1; j < clist.length; j++) {
+                        let c2 = clist[j];
+                        if (cell === c2 || c2.isnull || c2.anum !== -1 || c2.snum.every(n => n === -1)) { continue; }
+                        let l2 = new Set([...c.snum, ...c2.snum].filter(n => n !== -1));
+                        if (l2.size === 2) {
+                            cand = cand.filter(n => !l2.has(n));
+                        }
+                        for (let k = j + 1; k < clist.length; k++) {
+                            let c3 = clist[k];
+                            if (cell === c3 || c3.isnull || c3.anum !== -1 || c3.snum.every(n => n === -1)) { continue; }
+                            let l3 = new Set([...c.snum, ...c2.snum, ...c3.snum].filter(n => n !== -1));
+                            if (l3.size === 3) {
+                                cand = cand.filter(n => !l3.has(n));
+                            }
+                            for (let l = k + 1; l < clist.length; l++) {
+                                let c4 = clist[l];
+                                if (cell === c4 || c4.isnull || c4.anum !== -1 || c4.snum.every(n => n === -1)) { continue; }
+                                let l4 = new Set([...c.snum, ...c2.snum, ...c3.snum, ...c4.snum].filter(n => n !== -1));
+                                if (l4.size === 4) {
+                                    cand = cand.filter(n => !l4.has(n));
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            if (clist.every(c => !c.isnull) && a.length === 1) { add_sudokunum(cell, a[0]); }
         }
+        fn(row); fn(col);
+        if (hasBox) { fn(Array.from(cell.room.clist)); }
+        cand = ext(cell, cand);
+        add_candidate(cell, cand);
     });
 }
 
@@ -4196,64 +4220,103 @@ function BarnsAssist() {
 }
 
 function SkyscrapersAssist() {
+    let size = Math.max(board.rows, board.cols);
     LatinSquare();
-    // TODO: clues
+    let arr = () => Array(size).fill().map((_, i) => i + 1);
+    let fn = function (clist, n1, n2) {
+        let cands = clist.map(c => c.anum !== -1 ? [c.anum] : c.snum.some(n => n !== -1) ? c.snum.filter(n => n !== -1) : arr());
+        if (n1 > 1) {
+            for (let i = 1; i < n1; i++) {
+                cands[i - 1] = cands[i - 1].filter(n => n <= size - n1 + i);
+            }
+        }
+        if (n1 === 1) { cands[0] = [size]; }
+        if (n2 > 1) {
+            for (let i = 1; i < n2; i++) {
+                cands[size - i] = cands[size - i].filter(n => n <= size - n2 + i);
+            }
+        }
+        if (n2 === 1) { cands[size - 1] = [size]; }
+        if (size <= 9) {
+            let cc = Array(size).fill().map((_, i) => new Set());
+            let dfs = function (i, a) {
+                if (i === size) {
+                    if (n1 !== -1 && n1 !== a.reduce(([h, c], n) => h < n ? [n, c + 1] : [h, c], [0, 0])[1]) { return; }
+                    if (n2 !== -1 && n2 !== [...a].reverse().reduce(([h, c], n) => h < n ? [n, c + 1] : [h, c], [0, 0])[1]) { return; }
+                    a.forEach((n, i) => cc[i].add(n));
+                    return;
+                }
+                cands[i].forEach(n => {
+                    if (a.includes(n)) { return; }
+                    dfs(i + 1, [...a, n]);
+                });
+            }
+            dfs(0, []);
+            cands = cc.map(set => Array.from(set));
+        }
+        clist.forEach((c, i) => add_candidate(c, cands[i]));
+    }
+    for (let i = 1; i < size * 2; i += 2) {
+        let row = [], col = [];
+        for (let j = 1; j < size * 2; j += 2) {
+            row.push(board.getc(j, i));
+            col.push(board.getc(i, j));
+        }
+        fn(row, board.getex(-1, i).qnum, board.getex(size * 2 + 1, i).qnum);
+        fn(col, board.getex(i, -1).qnum, board.getex(i, size * 2 + 1).qnum);
+    }
 }
 
 function MinarismAssist() {
-    LatinSquare();
-    let size = board.rows;
-    forEachCell(cell => {
-        if (cell.anum !== -1) { return; }
-        let arr = () => Array(size).fill().map((_, i) => i + 1);
-        let cand = cell.snum.filter(n => n !== -1);
-        if (cand.length === 0) { cand = arr(); }
-        for (let d = 0; d < 4; d++) {
-            if (offset(cell, .5, 0, d).isnull) { continue; }
-            let ncell = offset(cell, 1, 0, d);
-            let nlist = ncell.snum.filter(n => n !== -1);
-            if (nlist.length === 0) { nlist = arr(); }
-            if (ncell.anum !== -1) { nlist = [ncell.anum]; }
-            if (offset(cell, .5, 0, d).qnum !== BQNUM.none) {
-                let dt = offset(cell, .5, 0, d).qnum;
-                cand = cand.filter(n => nlist.includes(n - dt) || nlist.includes(n + dt));
+    let size = Math.max(board.rows, board.cols);
+    LatinSquare({
+        ext: (cell, cand) => {
+            let arr = () => Array(size).fill().map((_, i) => i + 1);
+            for (let d = 0; d < 4; d++) {
+                if (offset(cell, .5, 0, d).isnull) { continue; }
+                let ncell = offset(cell, 1, 0, d);
+                let nlist = ncell.snum.filter(n => n !== -1);
+                if (nlist.length === 0) { nlist = arr(); }
+                if (ncell.anum !== -1) { nlist = [ncell.anum]; }
+                if (offset(cell, .5, 0, d).qnum !== BQNUM.none) {
+                    let dt = offset(cell, .5, 0, d).qnum;
+                    cand = cand.filter(n => nlist.includes(n - dt) || nlist.includes(n + dt));
+                }
+                if ([4, 1, 3, 2][d] === offset(cell, .5, 0, d).qdir) {
+                    cand = cand.filter(n => nlist.some(m => n > m));
+                }
+                if ([3, 2, 4, 1][d] === offset(cell, .5, 0, d).qdir) {
+                    cand = cand.filter(n => nlist.some(m => n < m));
+                }
             }
-            if ([4, 1, 3, 2][d] === offset(cell, .5, 0, d).qdir) {
-                cand = cand.filter(n => nlist.some(m => n > m));
-            }
-            if ([3, 2, 4, 1][d] === offset(cell, .5, 0, d).qdir) {
-                cand = cand.filter(n => nlist.some(m => n < m));
-            }
+            return cand;
         }
-        add_candidate(cell, cand);
     });
 }
 
 function KropkiAssist() {
-    LatinSquare();
-    let size = board.rows;
-    forEachCell(cell => {
-        if (cell.anum !== -1) { return; }
-        let arr = () => Array(size).fill().map((_, i) => i + 1);
-        let cand = cell.snum.filter(n => n !== -1);
-        if (cand.length === 0) { cand = arr(); }
-        for (let d = 0; d < 4; d++) {
-            if (offset(cell, .5, 0, d).isnull) { continue; }
-            let ncell = offset(cell, 1, 0, d);
-            let nlist = ncell.snum.filter(n => n !== -1);
-            if (nlist.length === 0) { nlist = arr(); }
-            if (ncell.anum !== -1) { nlist = [ncell.anum]; }
-            if (offset(cell, .5, 0, d).qnum === BQNUM.wcir) {
-                cand = cand.filter(n => nlist.includes(n - 1) || nlist.includes(n + 1));
+    let size = Math.max(board.rows, board.cols);
+    LatinSquare({
+        ext: (cell, cand) => {
+            let arr = () => Array(size).fill().map((_, i) => i + 1);
+            for (let d = 0; d < 4; d++) {
+                if (offset(cell, .5, 0, d).isnull) { continue; }
+                let ncell = offset(cell, 1, 0, d);
+                let nlist = ncell.snum.filter(n => n !== -1);
+                if (nlist.length === 0) { nlist = arr(); }
+                if (ncell.anum !== -1) { nlist = [ncell.anum]; }
+                if (offset(cell, .5, 0, d).qnum === BQNUM.wcir) {
+                    cand = cand.filter(n => nlist.includes(n - 1) || nlist.includes(n + 1));
+                }
+                if (offset(cell, .5, 0, d).qnum === BQNUM.bcir) {
+                    cand = cand.filter(n => nlist.includes(n / 2) || nlist.includes(n * 2));
+                }
+                if (offset(cell, .5, 0, d).qnum === BQNUM.none) {
+                    cand = cand.filter(n => nlist.some(m => ![n, n - 1, n + 1, n / 2, n * 2].includes(m)));
+                }
             }
-            if (offset(cell, .5, 0, d).qnum === BQNUM.bcir) {
-                cand = cand.filter(n => nlist.includes(n / 2) || nlist.includes(n * 2));
-            }
-            if (offset(cell, .5, 0, d).qnum === BQNUM.none) {
-                cand = cand.filter(n => nlist.some(m => ![n - 1, n + 1, n / 2, n * 2].includes(m)));
-            }
+            return cand;
         }
-        add_candidate(cell, cand);
     });
 }
 
@@ -4523,7 +4586,7 @@ function NonogramAssist() {
 }
 
 function SudokuAssist() {
-    LatinSquare(true);
+    LatinSquare({ hasBox: true });
 }
 
 function CirclesAndSquaresAssist() {
@@ -6504,7 +6567,7 @@ function SlantAssist() {
             let f = (arr, a, b) => a < 0 || b < 0 ? 0 : arr[a][b];
             scnt[i][j] = Math.max(0, board.getobj(2 * j, 2 * i).qnum);
             scnt[i][j] += f(scnt, i - 1, j) + f(scnt, i, j - 1) - f(scnt, i - 1, j - 1);
-            ncnt[i][j] = board.getobj(2 * j, 2 * i).qnum === CQNUM.none ? 0 : 1;
+            ncnt[i][j] = board.getobj(2 * j, 2 * i).qnum >= 0 ? 1 : 0;
             ncnt[i][j] += f(ncnt, i - 1, j) + f(ncnt, i, j - 1) - f(ncnt, i - 1, j - 1);;
         }
     }
