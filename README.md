@@ -25,6 +25,7 @@ Currently enhanced genre:
 * Cave
 * Choco Banana
 * Circles and Squares
+* Cocktail Lamp
 * Country Road
 * Creek
 * Dominion
@@ -101,6 +102,7 @@ Currently enhanced genre:
 * Tents
 * Tetrominous
 * Tilepaint
+* Tren
 * Yajilin
 * Yajisan-Kazusan
 * Yin-Yang

@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.8.4.1
+// @version      24.8.6.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -132,6 +132,7 @@ const GENRELIST = [
     ["Cave", CaveAssist],
     ["Choco Banana", ChocoBananaAssist],
     ["Circles and Squares", CirclesAndSquaresAssist],
+    ["Cocktail Lamp", CocktailLampAssist],
     ["Country Road", CountryRoadAssist],
     ["Creek", CreekAssist],
     ["Dominion", DominionAssist],
@@ -208,6 +209,7 @@ const GENRELIST = [
     ["Tents", TentsAssist],
     ["Tetrominous", TetrominousAssist],
     ["Tilepaint", TilepaintAssist],
+    ["Tren", TrenAssist],
     ["Yajilin", YajilinAssist],
     ["Yajisan-Kazusan", YajisanKazusanAssist],
     ["Yin-Yang", YinyangAssist],
@@ -438,7 +440,7 @@ let isCross = b => !b.isnull && b.qsub === BQSUB.cross;
 let isBound = b => b.ques === 1;
 let isInside = c => c.bx >= 0 && c.by >= 0 && c.bx <= board.cols * 2 && c.by <= board.rows * 2;
 
-let offset = function (c, dx, dy, dir = 0) {
+let offset = function (c, dx, dy, dir = 0) { // CCW as in coordinate
     dir = (dir % 4 + 4) % 4;
     if (dir === 0) { return board.getobj(c.bx + dx * 2, c.by + dy * 2); }
     if (dir === 1) { return board.getobj(c.bx + dy * 2, c.by - dx * 2); }
@@ -523,6 +525,7 @@ let cellTrail = function (c, sd) {
     }
     return [c, ...clist];
 }
+let getComb = l => l.reduce((a, b) => a.flatMap(i => b.flatMap(j => [[...i, j]])), [[]]);
 let roomId = room => board.roommgr.components.indexOf(room);
 function forEachCell(f = cell => { }) { for (let i = 0; i < board.cell.length; i++) { f(board.cell[i]); } }
 function forEachBorder(f = border => { }) { for (let i = 0; i < board.border.length; i++) { f(board.border[i]); } }
@@ -582,6 +585,13 @@ let add_green = function (c) {
     if (step && flg) { return; }
     flg = true;
     c.setQsub(CQSUB.green);
+    c.draw();
+};
+let add_yellow = function (c) {
+    if (c === undefined || c.isnull || c.qans !== CQANS.none || c.qsub !== CQSUB.none) { return; }
+    if (step && flg) { return; }
+    flg = true;
+    c.setQsub(CQSUB.yellow);
     c.draw();
 };
 let add_inout = function (cr, qsub) {
@@ -672,6 +682,13 @@ function NoCrossingBorder() {
     }
 }
 function RoomPassOnce({ LengthClue = false } = {}) {
+    CellConnected_InRegion({
+        isShaded: c => c.lcnt > 0,
+        isUnshaded: c => adjlist(c.adjborder).every(b => isntLine(b)),
+        add_shaded: () => { },
+        add_unshaded: () => { },
+        ByLine: true,
+    });
     forEachRoom(room => {
         let clist = Array.from(room.clist);
         let qnum = (room.top === undefined ? -1 : room.top.qnum);
@@ -1120,6 +1137,10 @@ function CellConnected_InRegion({ isShaded, isUnshaded, add_shaded, add_unshaded
         forEachRoom(room => {
             if (room.top.qnum < 0) { return; }
             let clist = Array.from(room.clist);
+            if (room.top.qnum === 0) {
+                clist.forEach(c => add_unshaded(c));
+                return;
+            }
             // unshade blank parts smaller than clue
             let cset = new Set();
             clist.forEach(c => {
@@ -2497,6 +2518,51 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function TrenAssist() {
+    forEachCell(cell => {
+        if (cell.qnum !== CQNUM.none) { add_green(cell); }
+        let l = [0, 1, 2, 3].map(d => ![1, 2].every(dd =>
+            ((nb, nc) => nc.isnull || nc.qnum === CQNUM.none || isSide(nb))(offset(cell, dd - .5, 0, d), offset(cell, dd, 0, d))));
+        if (cell.qnum === CQNUM.none && l.every(e => e === false)) { add_yellow(cell); }
+        if (cell.qsub === CQNUM.green && cell.qnum === CQNUM.none && l.filter(e => e === true).length === 1) {
+            l.forEach((e, d) => {
+                if (e === false) { return; }
+                add_green(offset(cell, 1, 0, d));
+                add_side(offset(cell, 1, -.5, d));
+                add_side(offset(cell, 1, +.5, d));
+            });
+        }
+        for (let d = 0; d < 4; d++) {
+            let ncell = offset(cell, 1, 0, d);
+            if (cell.qnum !== CQNUM.none && ncell.qnum !== CQNUM.none) {
+                add_side(offset(cell, .5, 0, d));
+            }
+            if (cell.qsub === CQSUB.green && ncell.qsub === CQSUB.yellow) {
+                add_side(offset(cell, .5, 0, d));
+            }
+            if (cell.qsub === CQSUB.green && adjlist(cell.adjborder).every(b => b.isnull || isSide(b) || b === offset(cell, .5, 0, d))) {
+                add_green(offset(cell, 1, 0, d));
+                add_side(offset(cell, 1, -.5, d));
+                add_side(offset(cell, 1, +.5, d));
+            }
+        }
+        // TODO: test all possible placement for one clue
+    });
+}
+
+function CocktailLampAssist() {
+    BlackConnected_InRegion(true);
+    BlackNotAdjacent_OverBorder();
+    No2x2Black();
+    CellConnected({
+        isShaded: isBlack,
+        isUnshaded: isGreen,
+        add_shaded: add_black,
+        add_unshaded: add_green,
+        DiagDir: true,
+    });
+}
+
 function MinesweeperAssist() {
     forEachCell(cell => {
         if (cell.qnum >= 0) {
@@ -2521,6 +2587,11 @@ function MinesweeperAssist() {
 }
 
 function TilepaintAssist() {
+    forEachRoom(room => {
+        let clist = Array.from(room.clist);
+        if (clist.some(c => isBlack(c))) { clist.forEach(c => add_black(c)); }
+        if (clist.some(c => isGreen(c))) { clist.forEach(c => add_green(c)); }
+    });
     let list = [...Array.from(board.cell), ...Array.from(board.excell)];
     list = [...list.filter(c => c.qnum > 0).map(c => {
         let pc = offset(c, 1, 0), clist = [];
@@ -2538,7 +2609,7 @@ function TilepaintAssist() {
         }
         return [c.qnum2, clist];
     })];
-    list = list.filter(([n, l]) => l.length > 0);
+    list = list.filter(([n, l]) => n !== CQNUM.none && l.length > 0);
     list.forEach(([n, clist]) => {
         n -= clist.filter(c => isBlack(c)).length;
         clist = clist.filter(c => !isBlack(c) && !isDot(c));
@@ -3580,7 +3651,7 @@ function TetrominousAssist() {
             let linklist = [], sidelist = [], namelist = [];
             TETRO.forEach(([cl, t]) => {
                 if (cell.anum >= 0 && cell.anum !== t) { return; }
-                [[0, 1, 2, 3], [1, -1], [...Array(N).keys()]].reduce((a, b) => a.flatMap(i => b.flatMap(j => [[...i, j]])), [[]]).forEach(([d, f, o]) => {
+                getComb([[0, 1, 2, 3], [1, -1], [...Array(N).keys()]]).forEach(([d, f, o]) => {
                     let clist = cl.map(([x, y]) => offset(cell, x - cl[o][0], (y - cl[o][1]) * f, d));
                     if (clist.some(c => c.isnull || c.ques === CQUES.wall)) { return; }
                     if (clist.some(c => c.anum >= 0 && c.anum !== t)) { return; }
@@ -3661,7 +3732,7 @@ function PentominousAssist() {
             let linklist = [], sidelist = [], namelist = [];
             PENTO.forEach(([cl, t]) => {
                 if (cell.anum >= 0 && cell.anum !== t) { return; }
-                [[0, 1, 2, 3], [1, -1], [...Array(N).keys()]].reduce((a, b) => a.flatMap(i => b.flatMap(j => [[...i, j]])), [[]]).forEach(([d, f, o]) => {
+                getComb([[0, 1, 2, 3], [1, -1], [...Array(N).keys()]]).forEach(([d, f, o]) => {
                     let clist = cl.map(([x, y]) => offset(cell, x - cl[o][0], (y - cl[o][1]) * f, d));
                     if (clist.some(c => c.isnull || c.ques === CQUES.wall)) { return; }
                     if (clist.some(c => c.anum >= 0 && c.anum !== t)) { return; }
@@ -3708,7 +3779,32 @@ function FourCellsAssist() {
         isSideable: (c, nb, nc) => !nb.isnull && !isLink(nb),
         allSize: 4,
     });
+    const TETRO = [// 0~4 : ILOST
+        [[[0, 0], [1, 0], [2, 0], [3, 0]], 0],
+        [[[0, 0], [1, 0], [2, 0], [2, 1]], 1],
+        [[[0, 0], [0, 1], [1, 0], [1, 1]], 2],
+        [[[0, 0], [1, 0], [1, 1], [2, 1]], 3],
+        [[[0, 0], [1, 0], [1, 1], [2, 0]], 4],
+    ];
+    let cset = new Set();
     forEachCell(cell => {
+        if (cell.ques === CQUES.wall) { return; }
+        if (cset.has(cell)) { return; }
+        else {
+            let clist = [];
+            let dfs = function (c) {
+                if (clist.includes(c)) { return; }
+                clist.push(c);
+                adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+                    if (isLink(nb)) { dfs(nc); }
+                });
+            };
+            dfs(cell);
+            if (clist.length === 4) {
+                clist.forEach(c => cset.add(c));
+                return;
+            }
+        }
         if (cell.qnum >= 0) {
             let list = adjlist(cell.adjborder, cell.adjacent);
             if (list.filter(([nb, nc]) => isSide(nb) || nc.isnull || nc.ques === CQUES.wall).length === cell.qnum) {
@@ -3718,26 +3814,34 @@ function FourCellsAssist() {
                 list.filter(([nb, nc]) => !isLink(nb)).forEach(([nb, nc]) => add_side(nb));
             }
         }
-        for (let d = 0; d < 4; d++) {
-            if (cell.qnum === 1 && [1, 2].includes(offset(cell, 1, 0, d).qnum)) {
-                add_side(offset(cell, .5, 0, d));
-            }
-            if (cell.qnum === 3 && offset(cell, 1, 0, d).qnum === 3) {
-                add_side(offset(cell, .5, 0, d));
-            }
-            if (cell.qnum === 1 && isLink(offset(cell, .5, 0, d))) {
-                add_side(offset(cell, 1, -.5, d));
-                add_side(offset(cell, 1.5, 0, d));
-                add_side(offset(cell, 1, .5, d));
-            }
-            if (cell.qnum === 1 && [[1, -.5], [1.5, 0], [1, .5]].some(([x, y]) => isLink(offset(cell, x, y, d)))) {
-                add_side(offset(cell, .5, 0, d));
-            }
-            if (cell.qnum === 1 && isSide(offset(cell, 1, 1.5, d)) && isSide(offset(cell, 1.5, 1, d))) {
-                add_link(offset(cell, -.5, 0, d));
-                add_link(offset(cell, 0, -.5, d));
-            }
-        }
+        let linklist = [], sidelist = [];
+        TETRO.forEach(([cl, t]) => {
+            getComb([[0, 1, 2, 3], [1, -1], [...Array(4).keys()]]).forEach(([d, f, o]) => {
+                let clist = cl.map(([x, y]) => offset(cell, x - cl[o][0], (y - cl[o][1]) * f, d));
+                if (clist.some(c => c.isnull || c.ques === CQUES.wall)) { return; }
+                if (clist.some(c => c.qnum >= 0 && adjlist(c.adjacent).filter(nc => !clist.includes(nc)).length !== c.qnum)) { return; }
+                if (clist.some(c => adjlist(c.adjborder, c.adjacent).some(
+                    ([nb, nc]) => {
+                        if (nc.isnull || nc.ques === CQUES.wall) { return false; }
+                        if (isLink(nb) && !clist.includes(nc) || isSide(nb) && clist.includes(nc)) { return true; }
+                        return false;
+                    }))) { return; }
+                let linkl = [], sidel = [];
+                clist.forEach(c => adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+                    if (clist.includes(nc) && !linkl.includes(nb)) { linkl.push(nb); }
+                    if (!clist.includes(nc) && !sidel.includes(nb)) { sidel.push(nb); }
+                }));
+                if (clist.flatMap(c => adjlist(c.adjacent).filter(nc => !nc.isnull && nc.ques !== CQUES.wall && nc.qnum >= 0))
+                    .some(c => adjlist(c.adjborder, c.adjacent).filter(([nb, nc]) =>
+                        isSide(nb) || sidel.includes(nb) || nc.isnull || nc.ques === CQUES.wall).length > c.qnum)) { return; }
+                linklist.push(linkl);
+                sidelist.push(sidel);
+            });
+        });
+        if (linklist.length > 0) { linklist = linklist.reduce((a, b) => a.filter(i => b.includes(i))); }
+        if (sidelist.length > 0) { sidelist = sidelist.reduce((a, b) => a.filter(i => b.includes(i))); }
+        linklist.forEach(b => add_link(b));
+        sidelist.forEach(b => add_side(b));
     });
 }
 
@@ -3747,7 +3851,39 @@ function FiveCellsAssist() {
         isSideable: (c, nb, nc) => !nb.isnull && !isLink(nb),
         allSize: 5,
     });
+    const PENTO = [// 0~11 : FILNPTUVWXYZ
+        [[[0, 0], [1, 0], [1, 1], [1, 2], [2, 1]], 0],
+        [[[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]], 1],
+        [[[0, 0], [1, 0], [2, 0], [3, 0], [3, 1]], 2],
+        [[[0, 0], [1, 0], [2, 0], [2, 1], [3, 1]], 3],
+        [[[0, 0], [1, 0], [2, 0], [1, 1], [2, 1]], 4],
+        [[[0, 0], [1, 0], [1, 1], [1, 2], [2, 0]], 5],
+        [[[0, 0], [0, 1], [1, 0], [2, 0], [2, 1]], 6],
+        [[[0, 0], [1, 0], [2, 0], [2, 1], [2, 2]], 7],
+        [[[0, 0], [1, 0], [1, 1], [2, 1], [2, 2]], 8],
+        [[[0, 0], [0, 1], [0, 2], [-1, 1], [1, 1]], 9],
+        [[[0, 0], [1, 0], [1, 1], [2, 0], [3, 0]], 10],
+        [[[0, 0], [1, 0], [1, 1], [1, 2], [2, 2]], 11],
+    ];
+    let cset = new Set();
     forEachCell(cell => {
+        if (cell.ques === CQUES.wall) { return; }
+        if (cset.has(cell)) { return; }
+        else {
+            let clist = [];
+            let dfs = function (c) {
+                if (clist.includes(c)) { return; }
+                clist.push(c);
+                adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+                    if (isLink(nb)) { dfs(nc); }
+                });
+            };
+            dfs(cell);
+            if (clist.length === 5) {
+                clist.forEach(c => cset.add(c));
+                return;
+            }
+        }
         if (cell.qnum >= 0) {
             let list = adjlist(cell.adjborder, cell.adjacent);
             if (list.filter(([nb, nc]) => isSide(nb) || nc.isnull || nc.ques === CQUES.wall).length === cell.qnum) {
@@ -3757,22 +3893,34 @@ function FiveCellsAssist() {
                 list.filter(([nb, nc]) => !isLink(nb)).forEach(([nb, nc]) => add_side(nb));
             }
         }
-        for (let d = 0; d < 4; d++) {
-            if (cell.qnum === 1 && offset(cell, 1, 0, d).qnum === 1) {
-                add_side(offset(cell, .5, 0, d));
-            }
-            if (cell.qnum === 3 && offset(cell, 1, 0, d).qnum === 3) {
-                add_side(offset(cell, .5, 0, d));
-            }
-            if (cell.qnum === 1 && isLink(offset(cell, 1, .5, d)) && isLink(offset(cell, .5, 1, d))) {
-                add_link(offset(cell, .5, 0, d));
-                add_link(offset(cell, 0, .5, d));
-            }
-            if (cell.qnum === 3 && isLink(offset(cell, 1, .5, d)) && isLink(offset(cell, .5, 1, d))) {
-                add_side(offset(cell, .5, 0, d));
-                add_side(offset(cell, 0, .5, d));
-            }
-        }
+        let linklist = [], sidelist = [];
+        PENTO.forEach(([cl, t]) => {
+            getComb([[0, 1, 2, 3], [1, -1], [...Array(5).keys()]]).forEach(([d, f, o]) => {
+                let clist = cl.map(([x, y]) => offset(cell, x - cl[o][0], (y - cl[o][1]) * f, d));
+                if (clist.some(c => c.isnull || c.ques === CQUES.wall)) { return; }
+                if (clist.some(c => c.qnum >= 0 && adjlist(c.adjacent).filter(nc => !clist.includes(nc)).length !== c.qnum)) { return; }
+                if (clist.some(c => adjlist(c.adjborder, c.adjacent).some(
+                    ([nb, nc]) => {
+                        if (nc.isnull || nc.ques === CQUES.wall) { return false; }
+                        if (isLink(nb) && !clist.includes(nc) || isSide(nb) && clist.includes(nc)) { return true; }
+                        return false;
+                    }))) { return; }
+                let linkl = [], sidel = [];
+                clist.forEach(c => adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+                    if (clist.includes(nc) && !linkl.includes(nb)) { linkl.push(nb); }
+                    if (!clist.includes(nc) && !sidel.includes(nb)) { sidel.push(nb); }
+                }));
+                if (clist.flatMap(c => adjlist(c.adjacent).filter(nc => !nc.isnull && nc.ques !== CQUES.wall && nc.qnum >= 0))
+                    .some(c => adjlist(c.adjborder, c.adjacent).filter(([nb, nc]) =>
+                        isSide(nb) || sidel.includes(nb) || nc.isnull || nc.ques === CQUES.wall).length > c.qnum)) { return; }
+                linklist.push(linkl);
+                sidelist.push(sidel);
+            });
+        });
+        if (linklist.length > 0) { linklist = linklist.reduce((a, b) => a.filter(i => b.includes(i))); }
+        if (sidelist.length > 0) { sidelist = sidelist.reduce((a, b) => a.filter(i => b.includes(i))); }
+        linklist.forEach(b => add_link(b));
+        sidelist.forEach(b => add_side(b));
     });
 }
 
@@ -4852,7 +5000,13 @@ function PencilsAssist() {
 }
 
 function MoonOrSunAssist() {
-    RoomPassOnce();
+    let add_Xcell = function (c) {
+        if (c === undefined || c.isnull || c.qnum === CQNUM.none || c.lcnt > 0) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setQsub(CQSUB.cross);
+        c.draw();
+    };
     let roomType = c => {
         if (c.room.count.sun.passed > 0) return 1;
         if (c.room.count.moon.passed > 0) return 2;
@@ -4860,9 +5014,19 @@ function MoonOrSunAssist() {
             let c2 = c.room.clist[i];
             if (c2.qnum === CQNUM.moon && c2.qsub === CQSUB.cross) { return 1; }
             if (c2.qnum === CQNUM.sun && c2.qsub === CQSUB.cross) { return 2; }
+            if (c2.qnum === CQNUM.moon && c2.lcnt > 0) { return 2; }
+            if (c2.qnum === CQNUM.sun && c2.lcnt > 0) { return 1; }
         }
         return 0;
     }
+    RoomPassOnce();
+    CellConnected_InRegion({
+        isShaded: c => c.lcnt > 0 || c.qnum !== CQNUM.none && c.qnum === roomType(c),
+        isUnshaded: c => adjlist(c.adjborder).every(b => isntLine(b)),
+        add_shaded: () => { },
+        add_unshaded: () => { },
+        ByLine: true,
+    });
     SingleLoopInCell({ isPass: c => c.qnum !== CQNUM.none && roomType(c) === c.qnum });
     CellConnected_InRegion({
         isShaded: c => isNum(c) && roomType(c) === c.qnum,
@@ -4871,13 +5035,6 @@ function MoonOrSunAssist() {
         add_unshaded: () => { },
         ByLine: true,
     });
-    let add_Ocell = function (c) {
-        if (c === undefined || c.isnull || c.qsub !== CQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
-        c.setQsub(CQSUB.circle);
-        c.draw();
-    };
     forEachCell(cell => {
         fourside((nb, nc) => {
             if (nc.isnull || cell.room === nc.room) { return; }
@@ -4902,7 +5059,7 @@ function MoonOrSunAssist() {
                 add_cross(nb);
             }
         }, cell.adjborder, cell.adjacent);
-        if (!adjlist(cell.adjborder).some(b => !b.isnull && b.qsub !== BQSUB.cross)) {
+        if (adjlist(cell.adjborder).every(b => b.isnull || isCross(b))) {
             add_Xcell(cell);
         }
         if (roomType(cell) > 0 && cell.qnum !== roomType(cell)) {
@@ -6501,17 +6658,57 @@ function CreekAssist() {
             }
         }
         for (let d = 0; d < 4; d++) {
-            // + + + +    + + + +
-            //             ·   █ 
-            // + 1 3 + -> + 1 3 +
-            //             ·   █ 
-            // + + + +    + + + +
-            if (cross.qnum === 1 && offset(cross, 1, 0, d).qnum === 3) {
-                add_dot(offset(cross, -.5, -.5, d));
-                add_dot(offset(cross, -.5, +.5, d));
-                add_black(offset(cross, 1.5, -.5, d));
-                add_black(offset(cross, 1.5, +.5, d));
+            let ncross = offset(cross, 1, 0, d);
+            // ++++
+            // +AB+
+            // ++++
+            if (cross.qnum >= 0 && ncross.qnum >= 0) {
+                let n1 = cross.qnum, n2 = ncross.qnum;
+                let r = [[offset(cross, -.5, -.5, d), offset(cross, -.5, +.5, d)],
+                [offset(cross, +.5, -.5, d), offset(cross, +.5, +.5, d)],
+                [offset(cross, 1.5, -.5, d), offset(cross, 1.5, +.5, d)]];
+                let fn = l => [0, 1, 2].filter(n => n >= l.filter(c => isBlack(c)).length && n <= l.filter(c => !isntBlack(c)).length)
+                let cand = getComb(r.map(l => fn(l)));
+                cand = cand.filter(([a1, a2, a3]) => a1 + a2 === n1 && a2 + a3 === n2);
+                for (let i = 0; i <= 2; i++) {
+                    if (cand.length > 0 && cand.every(l => l[i] === cand[0][i])) {
+                        NShadeInClist({ clist: r[i], n: cand[0][i] });
+                    }
+                }
             }
+            // // + + + +    + + + +
+            // //             ·   █ 
+            // // + 1 3 + -> + 1 3 +
+            // //             ·   █ 
+            // // + + + +    + + + +
+            // if (cross.qnum === 1 && offset(cross, 1, 0, d).qnum === 3) {
+            //     add_dot(offset(cross, -.5, -.5, d));
+            //     add_dot(offset(cross, -.5, +.5, d));
+            //     add_black(offset(cross, 1.5, -.5, d));
+            //     add_black(offset(cross, 1.5, +.5, d));
+            // }
+            // // + + + +    + + + +
+            // //      ·      ·   ·
+            // // + 1 2 + -> + 1 2 +
+            // //             ·   █ 
+            // // + + + +    + + + +
+            // if (cross.qnum === 1 && offset(cross, 1, 0, d).qnum === 2 &&
+            //     (isDot(offset(cross, 1.5, -.5, d)) || isDot(offset(cross, 1.5, +.5, d)))) {
+            //     add_dot(offset(cross, -.5, -.5, d));
+            //     add_dot(offset(cross, -.5, +.5, d));
+            //     add_black(offset(cross, 1.5, -.5, d));
+            //     add_black(offset(cross, 1.5, +.5, d));
+            // }
+            // // + + + +    + + + +
+            // //      ·      ·   ·
+            // // + 1 1 + -> + 1 1 +
+            // //      ·      ·   ·
+            // // + + + +    + + + +
+            // if (cross.qnum === 1 && offset(cross, 1, 0, d).qnum === 1 &&
+            //     (isDot(offset(cross, 1.5, -.5, d)) && isDot(offset(cross, 1.5, +.5, d)))) {
+            //     add_dot(offset(cross, -.5, -.5, d));
+            //     add_dot(offset(cross, -.5, +.5, d));
+            // }
             // + + + + +    + + + + +
             //               █     █
             // + 3 2 3 + -> + 3 2 3 +
