@@ -51,6 +51,7 @@ Currently enhanced genre:
 * Light and Shadow
 * Litherslink
 * LITS
+* Look-Air
 * Masyu
 * Mid-loop
 * Minarism

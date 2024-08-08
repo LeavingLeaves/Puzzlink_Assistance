@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.8.6.1
+// @version      24.8.8.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -158,6 +158,7 @@ const GENRELIST = [
     ["Light and Shadow", LightandShadowAssist],
     ["Litherslink", LitherslinkAssist],
     ["LITS", LitsAssist],
+    ["Look-Air", LookAirAssist],
     ["Masyu", MasyuAssist],
     ["Mid-loop", MidloopAssist],
     ["Minarism", MinarismAssist],
@@ -2518,6 +2519,29 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function LookAirAssist() {
+    RectRegion_Cell({
+        isShaded: isBlack,
+        isUnshaded: isGreen,
+        add_shaded: add_black,
+        add_unshaded: add_green,
+        isSizeAble: (w, h, sc, c) => w === h,
+    });
+    forEachCell(cell => {
+        NShadeInClist({
+            clist: [...adjlist(cell.adjacent), cell],
+            n: cell.qnum,
+        });
+        if (cell.qnum === 4) { add_black(cell); }
+        if (cell.qnum === 2) { add_green(cell); }
+        for (let d = 0; d < 4; d++) {
+            if (cell.qnum === 3 && isntBlack(offset(cell, -1, 0, d))) {
+                add_black(offset(cell, 1, 0, d));
+            }
+        }
+    });
+}
+
 function TrenAssist() {
     forEachCell(cell => {
         if (cell.qnum !== CQNUM.none) { add_green(cell); }
@@ -8135,6 +8159,18 @@ function HeyawakeAssist() {
         let qnum = room.top.qnum;
         if (qnum === CQNUM.none || qnum === CQNUM.quesmark) { return; }
         let list = Array.from(room.clist);
+        // (4^n-1)/3 black cells in 2^n-1 * 2^n-1 square
+        if (Math.sqrt(list.length) % 1 === 0) {
+            let n = Math.sqrt(list.length);
+            let tc = room.top;
+            if ((n & (n + 1)) === 0 && qnum * 3 === (n + 1) ** 2 - 1 && list.every(c => c.bx >= tc.bx && c.bx < tc.bx + n * 2 && c.by >= tc.by && c.by < tc.by + n * 2)) {
+                list.forEach(c => {
+                    let i = (c.bx - tc.bx) / 2 + 1, j = (c.by - tc.by) / 2 + 1;
+                    if ((~i & (i - 1)) === (~j & (j - 1))) { add_black(c); }
+                    else { add_green(c); }
+                });
+            }
+        }
         let surlist = [];
         let sitcnt = 0;
         let cst = new Map();
@@ -8145,7 +8181,7 @@ function HeyawakeAssist() {
         });
         if (qnum === list.filter(c => isBlack(c)).length) {
             list.forEach(c => add_green(c));
-            return
+            return;
         }
         // randomly chosen approximate formula
         if (list.filter(c => c.qans === CQANS.none && c.qsub === CQSUB.none).length > MAXAREA &&
