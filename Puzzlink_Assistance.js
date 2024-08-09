@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.8.8.1
+// @version      24.8.9.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -1144,6 +1144,7 @@ function CellConnected_InRegion({ isShaded, isUnshaded, add_shaded, add_unshaded
             }
             // unshade blank parts smaller than clue
             let cset = new Set();
+            let blkcnt = 0;
             clist.forEach(c => {
                 if (isUnshaded(c) || cset.has(c)) { return; }
                 let list = [];
@@ -1156,7 +1157,7 @@ function CellConnected_InRegion({ isShaded, isUnshaded, add_shaded, add_unshaded
                 dfs(c);
                 if (list.length < room.top.qnum) {
                     list.forEach(c => add_unshaded(c));
-                }
+                } else { blkcnt++; }
             });
             // unshade cells out of reach
             if (clist.some(c => isShaded(c))) {
@@ -1172,25 +1173,27 @@ function CellConnected_InRegion({ isShaded, isUnshaded, add_shaded, add_unshaded
                 clist.forEach(c => !cset.has(c) ? add_unshaded(c) : null);
             }
             // find shaded cell without given shaded cell
-            clist.forEach(c => {
-                if (isUnshaded(c) || isShaded(c)) { return; }
-                let fn = c => c.isnull || c.room !== room || isUnshaded(c);
-                if (!([0, 1, 2, 3].some(d => fn(offset(c, -1, 0, d)) && [-1, 0, 1].some(y => fn(offset(c, 1, y, d))) ||
-                    fn(offset(c, -1, -1, d)) && [[1, -1], [1, 0], [1, 1], [0, 1], [-1, 1]].some(([x, y]) => fn(offset(c, x, y, d)))))) { return; }
-                let cset;
-                let dfs = function (cc) {
-                    if (fn(cc) || cset.has(cc) || cc === c) { return; }
-                    cset.add(cc);
-                    fourside(dfs, cc.adjacent);
-                };
-                if (adjlist(c.adjacent).every(nc => {
-                    cset = new Set();
-                    dfs(nc);
-                    return cset.size < room.top.qnum;
-                })) {
-                    add_shaded(c);
-                }
-            });
+            if (blkcnt === 1) {
+                clist.forEach(c => {
+                    if (isUnshaded(c) || isShaded(c)) { return; }
+                    let fn = c => c.isnull || c.room !== room || isUnshaded(c);
+                    if (!([0, 1, 2, 3].some(d => fn(offset(c, -1, 0, d)) && [-1, 0, 1].some(y => fn(offset(c, 1, y, d))) ||
+                        fn(offset(c, -1, -1, d)) && [[1, -1], [1, 0], [1, 1], [0, 1], [-1, 1]].some(([x, y]) => fn(offset(c, x, y, d)))))) { return; }
+                    let cset;
+                    let dfs = function (cc) {
+                        if (fn(cc) || cset.has(cc) || cc === c) { return; }
+                        cset.add(cc);
+                        fourside(dfs, cc.adjacent);
+                    };
+                    if (adjlist(c.adjacent).every(nc => {
+                        cset = new Set();
+                        dfs(nc);
+                        return cset.size < room.top.qnum;
+                    })) {
+                        add_shaded(c);
+                    }
+                });
+            }
         });
     }
 }
