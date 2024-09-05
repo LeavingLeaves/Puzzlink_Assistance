@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.8.9.1
+// @version      24.9.5.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -127,6 +127,8 @@ const GENRELIST = [
     ["Aquapelago", AquapelagoAssist],
     ["Ayeheya", AyeheyaAssist],
     ["Barns", BarnsAssist],
+    ["Bosanowa", BosanowaAssist],
+    ["Bosnian Road", BosnianRoadAssist],
     ["Canal View", CanalViewAssist],
     ["Castle Wall", CastleWallAssist],
     ["Cave", CaveAssist],
@@ -145,6 +147,7 @@ const GENRELIST = [
     ["Goats and Wolves", GoatsAndWolvesAssist],
     ["Guide Arrow", GuideArrowAssist],
     ["Hashiwokakero", HashiwokakeroAssist],
+    ["Herugolf", HerugolfAssist],
     ["Heyablock", HeyablockAssist],
     ["Heyawake", HeyawakeAssist],
     ["Hitori", HitoriAssist],
@@ -159,6 +162,7 @@ const GENRELIST = [
     ["Litherslink", LitherslinkAssist],
     ["LITS", LitsAssist],
     ["Look-Air", LookAirAssist],
+    ["Martini", MartiniAssist],
     ["Masyu", MasyuAssist],
     ["Mid-loop", MidloopAssist],
     ["Minarism", MinarismAssist],
@@ -187,6 +191,7 @@ const GENRELIST = [
     ["Rail Pool", RailPoolAssist],
     ["Regional Yajilin", RegionalYajilinAssist],
     ["Ring-ring", RingringAssist],
+    ["Ripple Effect", RippleEffectAssist],
     ["Sashigane", SashiganeAssist],
     ["School Trip", SchoolTripAssist],
     ["Shakashaka", ShakashakaAssist],
@@ -196,6 +201,7 @@ const GENRELIST = [
     ["Slalom", SlalomAssist],
     ["Slant", SlantAssist],
     ["Slitherlink", SlitherlinkAssist],
+    ["Snake", SnakeAssist],
     ["Square Jam", SquareJamAssist],
     ["Star Battle", StarbattleAssist],
     ["Stostone", StostoneAssist],
@@ -211,6 +217,7 @@ const GENRELIST = [
     ["Tetrominous", TetrominousAssist],
     ["Tilepaint", TilepaintAssist],
     ["Tren", TrenAssist],
+    ["Wall Logic", WallLogicAssist],
     ["Yajilin", YajilinAssist],
     ["Yajisan-Kazusan", YajisanKazusanAssist],
     ["Yin-Yang", YinyangAssist],
@@ -616,8 +623,9 @@ let add_sudokunum = function (c, n) {
     c.draw();
 }
 let add_candidate = function (c, l) {
-    if (c.isnull || c.anum !== -1) { return; }
+    if (c.isnull || c.anum !== CANUM.none) { return; }
     l = Array.from(new Set(l.filter(n => n !== -1))).sort((a, b) => a - b);
+    if (c.snum.some(n => n !== -1)) { l = l.filter(n => c.snum.includes(n)); }
     // i tried to add more number in snum but something weird keeps happening
     if (l.length === 0 || l.length > 4) { return; }
     if (l.length === 1) { add_sudokunum(c, l[0]); return; }
@@ -2522,6 +2530,381 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function BosanowaAssist() {
+    let add_bn = function (b, n) {
+        if (b === undefined || b.isnull || b.qsub !== -1) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        b.setQsub(n);
+        b.draw();
+    };
+    forEachCell(cell => {
+        if (cell.ques !== 0) { return; }
+        if (cell.qnum !== CQNUM.none) { add_number(cell, cell.qnum); }
+        adjlist(cell.adjborder, cell.adjacent).forEach(([nb, nc]) => {
+            if (!nc.isnull && cell.anum !== CANUM.none && nc.anum !== CANUM.none) {
+                add_bn(nb, Math.abs(cell.anum - nc.anum));
+            }
+        });
+        let n = 0;
+        adjlist(cell.adjborder, cell.adjacent).forEach(([nb, nc]) => {
+            if (!nc.isnull && nc.ques === 0 && nb.qsub !== -1) {
+                n += nb.qsub;
+            }
+        });
+        if (adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => nc.isnull || nc.ques !== 0 || nb.qsub !== -1)) {
+            add_number(cell, n);
+        }
+        if (cell.anum !== CANUM.none && adjlist(cell.adjborder, cell.adjacent).filter(([nb, nc]) => !nc.isnull && nc.ques === 0 && nb.qsub === -1).length === 1) {
+            let [nb, nc] = adjlist(cell.adjborder, cell.adjacent).find(([nb, nc]) => !nc.isnull && nc.ques === 0 && nb.qsub === -1);
+            add_bn(nb, cell.anum - n);
+        }
+        for (let d = 0; d < 4; d++) {
+            let nb = offset(cell, .5, 0, d);
+            let nc = offset(cell, 1, 0, d);
+            if (cell.anum !== CANUM.none && nb.qsub !== -1 && cell.anum < nb.qsub * 2) {
+                add_number(nc, cell.anum + nb.qsub);
+            }
+            if (cell.anum !== CANUM.none && nb.qsub === 0) {
+                add_number(nc, cell.anum);
+            }
+        }
+    });
+}
+
+function RippleEffectAssist() {
+    forEachCell(cell => {
+        if (cell.qnum !== CQNUM.none) { add_sudokunum(cell, cell.qnum); }
+        if (cell.anum !== CANUM.none) { return; }
+        let cand = new Array(cell.room.clist.length).fill(0).map((_, i) => i + 1);
+        let t = Array.from(cell.room.clist).map(c => c.anum);
+        cand = cand.filter(n => !t.includes(n));
+        for (let d = 0; d < 4; d++) {
+            for (let i = 1; !offset(cell, i, 0, d).isnull; i++) {
+                if (offset(cell, i, 0, d).anum < i) { continue; }
+                cand = cand.filter(n => n !== offset(cell, i, 0, d).anum);
+            }
+        }
+        let fn = function (clist) {
+            let a = new Array(cell.room.clist.length).fill(0).map((_, i) => i + 1);
+            clist.forEach((c, i) => {
+                if (cell === c || c.isnull) { return; }
+                let b = c.anum === -1 && c.snum.every(n => n === -1);
+                a = b ? [] : a.filter(n => n !== c.anum && !c.snum.includes(n));
+                if (c.anum !== -1) { cand = cand.filter(n => n !== c.anum); }
+                if (c.anum === -1 && c.snum.filter(n => n !== -1).length > 0) {
+                    for (let j = i + 1; j < clist.length; j++) {
+                        let c2 = clist[j];
+                        if (cell === c2 || c2.isnull || c2.anum !== -1 || c2.snum.every(n => n === -1)) { continue; }
+                        let l2 = new Set([...c.snum, ...c2.snum].filter(n => n !== -1));
+                        if (l2.size === 2) {
+                            cand = cand.filter(n => !l2.has(n));
+                        }
+                        for (let k = j + 1; k < clist.length; k++) {
+                            let c3 = clist[k];
+                            if (cell === c3 || c3.isnull || c3.anum !== -1 || c3.snum.every(n => n === -1)) { continue; }
+                            let l3 = new Set([...c.snum, ...c2.snum, ...c3.snum].filter(n => n !== -1));
+                            if (l3.size === 3) {
+                                cand = cand.filter(n => !l3.has(n));
+                            }
+                            for (let l = k + 1; l < clist.length; l++) {
+                                let c4 = clist[l];
+                                if (cell === c4 || c4.isnull || c4.anum !== -1 || c4.snum.every(n => n === -1)) { continue; }
+                                let l4 = new Set([...c.snum, ...c2.snum, ...c3.snum, ...c4.snum].filter(n => n !== -1));
+                                if (l4.size === 4) {
+                                    cand = cand.filter(n => !l4.has(n));
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            if (a.length === 1) { add_sudokunum(cell, a[0]); }
+        }
+        fn(Array.from(cell.room.clist));
+        add_candidate(cell, cand);
+    });
+}
+
+function HerugolfAssist() {
+    forEachCell(cell => {
+        if (cell.qnum === CQNUM.none) { return; }
+        let fn = function (c, d, x) {
+            if (c.qnum !== CQNUM.none && c.lcnt === 1 && !isLine(offset(c, .5, 0, d))) { return false; }
+            if (c.qnum === CQNUM.none && c.lcnt === 2 && !isLine(offset(c, .5, 0, d))) { return false; }
+            for (let i = 1; i <= x; i++) {
+                let nc = offset(c, i, 0, d);
+                if (nc.qnum !== CQNUM.none) { return false; }
+                if (i < x && nc.ques === 31) { return false; }
+                if (i < x && (isLine(offset(nc, 0, -.5, d)) || isLine(offset(nc, 0, +.5, d)))) { return false; }
+                if (i === x) {
+                    if (nc.ques === 6) { return false; }
+                    if (x === 1 && nc.ques !== 31) { return false; }
+                    if (nc.lcnt === 2 && !isLine(offset(c, i - .5, 0, d))) { return false; }
+                    if (nc.ques === 31 && nc.lcnt === 1 && !isLine(offset(c, i - .5, 0, d))) { return false; }
+                }
+            }
+            return true;
+        }
+        let cand = [];
+        let dfs = function (c, n, p, clist) {
+            if (c.ques === 31) {
+                cand.push(p);
+                return;
+            }
+            if (n === 0) { return; }
+            for (let d = 0; d < 4; d++) {
+                if (p.length !== 0 && (d + 2) % 4 === p[p.length - 1]) { continue; }
+                let l = Array(n).fill(0).map((_, i) => offset(c, i + 1, 0, d));
+                if (l.some(c => clist.includes(c))) { continue; }
+                if (fn(c, d, n)) {
+                    dfs(offset(c, n, 0, d), n - 1, [...p, d], [...clist, ...l]);
+                }
+            }
+        }
+        dfs(cell, cell.qnum, [], [cell]);
+        let c = cell, n = cell.qnum;
+        for (let i = 0; cand.length > 0 && cand.every(s => s.length > i && s[i] === cand[0][i]); i++) {
+            for (let k = 0; k < n; k++) {
+                add_line(offset(c, .5 + k, 0, cand[0][i]));
+            }
+            c = offset(c, n, 0, cand[0][i]);
+            n--;
+        }
+    });
+}
+
+function MartiniAssist() {
+    BlackNotAdjacent_OverBorder();
+    BlackConnected_InRegion();
+    CellConnected({
+        isShaded: isBlack,
+        isUnshaded: isGreen,
+        add_shaded: add_black,
+        add_unshaded: add_green,
+        DiagDir: true,
+    });
+    forEachCell(cell => {
+        if (cell.qnum === 0) {
+            add_black(cell);
+            return;
+        }
+        if (cell.qnum > 0 || cell.qnum === -2) {
+            add_green(cell);
+        }
+        if (!isBlack(cell) && !isGreen(cell)) {
+            let cset = new Set();
+            let dfs = function (c) {
+                if (!isGreen(c) || cset.has(c)) { return; }
+                cset.add(c);
+                fourside(dfs, c.adjacent);
+            };
+            fourside(dfs, cell.adjacent);
+            let l = Array.from(cset).flatMap(c => c.qnum > 0 ? c.qnum : []);
+            if (l.length > 0 && l.some(n => n !== l[[0]])) {
+                add_black(cell);
+            }
+            if (l.length > 0 && Array.from(cset).filter(c => c.qnum !== CQNUM.none && c.qnum !== 0).length > l[0]) {
+                add_black(cell);
+            }
+        }
+    });
+}
+
+function WallLogicAssist() {
+    let emptycnt = board.cols * board.rows;
+    forEachCell(cell => {
+        if (cell.ques === 1) { emptycnt--; }
+        if (cell.qnum !== CQNUM.none) { emptycnt -= (cell.qnum + 1); }
+    });
+    forEachCell(cell => {
+        if (cell.qnum > 0) {
+            let ol = [0, 1, 2, 3].map(d => {
+                let n = 0, anum = [4, 1, 3, 2][d];
+                while ((c => !c.isnull && c.ques !== 1 && !isNum(c) && (c.anum === CANUM.none || c.anum === anum))(offset(cell, n + 1, 0, d))) { n++; }
+                return n;
+            });
+            for (let d = 0; d < 4; d++) {
+                for (let i = 1; i <= cell.qnum - ol.reduce((a, b) => a + b) + ol[d]; i++) {
+                    add_number(offset(cell, i, 0, d), [4, 1, 3, 2][d]);
+                }
+            }
+        }
+        if (emptycnt === 0 && cell.qnum === CQNUM.none && cell.ques !== 1 && cell.anum === CANUM.none) {
+            let cl = [0, 1, 2, 3].map(d => {
+                let n = 1;
+                while ((c => !c.isnull && c.ques !== 1 && c.qnum === CQNUM.none && (c.anum === CANUM.none || c.anum === [3, 2, 4, 1][d]))(offset(cell, n, 0, d))) {
+                    n++;
+                }
+                let nc = offset(cell, n, 0, d);
+                if (nc.qnum <= 0) { return -1; }
+                let ol = [0, 1, 2, 3].map(d => {
+                    let n = 0, anum = [4, 1, 3, 2][d];
+                    while ((c => !c.isnull && c.anum === anum)(offset(nc, n + 1, 0, d))) { n++; }
+                    return n;
+                });
+                if (nc.qnum - ol.reduce((a, b) => a + b) + ol[(d + 2) % 4] < n) { return -1; }
+                return n;
+            });
+            if (cl.filter(n => n !== -1).length === 1) {
+                cl.forEach((n, d) => {
+                    for (let i = 0; i < n; i++) {
+                        add_number(offset(cell, i, 0, d), [3, 2, 4, 1][d]);
+                    }
+                });
+            }
+        }
+        if (cell.anum !== CANUM.none) {
+            let d = [-1, 3, 1, 0, 2][cell.anum];
+            let nc = offset(cell, 1, 0, d);
+            if (!nc.isNull && !isNum(nc)) {
+                add_number(nc, cell.anum);
+            }
+        }
+    });
+}
+
+function BosnianRoadAssist() {
+    let isntBlack = c => c.isnull || isDot(c) || c.qnum !== CQNUM.none;
+    forEachCell(cell => {
+        let clist = [[-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1], [0, -1]].map(([x, y]) => offset(cell, x, y));
+        if (cell.qnum >= 0) {
+            NShadeInClist({
+                isUnshaded: isntBlack,
+                add_unshaded: add_dot,
+                n: cell.qnum,
+                clist: clist,
+            });
+        }
+        if (isBlack(cell)) {
+            NShadeInClist({
+                isUnshaded: isntBlack,
+                add_unshaded: add_dot,
+                n: 2,
+                clist: adjlist(cell.adjacent),
+            });
+        }
+        if (adjlist(cell.adjacent).filter(c => isntBlack(c)).length >= 3) {
+            add_dot(cell);
+        }
+        if (adjlist(cell.adjacent).filter(c => isBlack(c)).length >= 3) {
+            add_dot(cell);
+        }
+        if (board.sblkmgr.components.length > 1 && clist.some((c1, i) => !c1.isnull && c1.sblk !== null && clist.some((c2, j) => Math.abs(i - j) > 1 && Math.abs(i - j) < 7 && c1.sblk === c2.sblk))) {
+            add_dot(cell);
+        }
+        for (let d = 0; d < 4; d++) {
+            if (isBlack(offset(cell, 1, 0, d)) && isBlack(offset(cell, 0, 1, d)) && isntBlack(offset(cell, 1, 1, d))) {
+                add_black(cell);
+            }
+            if (isBlack(offset(cell, 1, 0, d)) && isBlack(offset(cell, 0, 1, d)) && isBlack(offset(cell, -1, -1, d))) {
+                add_dot(cell);
+            }
+            if (isBlack(offset(cell, 1, 1, d)) && isBlack(offset(cell, 1, -1, d)) && isBlack(offset(cell, -1, 0, d))) {
+                add_dot(cell);
+            }
+            if (isBlack(offset(cell, 1, 1, d)) && isBlack(offset(cell, 1, -1, d)) && isBlack(offset(cell, -1, 1, d))) {
+                add_dot(cell);
+            }
+            if (isBlack(offset(cell, 1, 1, d)) && (isntBlack(offset(cell, 1, 0, d)) && isntBlack(offset(cell, 0, 1, d)) ||
+                isBlack(offset(cell, 1, 0, d)) && isBlack(offset(cell, 0, 1, d)))) {
+                add_dot(cell);
+            }
+            if ([[-1, 0], [0, -1], [1, -1], [2, 0]].every(([x, y]) => isntBlack(offset(cell, x, y, d)))) {
+                add_dot(cell);
+            }
+        }
+    });
+}
+
+function SnakeAssist() {
+    let isntBlack = c => c.isnull || isDot(c) || c.bx < 0 || c.by < 0;
+    CellConnected({
+        isShaded: isBlack,
+        isUnshaded: isntBlack,
+        add_shaded: add_black,
+        add_unshaded: add_dot,
+    });
+    let heads = [];
+    forEachCell(cell => {
+        if (cell.qnum === 2 || isBlack(cell) && adjlist(cell.adjacent).filter(c => isntBlack(c)).length === 3) {
+            heads.push(cell);
+        }
+    });
+    for (let i = 1; i < board.cols * 2; i += 2) {
+        let l = [];
+        for (let j = 1; j < board.rows * 2; j += 2) {
+            l.push(board.getc(i, j));
+        }
+        NShadeInClist({
+            isUnshaded: isntBlack,
+            add_unshaded: add_dot,
+            n: board.getex(i, -1).qnum,
+            clist: l,
+        });
+    }
+    for (let j = 1; j < board.rows * 2; j += 2) {
+        let l = [];
+        for (let i = 1; i < board.cols * 2; i += 2) {
+            l.push(board.getc(i, j));
+        }
+        NShadeInClist({
+            isUnshaded: isntBlack,
+            add_unshaded: add_dot,
+            n: board.getex(-1, j).qnum,
+            clist: l,
+        });
+    }
+    forEachCell(cell => {
+        let clist = [[-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1], [0, -1]].map(([x, y]) => offset(cell, x, y));
+        if (cell.qnum !== CQNUM.none) { add_black(cell); }
+        if (cell.qnum === 1 || isBlack(cell) && heads.length === 2 && !heads.includes(cell)) {// white
+            NShadeInClist({
+                isUnshaded: isntBlack,
+                add_unshaded: add_dot,
+                n: 2,
+                clist: adjlist(cell.adjacent),
+            });
+        }
+        if (cell.qnum === 2) {// black
+            NShadeInClist({
+                isUnshaded: isntBlack,
+                add_unshaded: add_dot,
+                n: 1,
+                clist: adjlist(cell.adjacent),
+            });
+        }
+        if (isBlack(cell) && adjlist(cell.adjacent).filter(c => isBlack(c)).length === 2) {
+            adjlist(cell.adjacent).forEach(c => add_dot(c));
+        }
+        if (adjlist(cell.adjacent).filter(c => isBlack(c)).length >= 3) {
+            adjlist(cell.adjacent).forEach(c => add_dot(c));
+            add_dot(cell);
+        }
+        if (board.sblkmgr.components.length > 1 && clist.some((c1, i) => !c1.isnull && c1.sblk !== null && c1.sblk !== undefined && clist.some((c2, j) => Math.abs(i - j) > 1 && Math.abs(i - j) < 7 && c1.sblk === c2.sblk))) {
+            add_dot(cell);
+        }
+        for (let d = 0; d < 4; d++) {
+            if (isBlack(offset(cell, 1, 0, d)) && isBlack(offset(cell, 0, 1, d)) && isntBlack(offset(cell, 1, 1, d))) {
+                add_black(cell);
+            }
+            if (isBlack(offset(cell, 1, 0, d)) && isBlack(offset(cell, 0, 1, d)) && isBlack(offset(cell, -1, -1, d))) {
+                add_dot(cell);
+            }
+            if (isBlack(offset(cell, 1, 1, d)) && isBlack(offset(cell, 1, -1, d)) && isBlack(offset(cell, -1, 0, d))) {
+                add_dot(cell);
+            }
+            if (isBlack(offset(cell, 1, 1, d)) && isBlack(offset(cell, 1, -1, d)) && isBlack(offset(cell, -1, 1, d))) {
+                add_dot(cell);
+            }
+            if (isBlack(offset(cell, 1, 1, d)) && (isntBlack(offset(cell, 1, 0, d)) && isntBlack(offset(cell, 0, 1, d)) ||
+                isBlack(offset(cell, 1, 0, d)) && isBlack(offset(cell, 0, 1, d)))) {
+                add_dot(cell);
+            }
+        }
+    });
+}
+
 function LookAirAssist() {
     RectRegion_Cell({
         isShaded: isBlack,
@@ -3334,27 +3717,51 @@ function TentsAssist() {
             add_dot(cell);
         }
     });
+    let fn = function (clist, qnum) {
+        if (qnum === CQNUM.none) { return; }
+        clist = clist.filter(c => !c.isnull && !isDot(c) && c.qnum === CQNUM.none);
+        if (clist.filter(c => c.anum === 2).length === qnum) {
+            clist.forEach(c => add_dot(c));
+        }
+        for (let i = 0; i < clist.length; i++) {
+            if (offset(clist[i], 1, 0) === clist[i + 1] || offset(clist[i], 0, 1) === clist[i + 1]) {
+                clist[i] = [clist[i], clist[i + 1]];
+                clist.splice(i + 1, 1);
+            } else {
+                clist[i] = [clist[i]];
+            }
+        }
+        if (clist.length === qnum) {
+            clist.forEach(l => {
+                if (l.length === 1) {
+                    add_tent(l[0]);
+                }
+                if (l.length === 2) {
+                    if (offset(l[0], 1, 0) === l[1]) {
+                        [[0, -1], [0, 1], [1, -1], [1, 1]].forEach(([x, y]) => add_dot(offset(l[0], x, y)));
+                    }
+                    if (offset(l[0], 0, 1) === l[1]) {
+                        [[-1, 0], [1, 0], [-1, 1], [1, 1]].forEach(([x, y]) => add_dot(offset(l[0], x, y)));
+                    }
+                }
+            });
+        }
+    }
     for (let i = 0; i < board.cols; i++) {
         let qnum = board.getobj(i * 2 + 1, -1).qnum;
-        if (qnum === CQNUM.none) { continue; }
         let clist = [];
         for (let j = 0; j < board.rows; j++) {
             clist.push(board.getc(i * 2 + 1, j * 2 + 1));
         }
-        if (clist.filter(c => c.anum === 2).length === qnum) {
-            clist.forEach(c => add_dot(c));
-        }
+        fn(clist, qnum);
     }
     for (let j = 0; j < board.rows; j++) {
         let qnum = board.getobj(-1, j * 2 + 1).qnum;
-        if (qnum === CQNUM.none) { continue; }
         let clist = [];
         for (let i = 0; i < board.cols; i++) {
             clist.push(board.getc(i * 2 + 1, j * 2 + 1));
         }
-        if (clist.filter(c => c.anum === 2).length === qnum) {
-            clist.forEach(c => add_dot(c));
-        }
+        fn(clist, qnum);
     }
 }
 
@@ -4124,6 +4531,35 @@ function DoubleChocoAssist() {
         isSideable: (c, nb, nc) => c.ques === nc.ques,
     });
     let cset = new Set();
+    forEachCell(cell => {
+        let clist = [];
+        if (cset.has(cell)) { return; }
+        let dfs = function (c) {
+            if (clist.includes(c)) { return; }
+            clist.push(c);
+            cset.add(c);
+            fourside((nb, nc) => {
+                if (!isSide(nb) && !nc.isnull && c.ques === nc.ques) {
+                    dfs(nc);
+                }
+            }, c.adjborder, c.adjacent);
+        };
+        dfs(cell);
+        let ncset = new Set();
+        clist.forEach(c => adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+            if (!isSide(nb) && !nc.isnull && c.ques !== nc.ques) {
+                ncset.add(nc);
+            }
+        }));
+        if (ncset.size === 1) {
+            clist.forEach(c => adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+                if (!isSide(nb) && clist.includes(nc)) {
+                    add_link(nb);
+                }
+            }));
+        }
+    });
+    cset = new Set();
     forEachCell(cell => {
         let clist = [];
         if (cset.has(cell)) { return; }
@@ -7830,6 +8266,12 @@ function NothreeAssist() {
                     add_green(templist1[0]);
                 }
             }
+            if (offset(cell, 1.5, 0, d).qnum === 1 && offset(cell, 3.5, 0, d).qnum === 1) {
+                add_green(cell);
+            }
+            if (offset(cell, 1.5, 0, d).qnum === 1 && offset(cell, -1.5, 0, d).qnum === 1) {
+                add_green(cell);
+            }
         }
     });
 }
@@ -8016,33 +8458,49 @@ function ShakashakaAssist() {
             if (!isTriAble(offset(cell, +0, -1, ndir), ndir + 3)) { add_tri(offset(cell, -1, -1, ndir), ndir + 0); }
             if (!isTriAble(offset(cell, +1, +1, ndir), ndir + 0)) { add_tri(offset(cell, +1, +0, ndir), ndir + 1); }
             if (!isTriAble(offset(cell, +1, +0, ndir), ndir + 1)) { add_tri(offset(cell, +1, +1, ndir), ndir + 0); }
+            // opposite side
             // ＿〓＿    ＿＿〓    ＿＿＿    ＿＿＿
             // ＿＿＿ or ＿＿＿ or ＿＿〓 -> ＿◥＿
             // ◣＿＿    ◣＿＿    ◣＿＿    ◣＿＿
-            if (isEdgeEx(offset(cell, 2, -1, ndir), ndir) || isEdgeEx(offset(cell, 1, -2, ndir), ndir + 1) ||
-                isEdgeEx(offset(cell, 2, -2, ndir), ndir) || isEdgeEx(offset(cell, 2, -2, ndir), ndir + 1)) {
-                add_tri(offset(cell, 1, -1, ndir), ndir + 2);
+            let opc = offset(cell, 1, -1, ndir);
+            while (isDot(opc)) { opc = offset(opc, 1, -1, ndir); }
+            if (isEdgeEx(offset(opc, 1, 0, ndir), ndir) || isEdgeEx(offset(opc, 0, -1, ndir), ndir + 1) ||
+                isEdgeEx(offset(opc, 1, -1, ndir), ndir) || isEdgeEx(offset(cell, 1, -1, ndir), ndir + 1)) {
+                add_tri(opc, ndir + 2);
             }
-            // rectangle opposite side extend
+            // rectangle opposite side extend (also add dot in slant rectangle)
             // ＿◤＿    ＿◤＿
             // ◤＿＿ -> ◤＿◢
             // ◣◢＿    ◣◢＿
             let tri = [(ndir + 0) % 4 + 2, (ndir + 1) % 4 + 2, (ndir + 2) % 4 + 2, (ndir + 3) % 4 + 2];
             let turn1 = offset(cell, 0, -1, ndir);
-            let turn2 = cell;
+            let turn2 = cell, l = 0;
             while (!offset(turn2, 1, 1, ndir).isnull && offset(turn2, 1, 1, ndir).qans === tri[0]) {
                 turn2 = offset(turn2, 1, 1, ndir);
+                l++;
             }
             turn2 = offset(turn2, 1, 0, ndir);
             if (turn1.qans === tri[3] && turn2.qans === tri[1]) {
+                for (let i = 1; i <= l; i++) { add_dot(offset(turn1, i, i, ndir)); }
                 turn1 = offset(turn1, 1, -1, ndir);
                 turn2 = offset(turn2, 1, -1, ndir);
                 while ((!turn1.isnull && turn1.qans === tri[3]) || (!turn2.isnull && turn2.qans === tri[1])) {
                     add_tri(turn1, ndir + 3);
                     add_tri(turn2, ndir + 1);
+                    for (let i = 0; i <= l; i++) {
+                        add_dot(offset(turn1, i, i, ndir));
+                        add_dot(offset(turn1, i, i + 1, ndir));
+                    }
                     turn1 = offset(turn1, 1, -1, ndir);
                     turn2 = offset(turn2, 1, -1, ndir);
                 }
+            }
+            while ((!turn1.isnull && turn1.qans === tri[3])) {
+                for (let i = 0; i <= l; i++) {
+                    add_dot(offset(turn1, i, i, ndir));
+                    add_dot(offset(turn1, i, i + 1, ndir));
+                }
+                turn1 = offset(turn1, 1, -1, ndir);
             }
         }
     });

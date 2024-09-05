@@ -20,6 +20,8 @@ Currently enhanced genre:
 * Aquapelago
 * Ayeheya
 * Barns
+* Bosanowa
+* Bosnian Road
 * Canal View
 * Castle Wall
 * Cave
@@ -38,6 +40,7 @@ Currently enhanced genre:
 * Goats and Wolves
 * Guide Arrow
 * Hashiwokakero
+* Herugolf
 * Heyablock
 * Heyawake
 * Hitori
@@ -52,6 +55,7 @@ Currently enhanced genre:
 * Litherslink
 * LITS
 * Look-Air
+* Martini
 * Masyu
 * Mid-loop
 * Minarism
@@ -80,6 +84,7 @@ Currently enhanced genre:
 * Rail Pool
 * Regional Yajilin
 * Ring-ring
+* Ripple Effect
 * Sashigane
 * School Trip
 * Shakashaka
@@ -89,6 +94,7 @@ Currently enhanced genre:
 * Slalom
 * Slant
 * Slitherlink
+* Snake
 * Square Jam
 * Star Battle
 * Stostone
@@ -104,6 +110,7 @@ Currently enhanced genre:
 * Tetrominous
 * Tilepaint
 * Tren
+* Wall Logic
 * Yajilin
 * Yajisan-Kazusan
 * Yin-Yang
