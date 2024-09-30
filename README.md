@@ -77,11 +77,13 @@ Currently enhanced genre:
 * Nurimisaki
 * One Room One Door
 * Paintarea
+* Parquet
 * Pencils
 * Pentominous
 * Pipelink
 * Putteria
 * Rail Pool
+* Rassi Silai
 * Regional Yajilin
 * Ring-ring
 * Ripple Effect
