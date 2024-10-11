@@ -22,10 +22,12 @@ Currently enhanced genre:
 * Barns
 * Bosanowa
 * Bosnian Road
+* Box
 * Canal View
 * Castle Wall
 * Cave
 * Choco Banana
+* Chocona
 * Circles and Squares
 * Cocktail Lamp
 * Country Road
@@ -41,12 +43,15 @@ Currently enhanced genre:
 * Guide Arrow
 * Hashiwokakero
 * Herugolf
+* Heteromino
 * Heyablock
 * Heyawake
 * Hitori
 * Icebarn
 * Icelom
 * Inverse LITSO
+* Islands
+* Juosan
 * Kakuro
 * Koburin
 * Kropki

@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.9.30.1
+// @version      24.10.11.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -129,10 +129,12 @@ const GENRELIST = [
     ["Barns", BarnsAssist],
     ["Bosanowa", BosanowaAssist],
     ["Bosnian Road", BosnianRoadAssist],
+    ["Box", BoxAssist],
     ["Canal View", CanalViewAssist],
     ["Castle Wall", CastleWallAssist],
     ["Cave", CaveAssist],
     ["Choco Banana", ChocoBananaAssist],
+    ["Chocona", ChoconaAssist],
     ["Circles and Squares", CirclesAndSquaresAssist],
     ["Cocktail Lamp", CocktailLampAssist],
     ["Country Road", CountryRoadAssist],
@@ -148,12 +150,15 @@ const GENRELIST = [
     ["Guide Arrow", GuideArrowAssist],
     ["Hashiwokakero", HashiwokakeroAssist],
     ["Herugolf", HerugolfAssist],
+    ["Heteromino", HeterominoAssist],
     ["Heyablock", HeyablockAssist],
     ["Heyawake", HeyawakeAssist],
     ["Hitori", HitoriAssist],
     ["Icebarn", IcebarnAssist],
     ["Icelom", IcelomAssist],
     ["Inverse LITSO", InverseLitsoAssist],
+    ["Islands", IslandsAssist],
+    ["Juosan", JuosanAssist],
     ["Kakuro", KakuroAssist],
     ["Koburin", KoburinAssist],
     ["Kropki", KropkiAssist],
@@ -164,6 +169,7 @@ const GENRELIST = [
     ["Look-Air", LookAirAssist],
     ["Martini", MartiniAssist],
     ["Masyu", MasyuAssist],
+    ["Mejilink", MejilinkAssist],
     ["Mid-loop", MidloopAssist],
     ["Minarism", MinarismAssist],
     ["Minesweeper", MinesweeperAssist],
@@ -442,7 +448,7 @@ let isGreen = c => !c.isnull && c.qsub === CQSUB.green;
 let isDot = isGreen;
 let isIce = c => !c.isnull && c.ques === CQUES.ice && ["Barns", "Icebarn", "Icelom"].includes(GENRENAME);
 let isNum = c => c.qnum !== CQNUM.none && c.qnum !== CQNUM.quesmark;
-let isSide = b => !b.isnull && (b.qans === 1 || !b.inside);
+let isSide = b => !b.isnull && (b.qans === 1 || !b.inside || b.ques === 1 || b.sidecell.some(c => c.ques === CQUES.wall));
 let isLink = b => !b.isnull && b.qsub === BQSUB.link;
 let isLine = b => !b.isnull && b.line === 1;
 let isntLine = b => b.isnull || b.qsub === BQSUB.cross;
@@ -488,7 +494,7 @@ let dir = function (c, d) {
 let qdirRemap = function (qdir) {
     return [-1, 0, 2, 1, 3][qdir];
 }
-let getShape = function (clist) {
+let getShape = function (clist, rot = true) {
     let minx = board.maxbx, miny = board.maxby, maxx = board.minbx, maxy = board.minby;
     for (let i = 0; i < clist.length; i++) {
         minx = Math.min(minx, clist[i].bx);
@@ -503,6 +509,7 @@ let getShape = function (clist) {
             s[1].push(clist.includes(board.getc(minx + x, maxy - y)) ? 1 : 0);
         }
     }
+    if (!rot) { return s[0]; }
     for (let x = 0; x <= maxx - minx; x += 2) {
         for (let y = 0; y <= maxy - miny; y += 2) {
             s[4].push(clist.includes(board.getc(minx + x, miny + y)) ? 1 : 0);
@@ -673,6 +680,69 @@ function NShadeInClist({ isShaded = isBlack, isUnshaded = isGreen, add_shaded = 
     }
     if (clist.filter(c => !isUnshaded(c)).length === n) {
         clist.filter(c => !isUnshaded(c)).forEach(c => add_shaded(c));
+    }
+}
+function NShadeConnectedInRoom({ isShaded = isBlack, isUnshaded = isGreen, add_shaded = add_black, add_unshaded = add_green, room, qnum } = {}) {
+    if (qnum < 0) { return; }
+    let clist = Array.from(room.clist);
+    if (qnum === 0) {
+        clist.forEach(c => add_unshaded(c));
+        return;
+    }
+    if (clist.filter(c => !isUnshaded(c)).length === qnum) {
+        clist.filter(c => !isUnshaded(c)).forEach(c => add_shaded(c));
+    }
+    // unshade blank parts smaller than clue
+    let cset = new Set();
+    let blkcnt = 0;
+    clist.forEach(c => {
+        if (isUnshaded(c) || cset.has(c)) { return; }
+        let list = [];
+        let dfs = function (c) {
+            if (c.isnull || isUnshaded(c) || !clist.includes(c) || cset.has(c)) { return; }
+            cset.add(c);
+            list.push(c);
+            fourside(dfs, c.adjacent);
+        };
+        dfs(c);
+        if (list.length < qnum) {
+            list.forEach(c => add_unshaded(c));
+        } else { blkcnt++; }
+    });
+    // unshade cells out of reach
+    if (clist.some(c => isShaded(c))) {
+        let cset = new Set();
+        let t = qnum - clist.filter(c => isShaded(c)).length;
+        let queue = clist.flatMap(c => isShaded(c) ? [[c, t]] : []);
+        while (queue.length > 0) {
+            let [c, t] = queue.shift();
+            if (c.room !== room || t < 0 || cset.has(c)) { continue; }
+            cset.add(c);
+            fourside(nc => queue.push([nc, t - 1]), c.adjacent);
+        }
+        clist.forEach(c => !cset.has(c) ? add_unshaded(c) : null);
+    }
+    // find shaded cell without given shaded cell
+    if (blkcnt === 1) {
+        clist.forEach(c => {
+            if (isUnshaded(c) || isShaded(c)) { return; }
+            let fn = c => c.isnull || c.room !== room || isUnshaded(c);
+            if (!([0, 1, 2, 3].some(d => fn(offset(c, -1, 0, d)) && [-1, 0, 1].some(y => fn(offset(c, 1, y, d))) ||
+                fn(offset(c, -1, -1, d)) && [[1, -1], [1, 0], [1, 1], [0, 1], [-1, 1]].some(([x, y]) => fn(offset(c, x, y, d)))))) { return; }
+            let cset;
+            let dfs = function (cc) {
+                if (fn(cc) || cset.has(cc) || cc === c) { return; }
+                cset.add(cc);
+                fourside(dfs, cc.adjacent);
+            };
+            if (adjlist(c.adjacent).every(nc => {
+                cset = new Set();
+                dfs(nc);
+                return cset.size < qnum;
+            })) {
+                add_shaded(c);
+            }
+        });
     }
 }
 function NoDeadendBorder() {
@@ -1150,66 +1220,14 @@ function CellConnected_InRegion({ isShaded, isUnshaded, add_shaded, add_unshaded
         SizeInRegion: SizeClue,
     });
     if (SizeClue) {
-        forEachRoom(room => {
-            if (room.top.qnum < 0) { return; }
-            let clist = Array.from(room.clist);
-            if (room.top.qnum === 0) {
-                clist.forEach(c => add_unshaded(c));
-                return;
-            }
-            // unshade blank parts smaller than clue
-            let cset = new Set();
-            let blkcnt = 0;
-            clist.forEach(c => {
-                if (isUnshaded(c) || cset.has(c)) { return; }
-                let list = [];
-                let dfs = function (c) {
-                    if (c.isnull || isUnshaded(c) || !clist.includes(c) || cset.has(c)) { return; }
-                    cset.add(c);
-                    list.push(c);
-                    fourside(dfs, c.adjacent);
-                };
-                dfs(c);
-                if (list.length < room.top.qnum) {
-                    list.forEach(c => add_unshaded(c));
-                } else { blkcnt++; }
-            });
-            // unshade cells out of reach
-            if (clist.some(c => isShaded(c))) {
-                let cset = new Set();
-                let t = room.top.qnum - clist.filter(c => isShaded(c)).length;
-                let queue = clist.flatMap(c => isShaded(c) ? [[c, t]] : []);
-                while (queue.length > 0) {
-                    let [c, t] = queue.shift();
-                    if (c.room !== room || t < 0 || cset.has(c)) { continue; }
-                    cset.add(c);
-                    fourside(nc => queue.push([nc, t - 1]), c.adjacent);
-                }
-                clist.forEach(c => !cset.has(c) ? add_unshaded(c) : null);
-            }
-            // find shaded cell without given shaded cell
-            if (blkcnt === 1) {
-                clist.forEach(c => {
-                    if (isUnshaded(c) || isShaded(c)) { return; }
-                    let fn = c => c.isnull || c.room !== room || isUnshaded(c);
-                    if (!([0, 1, 2, 3].some(d => fn(offset(c, -1, 0, d)) && [-1, 0, 1].some(y => fn(offset(c, 1, y, d))) ||
-                        fn(offset(c, -1, -1, d)) && [[1, -1], [1, 0], [1, 1], [0, 1], [-1, 1]].some(([x, y]) => fn(offset(c, x, y, d)))))) { return; }
-                    let cset;
-                    let dfs = function (cc) {
-                        if (fn(cc) || cset.has(cc) || cc === c) { return; }
-                        cset.add(cc);
-                        fourside(dfs, cc.adjacent);
-                    };
-                    if (adjlist(c.adjacent).every(nc => {
-                        cset = new Set();
-                        dfs(nc);
-                        return cset.size < room.top.qnum;
-                    })) {
-                        add_shaded(c);
-                    }
-                });
-            }
-        });
+        forEachRoom(room => NShadeConnectedInRoom({
+            isShaded: isShaded,
+            isUnshaded: isUnshaded,
+            add_shaded: add_shaded,
+            add_unshaded: add_unshaded,
+            room: room,
+            qnum: room.top.qnum,
+        }));
     }
 }
 function BlackConnected_InRegion(SizeClue = false) {
@@ -1594,7 +1612,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => b.qsub !==
                 // extend i/o through cross/line
                 (() => {
                     if (ncr.isnull) { return; }
-                    if (b.isnull || (!b.inside && !isLine(b)) || isCross(b)) {
+                    if (isntLine(b) || (!b.inside && !isLine(b))) {
                         add_inout(ncr, cr.qsub);
                     }
                     if (!b.isnull && isLine(b) && !hasIce) {
@@ -2537,6 +2555,154 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function ChoconaAssist() {
+    RectRegion_Cell({
+        isShaded: isBlack,
+        isUnshaded: isGreen,
+        add_shaded: add_black,
+        add_unshaded: add_green,
+    });
+    forEachRoom(room => {
+        if (room.top.qnum === CQNUM.none || room.top.qnum === CQNUM.quesmark) { return; }
+        NShadeInClist({
+            n: room.top.qnum,
+            clist: Array.from(room.clist),
+        });
+    });
+}
+
+function MejilinkAssist() {
+    forEachBorder(b => b.ques === 1 ? add_cross(b) : undefined);
+    SingleLoopInBorder();
+    for (let i = 0; i < board.tilegraph.components.length; i++) {
+        let tile = board.tilegraph.components[i];
+        if (tile.count < 0) { continue; }
+        let clist = Array.from(tile.clist);
+        let blist = [];
+        clist.forEach(c => blist.push(...adjlist(c.adjborder).filter(b => b.ques === 0)));
+        NShadeInClist({
+            isShaded: isCross,
+            isUnshaded: isLine,
+            add_shaded: add_cross,
+            add_unshaded: add_line,
+            n: clist.length,
+            clist: blist,
+        });
+    }
+}
+
+function JuosanAssist() {
+    let add_bar = function (c, n) { // 12:| 13:-
+        if (c === undefined || c.isnull || c.qans !== CQANS.none || ![12, 13].includes(n)) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setQans(n);
+        c.draw();
+    };
+    forEachCell(cell => {
+        if ([[-2, -1], [-1, 1], [1, 2]].some(l => l.every(x => (c => !c.isnull && c.qans === 12)(offset(cell, x, 0))))) {
+            add_bar(cell, 13);
+        }
+        if ([[-2, -1], [-1, 1], [1, 2]].some(l => l.every(y => (c => !c.isnull && c.qans === 13)(offset(cell, 0, y))))) {
+            add_bar(cell, 12);
+        }
+    });
+    forEachRoom(room => {
+        let qnum = room.top.qnum;
+        let clist = Array.from(room.clist);
+        if (qnum === CQNUM.none || qnum === CQNUM.quesmark) { return; }
+        if (qnum > clist.filter(c => c.qans !== 12).length || qnum * 2 === clist.length) {
+            NShadeInClist({
+                isShaded: c => c.qans === 12,
+                isUnshaded: c => c.qans === 13,
+                add_shaded: c => add_bar(c, 12),
+                add_unshaded: c => add_bar(c, 13),
+                n: qnum,
+                clist: clist,
+            });
+        }
+        if (qnum > clist.filter(c => c.qans !== 13).length) {
+            NShadeInClist({
+                isShaded: c => c.qans === 13,
+                isUnshaded: c => c.qans === 12,
+                add_shaded: c => add_bar(c, 13),
+                add_unshaded: c => add_bar(c, 12),
+                n: qnum,
+                clist: clist,
+            });
+        }
+    });
+}
+
+function IslandsAssist() {
+    CellConnected_InRegion({
+        isShaded: isBlack,
+        isUnshaded: isGreen,
+        add_shaded: add_black,
+        add_unshaded: add_green,
+        SizeClue: true,
+    });
+    BlackNotAdjacent_OverBorder();
+    forEachRoom(room => {
+        if (room.top.qnum !== CQNUM.none) { return; }
+        let clist = Array.from(room.clist);
+        let s = new Set(), t, maxn = 0, minn = Math.max(1, clist.filter(c => isBlack(c)).length);
+        let dfs = function (c) {
+            if (c.isnull || c.room !== room || isGreen(c) || s.has(c)) { return; }
+            s.add(c);
+            t++;
+            adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => !isBound(nb) ? dfs(nc) : undefined);
+        };
+        clist.forEach(c => {
+            t = 0;
+            dfs(c);
+            maxn = Math.max(maxn, t);
+        });
+        let cand = Array(maxn - minn + 1).fill(0).map((_, i) => minn + i);
+        clist.forEach(c => adjlist(c.adjacent).forEach(nc => {
+            if (nc.isnull || nc.room === room) { return; }
+            let t = nc.room.top.qnum;
+            let nclist = Array.from(nc.room.clist);
+            if (nclist.every(c => isBlack(c) || isGreen(c))) {
+                t = nclist.filter(c => isBlack(c)).length;
+            }
+            cand = cand.filter(n => n !== t);
+        }));
+        if (cand.length === 1) {
+            NShadeConnectedInRoom({ room: room, qnum: cand[0] });
+        }
+    });
+}
+
+function BoxAssist() {
+    let f = function (l, qnum) {
+        let cand = Array(1 << (l.length)).fill(0).map((_, i) => i);
+        let t = parseInt(l.map(c => isBlack(c) || isDot(c) ? '1' : '0').join(''), 2);
+        cand = cand.filter(n => (n & t) === 0);
+        t = parseInt(l.map(c => isBlack(c) ? '1' : '0').join(''), 2);
+        cand = cand.map(n => (n | t));
+        cand = cand.filter(n => n.toString(2).padStart(l.length, '0').split('').map((c, i) => c === '1' ? i + 1 : 0).reduce((a, b) => a + b) === qnum);
+        let b = cand.reduce((a, b) => (a & b), (1 << l.length) - 1);
+        let d = cand.reduce((a, b) => (a & ~b), (1 << l.length) - 1);
+        b.toString(2).padStart(l.length, '0').split('').forEach((c, i) => c === '1' ? add_black(l[i]) : undefined);
+        d.toString(2).padStart(l.length, '0').split('').forEach((c, i) => c === '1' ? add_dot(l[i]) : undefined);
+    };
+    for (let i = 0; i < board.cols; i++) {
+        let l = [];
+        for (let j = 0; j < board.rows; j++) {
+            l.push(board.getc(i * 2 + 1, j * 2 + 1));
+        }
+        f(l, board.getobj(i * 2 + 1, -1).qnum);
+    }
+    for (let j = 0; j < board.rows; j++) {
+        let l = [];
+        for (let i = 0; i < board.cols; i++) {
+            l.push(board.getc(i * 2 + 1, j * 2 + 1));
+        }
+        f(l, board.getobj(-1, j * 2 + 1).qnum);
+    }
+}
+
 function RassiSilaiAssist() {
     CellConnected_InRegion({
         isShaded: () => true,
@@ -3900,24 +4066,6 @@ function StostoneAssist() {
 }
 
 function KakuroAssist() {
-    let add_candidate = function (c, l) {
-        if (c.isnull || c.anum !== -1) { return; }
-        l = l.sort();
-        while (l.length < 4) { l.push(-1); }
-        if (c.snum.join(',') === l.join(',')) { return; }
-        if (step && flg) { return; }
-        flg = true;
-        [0, 1, 2, 3].forEach(n => c.setSnum(n, l[n]));
-        c.draw();
-    }
-    let add_number = function (c, n) {
-        if (c.isnull || c.anum !== -1) { return; }
-        if (step && flg) { return; }
-        flg = true;
-        [0, 1, 2, 3].forEach(n => c.setSnum(n, -1));
-        c.setAnum(n);
-        c.draw();
-    }
     let list = [...Array.from(board.cell), ...Array.from(board.excell)];
     list = [...list.filter(c => c.qnum > 0).map(c => {
         let pc = offset(c, 1, 0), clist = [];
@@ -3949,9 +4097,21 @@ function KakuroAssist() {
         cand = cand.map(l => Array.from(new Set(l)));
         cand.forEach((a, i) => {
             let c = clist[i];
-            if (a.length === 1) { add_number(c, a[0]); }
+            if (a.length === 1) { add_sudokunum(c, a[0]); }
             if (a.length <= 4) { add_candidate(c, a); }
         });
+    });
+    forEachCell(cell => {
+        if (cell.ques !== CQUES.none) { return; }
+        let cand = [...Array(9).keys()].map(n => n + 1);
+        for (let d = 0; d < 4; d++) {
+            let nc = offset(cell, 1, 0, d);
+            while (!nc.isnull && nc.ques === CQUES.none) {
+                cand = cand.filter(n => n !== nc.anum);
+                nc = offset(nc, 1, 0, d);
+            }
+        }
+        add_candidate(cell, cand);
     });
 }
 
@@ -4131,6 +4291,65 @@ function DosunFuwariAssist() {
         if (clist.filter(c => !ni.has(c)).length === 1) {
             add_ball(clist.filter(c => !ni.has(c))[0], 2);
         }
+    });
+}
+
+function HeterominoAssist() {
+    const N = 3;
+    SizeRegion_Border({
+        isLinkable: (c, nb, nc) => !nb.isnull && !isSide(nb) && c.ques !== CQUES.wall && nc.ques !== CQUES.wall,
+        isSideable: (c, nb, nc) => !nb.isnull && !isLink(nb),
+        allSize: N,
+    });
+    const HETERO = [
+        [[[0, 0], [1, 0], [2, 0]], "━"],
+        [[[0, 0], [0, 1], [0, 2]], "┃"],
+        [[[0, 0], [1, 0], [1, 1]], "┓"],
+        [[[0, 0], [-1, 1], [0, 1]], "┛"],
+        [[[0, 0], [0, 1], [1, 1]], "┗"],
+        [[[0, 0], [1, 0], [0, 1]], "┏"],
+    ];
+    forEachCell(cell => {
+        if (cell.ques === CQUES.wall) { return; }
+        let linklist = [], sidelist = [], namelist = [];
+        HETERO.forEach(([cl, t]) => {
+            [...Array(N).keys()].forEach(o => {
+                let clist = cl.map(([x, y]) => offset(cell, x - cl[o][0], y - cl[o][1]));
+                if (clist.some(c => c.isnull || c.ques === CQUES.wall)) { return; }
+                if (clist.some(c => c.anum !== CANUM.none && c.anum !== t)) { return; }
+                if (clist.some(c => adjlist(c.adjborder, c.adjacent).some(
+                    ([nb, nc]) => {
+                        if (nc.isnull || nc.ques === CQUES.wall) { return false; }
+                        if (isLink(nb) && !clist.includes(nc) || isSide(nb) && clist.includes(nc)) { return true; }
+                        if (clist.includes(nc)) { return false; }
+                        if (nc.anum !== CANUM.none && nc.anum === t) { return true; }
+                        let nclist = [];
+                        let dfs = function (c) {
+                            if (nclist.includes(c)) { return; }
+                            nclist.push(c);
+                            adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+                                if (isLink(nb)) { dfs(nc); }
+                            });
+                        };
+                        dfs(nc);
+                        return getShape(clist, false) === getShape(nclist, false);
+                    }))) { return; }
+                let linkl = [], sidel = [];
+                clist.forEach(c => adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
+                    if (clist.includes(nc) && !linkl.includes(nb)) { linkl.push(nb); }
+                    if (!clist.includes(nc) && !sidel.includes(nb)) { sidel.push(nb); }
+                }));
+                linklist.push(linkl);
+                sidelist.push(sidel);
+                namelist.push(t);
+            });
+        });
+        if (linklist.length > 0) { linklist = linklist.reduce((a, b) => a.filter(i => b.includes(i))); }
+        if (sidelist.length > 0) { sidelist = sidelist.reduce((a, b) => a.filter(i => b.includes(i))); }
+        linklist.forEach(b => add_link(b));
+        sidelist.forEach(b => add_side(b));
+        namelist = Array.from(new Set(namelist));
+        if (namelist.length === 1) { add_number(cell, namelist[0]); }
     });
 }
 
@@ -5573,10 +5792,14 @@ function MoonOrSunAssist() {
         c.draw();
     };
     let roomType = c => {
+        if (c.anum !== CANUM.none) return c.anum;
         if (c.room.count.sun.passed > 0) return 1;
         if (c.room.count.moon.passed > 0) return 2;
+        if (c.room.count.sun.exists === c.room.clist.length) return 1;
+        if (c.room.count.moon.exists === c.room.clist.length) return 2;
         for (let i = 0; i < c.room.clist.length; i++) {
             let c2 = c.room.clist[i];
+            if (c2.anum !== CANUM.none) return c2.anum;
             if (c2.qnum === CQNUM.moon && c2.qsub === CQSUB.cross) { return 1; }
             if (c2.qnum === CQNUM.sun && c2.qsub === CQSUB.cross) { return 2; }
             if (c2.qnum === CQNUM.moon && c2.lcnt > 0) { return 2; }
@@ -5601,14 +5824,14 @@ function MoonOrSunAssist() {
         ByLine: true,
     });
     forEachCell(cell => {
+        if (cell.anum === CANUM.none && roomType(cell) !== 0) {
+            let t = roomType(cell);
+            Array.from(cell.room.clist).forEach(c => add_number(c, t));
+        }
         fourside((nb, nc) => {
             if (nc.isnull || cell.room === nc.room) { return; }
             if (nb.line && roomType(nc) !== 0) {
-                Array.from(cell.room.clist).forEach(cell2 => {
-                    if (cell2.qnum === roomType(nc)) {
-                        add_Xcell(cell2);
-                    }
-                });
+                add_number(cell, 3 - roomType(nc));
             }
             if (roomType(nc) !== 0 && cell.qnum === roomType(nc)) {
                 add_cross(nb);
@@ -5627,11 +5850,26 @@ function MoonOrSunAssist() {
         if (adjlist(cell.adjborder).every(b => b.isnull || isCross(b))) {
             add_Xcell(cell);
         }
-        if (roomType(cell) > 0 && cell.qnum !== roomType(cell)) {
+        if (roomType(cell) !== 0 && cell.qnum !== roomType(cell)) {
             add_Xcell(cell);
         }
         if (cell.qsub === CQSUB.cross) {
             fourside(add_cross, cell.adjborder);
+        }
+    });
+    forEachRoom(room => {
+        let t = roomType(room.clist[0]);
+        if (t === 0) { return; }
+        let nrl = new Set();
+        Array.from(room.clist).forEach(c => fourside(
+            (nb, nc) => {
+                if (!nc.isnull && nc.room !== room && !isCross(nb)) {
+                    nrl.add(nc.room);
+                }
+            }, c.adjborder, c.adjacent
+        ));
+        if (nrl.size <= 2) {
+            Array.from(nrl).forEach(nroom => add_number(nroom.clist[0], 3 - t));
         }
     });
 }
@@ -6785,6 +7023,12 @@ function CastleWallAssist() {
         isPassable: c => c.qnum === CQNUM.none,
     });
     // add invisible qsub at cross
+    forEachBorder(border => {
+        if (border.sidecell.some(c => c.qnum !== CQNUM.none)) {
+            add_inout(border.sidecross[0], border.sidecross[1].qsub);
+            add_inout(border.sidecross[1], border.sidecross[0].qsub);
+        }
+    });
     forEachCell(cell => {
         if (cell.qnum !== CQNUM.none) {
             // add qsub around b/w clue
@@ -8261,6 +8505,21 @@ function LitsAssist() {
     BlackConnected();
     BlackConnected_InRegion();
     No2x2Black();
+    let cset = new Set();
+    forEachCell(cell => {
+        if (cset.has(cell) || isDot(cell)) { return; }
+        let l = [];
+        let dfs = function (c) {
+            if (c.isnull || cset.has(c) || isDot(c) || c.room !== cell.room) { return; }
+            cset.add(c);
+            l.push(c);
+            fourside(dfs, c.adjacent);
+        };
+        dfs(cell);
+        if (l.length < 4) {
+            l.forEach(c => add_dot(c));
+        }
+    });
     const LITS = [
         [[0, 0], [1, 0], [2, 0], [0, 1]],// L
         [[0, 0], [1, 0], [2, 0], [2, 1]],
@@ -8689,17 +8948,8 @@ function AkichiwakeAssist() {
             if (qnum === 0) {
                 add_black(clist[0]);
             }
-            if (qnum > 0) {
-                let l = [];
-                let dfs = function (c) {
-                    if (l.includes(c) || c.room !== room || isBlack(c)) { return; }
-                    l.push(c);
-                    adjlist(c.adjacent).forEach(c => dfs(c));
-                };
-                dfs(!isBlack(clist[0]) ? clist[0] : clist[1]);
-                if (l.length === qnum) {
-                    l.forEach(c => add_green(c));
-                }
+            if (qnum === clist.filter(c => !isBlack(c)).length) {
+                clist.forEach(c => add_green(c));
             }
         }
     });
