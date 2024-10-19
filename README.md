@@ -12,6 +12,7 @@ Greasyfork link:
 https://greasyfork.org/en/scripts/477117-puzz-link-assistance
 
 Currently enhanced genre:
+* Aho-ni-Narikire
 * Akari
 * Akichiwake
 * All or Nothing
@@ -62,6 +63,7 @@ Currently enhanced genre:
 * Look-Air
 * Martini
 * Masyu
+* Maxi Loop
 * Mid-loop
 * Minarism
 * Minesweeper
