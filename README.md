@@ -19,14 +19,19 @@ Currently enhanced genre:
 * Ant Mill
 * Aqre
 * Aquapelago
+* Aquarium
+* Araf
+* Arukone
 * Ayeheya
 * Barns
+* Border Block
 * Bosanowa
 * Bosnian Road
 * Box
 * Canal View
 * Castle Wall
 * Cave
+* Chained Block
 * Choco Banana
 * Chocona
 * Circles and Squares
@@ -118,7 +123,9 @@ Currently enhanced genre:
 * Tents
 * Tetrominous
 * Tilepaint
+* Toichika
 * Tren
+* Voxas
 * Wall Logic
 * Yajilin
 * Yajisan-Kazusan
