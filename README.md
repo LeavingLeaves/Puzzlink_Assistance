@@ -125,6 +125,7 @@ Currently enhanced genre:
 * Tilepaint
 * Toichika
 * Tren
+* Uso-one
 * Voxas
 * Wall Logic
 * Yajilin

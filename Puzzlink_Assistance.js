@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      24.11.5.1
+// @version      24.11.8.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -234,6 +234,7 @@ const GENRELIST = [
     ["Tilepaint", TilepaintAssist],
     ["Toichika", ToichikaAssist],
     ["Tren", TrenAssist],
+    ["Uso-one", UsoOneAssist],
     ["Voxas", VoxasAssist],
     ["Wall Logic", WallLogicAssist],
     ["Yajilin", YajilinAssist],
@@ -2578,6 +2579,67 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function UsoOneAssist() {
+    let add_Ocell = function (c) {
+        if (c === undefined || c.isnull || c.qcmp !== 0) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setQcmp(1);
+        c.draw();
+    };
+    let add_Xcell = function (c) {
+        if (c === undefined || c.isnull || c.qcmp !== 0) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setQcmp(2);
+        c.draw();
+    };
+    let isOcell = c => c.qcmp === 1;
+    let isXcell = c => c.qcmp === 2;
+    GreenConnected();
+    BlackNotAdjacent();
+    forEachCell(cell => {
+        if (cell.qnum !== CQNUM.none) { add_green(cell); }
+        if (cell.qnum >= 0 && isOcell(cell)) {
+            NShadeInClist({
+                isShaded: isBlack,
+                isUnshaded: isGreen,
+                add_shaded: add_black,
+                add_unshaded: add_green,
+                clist: adjlist(cell.adjacent),
+                n: cell.qnum,
+            });
+        }
+        if (cell.qnum >= 0 && cell.qnum === adjlist(cell.adjacent).filter(c => !c.isnull).length) {
+            add_Xcell(cell);
+        }
+        if (cell.qnum >= 0 && isXcell(cell) && adjlist(cell.adjacent).filter(c => !c.isnull && !isGreen(c) && !isBlack(c)).length === 1) {
+            let c = adjlist(cell.adjacent).find(c => !c.isnull && !isGreen(c) && !isBlack(c));
+            if (adjlist(cell.adjacent).filter(c => isBlack(c)).length === cell.qnum) { add_black(c); }
+            if (adjlist(cell.adjacent).filter(c => isBlack(c)).length === cell.qnum - 1) { add_green(c); }
+        }
+        if (cell.qnum >= 0 && (adjlist(cell.adjacent).filter(c => isBlack(c)).length > cell.qnum ||
+            4 - adjlist(cell.adjacent).filter(c => isntBlack(c)).length < cell.qnum)) {
+            add_Xcell(cell);
+        }
+        if (cell.qnum >= 0 && adjlist(cell.adjacent).every(c => c.isnull || isBlack(c) || isGreen(c)) &&
+            adjlist(cell.adjacent).filter(c => isBlack(c)).length === cell.qnum) {
+            add_Ocell(cell);
+        }
+    });
+    forEachRoom(room => {
+        let l = Array.from(room.clist).filter(c => c.qnum !== CQNUM.none);
+        NShadeInClist({
+            isShaded: isXcell,
+            isUnshaded: isOcell,
+            add_shaded: add_Xcell,
+            add_unshaded: add_Ocell,
+            clist: l,
+            n: 1,
+        });
+    });
+}
+
 function ToichikaAssist() {
     let isArrowAble = function (c, d) {
         if (isDot(c) || c.anum !== CANUM.none && d !== [-1, 1, 3, 2, 0][c.anum]) { return false; }
@@ -9618,6 +9680,22 @@ function HeyablockAssist() {
 }
 
 function HeyawakeAssist(isSym = false) {
+    if (document.querySelector('#penaltyText') === null) {
+        let penalty = ((board.cols - 1) * (board.rows - 1) + 2 * (Math.ceil(board.cols / 2) + Math.ceil(board.rows / 2)));
+        let shadecnt = Array.from(board.roommgr.components).reduce((tot, room) => room.top.qnum >= 0 ? tot + room.top.qnum : tot, 0);
+        if ((penalty - shadecnt * 3) <= 5) {
+            console.log("Penalty: " + penalty);
+            console.log("Max Shade: " + (Math.floor(penalty / 3)));
+            console.log("Min Shade: " + shadecnt);
+            console.log("Spare Penalty: " + (penalty - shadecnt * 3));
+            let penaltyText = '<div id="penaltyText">' +
+                "Penalty: " + penalty + "; " +
+                "Max Shade: " + (Math.floor(penalty / 3)) + "; " +
+                "Min Shade: " + shadecnt + "; " +
+                "Spare penalty: " + (penalty - shadecnt * 3) + '</div>';
+            document.querySelector('#quesboard').insertAdjacentHTML('beforebegin', penaltyText);
+        }
+    }
     GreenConnected();
     BlackNotAdjacent();
     NoFacingDoor();
