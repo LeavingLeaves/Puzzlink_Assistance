@@ -28,6 +28,7 @@ Currently enhanced genre:
 * Bosanowa
 * Bosnian Road
 * Box
+* Brownies
 * Canal View
 * Castle Wall
 * Cave
@@ -36,6 +37,9 @@ Currently enhanced genre:
 * Chocona
 * Circles and Squares
 * Cocktail Lamp
+* Coffee Milk
+* Combi Block
+* Context
 * Country Road
 * Creek
 * Dominion
@@ -77,6 +81,7 @@ Currently enhanced genre:
 * Myopia
 * Nanameguri
 * Nawabari
+* NIKOJI
 * Nondango
 * Nonogram
 * Norinori
@@ -96,6 +101,7 @@ Currently enhanced genre:
 * Putteria
 * Rail Pool
 * Rassi Silai
+* Reflect Link
 * Regional Yajilin
 * Ring-ring
 * Ripple Effect
@@ -107,6 +113,7 @@ Currently enhanced genre:
 * Skyscrapers
 * Slalom
 * Slant
+* Slash Pack
 * Slitherlink
 * Snake
 * Square Jam
@@ -126,6 +133,8 @@ Currently enhanced genre:
 * Toichika
 * Tren
 * Uso-one
+* Uso-tatami
+* Vertex Slitherlink
 * Voxas
 * Wall Logic
 * Yajilin
