@@ -68,6 +68,7 @@ const CQUES = {
     black: 2,
     // Icebarn
     ice: 6,
+    fire: 6,
     // Simpleloop
     wall: 7,
     // Slalom
@@ -113,9 +114,9 @@ const BQNUM = {
     bcir: 2,
 };
 const CRQSUB = {
-    none: null,
-    out: 0,
+    none: 0,
     in: 1,
+    out: 2,
 }
 
 const GENRELIST = [
@@ -145,8 +146,8 @@ const GENRELIST = [
     ["Chocona", ChoconaAssist],
     ["Circles and Squares", CirclesAndSquaresAssist],
     ["Cocktail Lamp", CocktailLampAssist],
-    ["Combi Block", CombiBlockAssist],
     ["Coffee Milk", CoffeeMilkAssist],
+    ["Combi Block", CombiBlockAssist],
     ["Context", ContextAssist],
     ["Country Road", CountryRoadAssist],
     ["Creek", CreekAssist],
@@ -155,11 +156,13 @@ const GENRELIST = [
     ["Double Back", DoubleBackAssist],
     ["Double Choco", DoubleChocoAssist],
     ["Fillomino", FillominoAssist],
+    ["Fire Walk", FireWalkAssist],
     ["FiveCells", FiveCellsAssist],
     ["FourCells", FourCellsAssist],
     ["Goats and Wolves", GoatsAndWolvesAssist],
     ["Guide Arrow", GuideArrowAssist],
     ["Hashiwokakero", HashiwokakeroAssist],
+    ["Hebi-Ichigo", HebiIchigoAssist],
     ["Herugolf", HerugolfAssist],
     ["Heteromino", HeterominoAssist],
     ["Heyablock", HeyablockAssist],
@@ -167,6 +170,7 @@ const GENRELIST = [
     ["Hitori", HitoriAssist],
     ["Icebarn", IcebarnAssist],
     ["Icelom", IcelomAssist],
+    ["Ice Walk", IceWalkAssist],
     ["Inverse LITSO", InverseLitsoAssist],
     ["Islands", IslandsAssist],
     ["Juosan", JuosanAssist],
@@ -185,6 +189,7 @@ const GENRELIST = [
     ["Mid-loop", MidloopAssist],
     ["Minarism", MinarismAssist],
     ["Minesweeper", MinesweeperAssist],
+    ["Mirroring Tile", MirroringTileAssist],
     ["Mochikoro", MochikoroAssist],
     ["Moon or Sun", MoonOrSunAssist],
     ["Myopia", MyopiaAssist],
@@ -246,7 +251,9 @@ const GENRELIST = [
     ["Vertex Slitherlink", VertexSlitherlinkAssist],
     ["Voxas", VoxasAssist],
     ["Wall Logic", WallLogicAssist],
+    ["Water Walk", WaterWalkAssist],
     ["Yajilin", YajilinAssist],
+    ["Yajirushi 2", Yajirushi2Assist],
     ["Yajisan-Kazusan", YajisanKazusanAssist],
     ["Yin-Yang", YinyangAssist],
 ];
@@ -467,11 +474,13 @@ let isntBlack = c => c.isnull || c.qsub === CQSUB.green;
 let isGreen = c => !c.isnull && c.qsub === CQSUB.green;
 let isYellow = c => !c.isnull && c.qsub === CQSUB.yellow;
 let isDot = isGreen;
-let isIce = c => !c.isnull && c.ques === CQUES.ice && ["Barns", "Icebarn", "Icelom"].includes(GENRENAME);
+let isIce = c => !c.isnull && c.ques === CQUES.ice && (GENRENAME === "Barns" || GENRENAME.includes("Ice"));
+let isFire = c => !c.isnull && c.ques === CQUES.fire && (GENRENAME.includes("Fire"));
 let isNum = c => c.qnum !== CQNUM.none && c.qnum !== CQNUM.quesmark;
 let isClue = c => c.qnum !== CQNUM.none;
 let isSide = b => !b.isnull && (b.qans === 1 || !b.inside || b.ques === 1 || b.sidecell.some(c => c.ques === CQUES.wall));
 let isLink = b => !b.isnull && b.qsub === BQSUB.link;
+let isntLink = b => b.isnull || isSide(b);
 let isLine = b => !b.isnull && b.line === 1;
 let isntLine = b => b.isnull || b.qsub === BQSUB.cross;
 let isCross = b => !b.isnull && b.qsub === BQSUB.cross;
@@ -489,10 +498,8 @@ let offset = function (c, dx, dy, dir = 0) { // CCW as in coordinate
     if (dir === 3) { return board.getobj(c.bx - dy * 2, c.by + dx * 2); }
 }
 let adjlist = function (a, b = undefined) {
-    if (b === undefined) {
-        return [a.top, a.left, a.bottom, a.right];
-    }
-    return [[a.top, b.top], [a.left, b.left], [a.bottom, b.bottom], [a.right, b.right]];
+    if (b === undefined) { return [a.right, a.top, a.left, a.bottom]; }
+    return [[a.right, b.right], [a.top, b.top], [a.left, b.left], [a.bottom, b.bottom]];
 }
 let adjdiaglist = function (c) {
     return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => offset(c, x, y));
@@ -513,12 +520,8 @@ let fourside = function (f, a, b = undefined) {
         f(a.right, b.right);
     }
 };
-let dir = function (c, d) {
-    d = (d % 4 + 4) % 4;
-    return [c.top, c.left, c.bottom, c.right][d];
-}
 let qdirRemap = function (qdir) {
-    return [-1, 0, 2, 1, 3][qdir];
+    return [null, 1, 3, 2, 0][qdir];
 }
 let getShape = function (clist, rot = true) {
     let minx = board.maxbx, miny = board.maxby, maxx = board.minbx, maxy = board.minby;
@@ -552,22 +555,30 @@ let getShape = function (clist, rot = true) {
     s = s.sort();
     return s[0];
 }
-let cellTrail = function (c, sd) {
-    let nc = dir(c.adjacent, sd);
-    while (isIce(nc)) { nc = dir(nc.adjacent, sd); }
-    let clist = [nc];
-    while (!nc.isnull && nc !== c && nc.lcnt === 0 && adjlist(nc.adjborder).filter(nnb => !nnb.isnull && nnb.inside && !isCross(nnb)).length === 2) {
+let cellTrail = function (c, sd, PassLine = false) {
+    if (c.isnull) { return []; }
+    let nc = offset(c, 1, 0, sd);
+    if (nc.isnull) { return [c] };
+    let clist = [nc], lstd = sd;
+    while (isIce(nc)) { nc = offset(nc, 1, 0, sd); clist.push(nc); }
+    while (!nc.isnull && isInside(nc) && nc !== c && (PassLine || nc.lcnt === 0)) {
+        let nd;
         let nnc = [0, 1, 2, 3].flatMap(d => {
-            let nnb = dir(nc.adjborder, d);
-            let nnc = dir(nc.adjacent, d);
+            if ((lstd + 2) % 4 === d) { return []; }
+            let nnb = offset(nc, .5, 0, d);
+            let nnc = offset(nc, 1, 0, d);
+            let nl = [nnc];
             if (clist.length === 1 && nnc === c) { return []; }
-            while (isIce(nnc)) { nnc = dir(nnc.adjacent, d); }
-            if (nnb.isnull || !nnb.inside || isCross(nnb) || clist.includes(nnc)) { return []; }
-            return [nnc];
+            if (PassLine && nc.lcnt === 1 && !isLine(nnb)) { return []; }
+            while (isIce(nnc)) { nnc = offset(nnc, 1, 0, d); nl.push(nnc); }
+            if (nnc.isnull || isCross(nnb) || clist.includes(nnc)) { return []; }
+            nd = d;
+            return [nl];
         });
         if (nnc.length === 1) {
-            nc = nnc[0];
-            clist.push(nc);
+            nc = nnc[0][nnc[0].length - 1];
+            lstd = nd;
+            clist.push(...nnc[0]);
         }
         else { break; }
     }
@@ -644,9 +655,12 @@ let add_yellow = function (c) {
     c.draw();
 };
 let add_inout = function (cr, qsub) {
+    if (qsub === 3) { qsub = 1; }
+    if (qsub === 0) { qsub = 2; }
     if (cr.isnull || cr.qsub !== CRQSUB.none || qsub === undefined) { return; }
     flg2 = true;
     cr.setQsub(qsub);
+    cr.draw();
 }
 let add_number = function (c, n) {
     if (c === undefined || c.isnull || c.anum !== CANUM.none) { return; }
@@ -1000,15 +1014,15 @@ function NoFacingDoor() {
     forEachCell(cell => {
         for (let d = 0; d < 4; d++) {
             if (!isGreen(cell)) { break; }
-            let pcell = dir(cell.adjacent, d);
+            let pcell = offset(cell, 1, 0, d);
             let bordercnt = 0;
             let emptycellList = [cell];
             while (!pcell.isnull && !isBlack(pcell) && bordercnt < 2) {
-                if (dir(pcell.adjborder, d + 2).ques) {
+                if (offset(pcell, -.5, 0, d).ques) {
                     bordercnt++;
                 }
                 emptycellList.push(pcell);
-                pcell = dir(pcell.adjacent, d);
+                pcell = offset(pcell, 1, 0, d);
             }
             emptycellList = emptycellList.filter(c => !isGreen(c));
             if (bordercnt === 2 && emptycellList.length === 1) {
@@ -1115,7 +1129,7 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
                 }
                 let cn = cellset.size;
                 let fn = function (c, nb, nc) {
-                    if (nb !== undefined && isNotPassable(c, nb, nc)) { return; }
+                    if (isNotPassable(c, nb, nc)) { return; }
                     if (nc.isnull && !OutsideAsShaded) { return; }
                     if (nc === f || f !== null && ord.get(f) === ord.get(nc) || isUnshaded(nc)) { return; }
                     if (ord.get(c) === ord.get(nc)) { return; }
@@ -1428,8 +1442,9 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
             Obj: "cross",
         });
     }
+    // don't form a loop of crossed borders when some cells inbetween should be passed
     if ((hasIce || hasCross) && isPass(board.emptycell)) {
-        let ord = new Map(); // Disjoint Set Union
+        let ord = new Map();
         let n = 0;
         forEachCross(cross => {
             if (ord.has(cross)) { return; }
@@ -1446,11 +1461,17 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
         });
         let m = new Map();
         forEachBorder(border => {
-            let t = border.sidecross.map(cr => ord.get(cr)).sort().join(',');
+            let t = border.sidecross.map(cr => ord.get(cr)).sort();
+            if (t[0] === t[1]) { return; }
+            t = t.join(',');
             if (!m.has(t)) { m.set(t, []); }
             m.get(t).push(border);
         });
-        Array.from(m).forEach(([_, l]) => l.length > 1 ? l.forEach(b => add_line(b)) : undefined);
+        Array.from(m).forEach(([_, l]) => {
+            // TODO: find a better way to cover all cases
+            if (l.length <= 1 || !l.some(c => c.sidecell.every(c => isInside(c) && !isIce(c)))) { return; }
+            l.forEach(b => add_line(b));
+        });
     }
     forEachCell(cell => {
         if (isIce(cell)) {
@@ -1468,6 +1489,20 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
         }
     });
     forEachCell(cell => {
+        // avoid forming multiple loop
+        if (cell.path !== null && !isIce(cell) && !hasCross) {
+            for (let d = 0; d < 4; d++) {
+                let ncell = cellTrail(cell, d).pop();
+                if (cell.lcnt === 1 && ncell.lcnt === 1 && cell.path === ncell.path && board.linegraph.components.length > 1) {
+                    add_notpath(offset(cell, .5, 0, d));
+                }
+                if (cell === ncell && board.linegraph.components.length > 1) {
+                    add_notpath(offset(cell, .5, 0, d));
+                }
+            }
+        }
+    })
+    forEachCell(cell => {
         if (!isPassable(cell)) {
             add_notpass(cell);
             fourside(add_notpath, cell.adjborder);
@@ -1475,50 +1510,26 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
         let emptycnt = 0;
         let linecnt = 0;
         fourside((c, b) => {
-            if (!isPassable(c) || !isPathable(b)) {
-                add_notpath(b);
-            }
+            if (!isPassable(c) || !isPathable(b)) { add_notpath(b); }
             if (!c.isnull && isPassable(c) && isPathable(b)) { emptycnt++; }
             linecnt += isPath(b);
         }, cell.adjacent, cell.adjborder);
-        if (linecnt > 0) {
-            add_pass(cell);
-        }
+        if (linecnt > 0) { add_pass(cell); }
         // no branch and no cross
-        if (linecnt === 2 && !isIce(cell) && !hasCross) {
-            fourside(add_notpath, cell.adjborder);
-        }
+        if (linecnt === 2 && !isIce(cell) && !hasCross) { fourside(add_notpath, cell.adjborder); }
         // no deadend
-        if (emptycnt <= 1) {
-            fourside(add_notpath, cell.adjborder);
-            add_notpass(cell);
-        }
+        if (emptycnt <= 1) { fourside(add_notpath, cell.adjborder); add_notpass(cell); }
         // cross
-        if (linecnt === 3 && hasCross) {
-            fourside(add_path, cell.adjborder);
-        }
+        if (linecnt === 3 && hasCross) { fourside(add_path, cell.adjborder); }
         // 2 degree path
-        if (emptycnt === 2 && (linecnt === 1 || isPass(cell))) {
-            fourside(add_path, cell.adjborder);
-        }
-        // avoid forming multiple loop
-        if (cell.path !== null && !isIce(cell) && !hasCross) {
-            for (let d = 0; d < 4; d++) {
-                let ncell = cellTrail(cell, d).pop();
-                if (cell.lcnt === 1 && ncell.lcnt === 1 && cell.path === ncell.path && board.linegraph.components.length > 1) {
-                    add_notpath(dir(cell.adjborder, d));
-                }
-                if (cell === ncell && board.linegraph.components.length > 0) {
-                    add_notpath(dir(cell.adjborder, d));
-                }
-            }
-        }
+        if (emptycnt === 2 && (linecnt === 1 || isPass(cell))) { fourside(add_path, cell.adjborder); }
         if (linecnt === 0 && !isIce(cell) && !hasCross) {
-            let list = adjlist(cell.adjborder, cell.adjacent).filter(([nb, nc], d) => {
-                while (isIce(nc)) { nc = dir(nc.adjacent, d); }
-                if (nb.isnull || nc.isnull || !isPathable(nb)) { return false; }
-                return true;
+            let list = adjlist(cell.adjborder, cell.adjacent);
+            list = list.map(([nb, nc], d) => {
+                while (isIce(nc)) { nc = offset(nc, 1, 0, d); }
+                return [nb, nc];
             });
+            list = list.filter(([nb, nc]) => !nb.isnull && !nc.isnull && isPathable(nb));
             if (list.length > 0 && list[0][1].path !== null && list.every(([nb, nc]) => nc.path === list[0][1].path &&
                 board.linegraph.components.length > 1)) {
                 fourside(add_notpath, cell.adjborder);
@@ -1555,13 +1566,13 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
         // choose path
         if (Directed && cell.lcnt === 1 && !isIce(cell)) {
             for (let d = 0; d < 4; d++) {
-                let ncell = dir(cell.adjacent, d);
+                let ncell = offset(cell, 1, 0, d);
                 while (!ncell.isnull && isIce(ncell)) {
-                    ncell = dir(ncell.adjacent, d);
+                    ncell = offset(ncell, 1, 0, d);
                 }
-                if (ncell.isnull || ncell.lcnt !== 1 || dir(ncell.adjborder, d + 2).line) { continue; }
+                if (ncell.isnull || ncell.lcnt !== 1 || offset(ncell, -.5, 0, d).line) { continue; }
                 if (has_in(cell) && has_in(ncell) || has_out(cell) && has_out(ncell)) {
-                    add_cross(dir(cell.adjborder, d));
+                    add_cross(offset(cell, .5, 0, d));
                 }
             }
         }
@@ -1571,18 +1582,18 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
         if (!isIce(cell)) { return; }
         for (let d = 0; d < 4; d++) {
             let pcell = cell;
-            while (isIce(pcell) && dir(pcell.adjborder, d).qsub === BQSUB.cross && dir(pcell.adjborder, d + 2).qsub === BQSUB.cross) {
-                add_cross(dir(pcell.adjborder, d + 2));
-                pcell = dir(pcell.adjacent, d + 2);
+            while (isIce(pcell) && offset(pcell, .5, 0, d).qsub === BQSUB.cross && offset(pcell, -.5, 0, d).qsub === BQSUB.cross) {
+                add_cross(offset(pcell, -.5, 0, d));
+                pcell = offset(pcell, -1, 0, d);
             }
             pcell = cell;
-            while (isIce(pcell) && dir(pcell.adjborder, d).line && (!dir(pcell.adjborder, d + 2).line ||
-                dir(pcell.adjborder, d).qsub !== BQSUB.none && dir(pcell.adjborder, d + 2).qsub === BQSUB.none)) {
-                add_line(dir(pcell.adjborder, d + 2));
-                if (dir(pcell.adjborder, d).qsub !== BQSUB.none) {
-                    add_arrow(dir(pcell.adjborder, d + 2), dir(pcell.adjborder, d).qsub);
+            while (isIce(pcell) && offset(pcell, .5, 0, d).line && (!offset(pcell, -.5, 0, d).line ||
+                offset(pcell, .5, 0, d).qsub !== BQSUB.none && offset(pcell, -.5, 0, d).qsub === BQSUB.none)) {
+                add_line(offset(pcell, -.5, 0, d));
+                if (offset(pcell, .5, 0, d).qsub !== BQSUB.none) {
+                    add_arrow(offset(pcell, -.5, 0, d), offset(pcell, .5, 0, d).qsub);
                 }
-                pcell = dir(pcell.adjacent, d + 2);
+                pcell = offset(pcell, -1, 0, d);
             }
         }
     });
@@ -1605,7 +1616,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
             OnlyOneConnected: false,
         });
     }
-    add_inout(board.getobj(0, 0), CRQSUB.out);
+    add_inout(board.getobj(0, 0), !Directed ? CRQSUB.out : .5);
     // add invisible qsub at cross
     if (!hasIce && !hasCross) {
         forEachCross(cross => {
@@ -1653,12 +1664,8 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
                 (() => {
                     if (cr.isnull || ncr.isnull) { return; }
                     if (cr.qsub === CRQSUB.none || ncr.qsub === CRQSUB.none) { return; }
-                    if (cr.qsub === ncr.qsub) {
-                        add_cross(b);
-                    }
-                    if (cr.qsub !== ncr.qsub) {
-                        add_line(b);
-                    }
+                    if (cr.qsub === ncr.qsub) { add_cross(b); }
+                    if (cr.qsub !== ncr.qsub) { add_line(b); }
                     if (cr.qsub !== ncr.qsub && di !== -1) {
                         let l = [[BQSUB.arrow_up, CRQSUB.out, false], [BQSUB.arrow_dn, CRQSUB.in, false],
                         [BQSUB.arrow_lt, CRQSUB.in, true], [BQSUB.arrow_rt, CRQSUB.out, true]];
@@ -1669,16 +1676,12 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
                 // extend i/o through cross/line
                 (() => {
                     if (ncr.isnull) { return; }
-                    if (isntLine(b) || (!b.inside && !isLine(b))) {
-                        add_inout(ncr, cr.qsub);
-                    }
-                    if (!b.isnull && isLine(b) && !Directed) {
-                        add_inout(ncr, cr.qsub ^ 1);
-                    }
-                    if (!b.isnull && isLine(b) && b.qsub !== BQSUB.none && Directed && hasIce) {
+                    if (isntLine(b)) { add_inout(ncr, cr.qsub); }
+                    if (!b.isnull && isLine(b) && !Directed) { add_inout(ncr, cr.qsub ^ 1); }
+                    if (!b.isnull && isLine(b) && b.qsub !== BQSUB.none && Directed) {
                         add_inout(ncr, cr.qsub + ([BQSUB.arrow_up, BQSUB.arrow_lt, BQSUB.arrow_dn, BQSUB.arrow_rt][d] === b.qsub ? 1 : -1));
                     }
-                    if ([11, 12, 13, 14].includes(b.qsub) && di !== -1 && !hasIce) {
+                    if ([11, 12, 13, 14].includes(b.qsub) && di !== -1 && !hasIce && !hasCross) {
                         let l = [[BQSUB.arrow_up, CRQSUB.out], [BQSUB.arrow_dn, CRQSUB.in],
                         [BQSUB.arrow_lt, CRQSUB.in], [BQSUB.arrow_rt, CRQSUB.out]];
                         l = l.filter(([bq, crq]) => bq === b.qsub);
@@ -1692,7 +1695,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
     };
     forEachCross(cross => dfs(cross));
 }
-function SingleLoopInBorder({ useCrossQsub = true }) {
+function SingleLoopInBorder({ useCrossQsub = true } = {}) {
     let add_bg_color = function (c, color) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none || c.qsub === color) { return; }
         if (step && flg) { return; }
@@ -1815,30 +1818,30 @@ function SightNumber({ isShaded, isUnshaded, add_shaded, add_unshaded } = {}) {
         let farthest = [0, 0, 0, 0];
         // count seen shaded cells
         for (let d = 0; d < 4; d++) {
-            let pcell = dir(cell.adjacent, d);
+            let pcell = offset(cell, 1, 0, d);
             while (!pcell.isnull && isShaded(pcell)) {
                 farthest[d]++;
                 seencnt++;
-                pcell = dir(pcell.adjacent, d);
+                pcell = offset(pcell, 1, 0, d);
             }
             while (!pcell.isnull && !isUnshaded(pcell)) {
                 farthest[d]++;
-                pcell = dir(pcell.adjacent, d);
+                pcell = offset(pcell, 1, 0, d);
             }
         }
         // not extend too much
         for (let d = 0; d < 4; d++) {
-            let pcell = dir(cell.adjacent, d);
+            let pcell = offset(cell, 1, 0, d);
             while (!pcell.isnull && isShaded(pcell)) {
-                pcell = dir(pcell.adjacent, d);
+                pcell = offset(pcell, 1, 0, d);
             }
             if (pcell.isnull || isUnshaded(pcell)) { continue; }
             let tcell = pcell;
-            pcell = dir(pcell.adjacent, d);
+            pcell = offset(pcell, 1, 0, d);
             let n = 0;
             while (!pcell.isnull && isShaded(pcell)) {
                 n++;
-                pcell = dir(pcell.adjacent, d);
+                pcell = offset(pcell, 1, 0, d);
             }
             if (n + seencnt + 1 > qnum) {
                 add_unshaded(tcell);
@@ -1867,7 +1870,7 @@ function SizeRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, OneNu
         offset(cell, 0, 1), offset(cell, 1, -1), offset(cell, 1, 0), offset(cell, 1, 1)];
         if (!isShaded(cell) && !isUnshaded(cell) && templist.filter(c => isUnshaded(c) || c.isnull).length >= 2) {
             for (let d = 0; d < 4; d++) {
-                let ncell = dir(cell.adjacent, d);
+                let ncell = offset(cell, 1, 0, d);
                 if (isUnshaded(ncell)) { continue; }
                 let cellList = [];
                 let dfs = function (c) {
@@ -1944,7 +1947,7 @@ function SizeRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, OneNu
         // cell and region
         for (let d = 0; d < 4; d++) {
             if (isShaded(cell) || isUnshaded(cell) || cell.qnum === CQNUM.none) { continue; }
-            let ncell = dir(cell.adjacent, d);
+            let ncell = offset(cell, 1, 0, d);
             if (ncell.isnull || !isShaded(ncell)) { continue; }
             let cellList = [];
             let dfs = function (c) {
@@ -1962,31 +1965,65 @@ function SizeRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, OneNu
             }
         }
     });
+    // unreachable cell
+    if (OneNumPerRegion) {
+        let cset = new Set();
+        let cques = new Set();
+        forEachCell(cell => {
+            if (cell.qnum === CQNUM.none || cques.has(cell)) { return; }
+            let cs = new Set();
+            let queue = [[cell, cell.qnum]];
+            while (queue.length > 0) {
+                let [c, t] = queue.shift();
+                if (c.isnull || isUnshaded(c) || t === 0 || cs.has(c)) { continue; }
+                cs.add(c);
+                cset.add(c);
+                if (t < 0) { cques.add(c); }
+                adjlist(c.adjacent).forEach(nc => queue.push([nc, t - 1]));
+            }
+        });
+        forEachCell(cell => !cset.has(cell) ? add_unshaded(cell) : undefined);
+    }
 }
 function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnull,
     isSideable = (c, nb, nc) => !nb.isnull && !nc.isnull,
+    isGroupable = (sc, c) => true,
+    isCon = isLink, isNCon = isSide, add_con = add_link, add_ncon = add_side,
     OneNumPerRegion = false,
     scell = null,
-    allSize = null } = {}) {
+    allSize = null,
+    byLine = false,
+    hasAnum = false,
+} = {}) {
+    if (hasAnum && !byLine) {
+        forEachCell(cell => {
+            if (isNum(cell)) { add_number(cell, cell.qnum); }
+            if (cell.anum === CANUM.none) { return; }
+            fourside((nb, nc) => {
+                if (nb.isnull || nc.isnull) { return; }
+                if (nc.anum !== CANUM.none && nc.anum !== cell.anum && isSideable(cell, nb, nc)) { add_side(nb); }
+                if (nb.qsub === BQSUB.link) { add_number(nc, cell.anum); }
+            }, cell.adjborder, cell.adjacent);
+        });
+    }
+    let getqn = c => !hasAnum ? c.qnum : c.anum;
     NoDeadendBorder();
     if (scell === null && allSize === null) {
         forEachCell(cell => {
-            if (cell.qnum === CQNUM.none || cell.qnum === CQNUM.quesmark) { return; }
-            SizeRegion_Border({
-                isLinkable: isLinkable,
-                isSideable: isSideable,
-                OneNumPerRegion: OneNumPerRegion,
-                scell: cell,
-            });
+            if (getqn(cell) === CQNUM.none || getqn(cell) === CQNUM.quesmark) { return; }
+            let arg = { ...arguments[0] };
+            arg.scell = cell;
+            SizeRegion_Border(arg);
         });
     }
-    let isNear = c => !c.isnull && (scell === null || Math.abs(c.bx - scell.bx) + Math.abs(c.by - scell.by) <= 2 * (allSize ?? scell.qnum) - 2);
+    let isNear = c => !c.isnull && (scell === null || Math.abs(c.bx - scell.bx) + Math.abs(c.by - scell.by) <= 2 * (allSize ?? getqn(scell)) - 2);
     // use tarjan to find cut vertex
     let n = 0;
     let ord = new Map();
     let low = new Map();
     let cgn = new Map();
     let ctn = new Map();
+    let csn = new Map();
     let clg = new Map();
     let clt = new Map();
     let fth = new Map();
@@ -2006,6 +2043,7 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
                 low.set(n, n);
                 cgn.set(n, 1);
                 ctn.set(n, 1);
+                csn.set(n, 1);
                 clg.set(n, []);
                 clt.set(n, []);
                 fth.set(c, f);
@@ -2022,46 +2060,48 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
                     let nb = offset(c, .5, 0, d);
                     let nc = offset(c, 1, 0, d);
                     if (nb.isnull || nc.isnull) { continue; }
-                    if (isLink(nb) && isLinkable(c, nb, nc)) {
+                    if (isCon(nb) && isLinkable(c, nb, nc)) {
                         linkdfs(nc);
                     }
                 }
             }
-            linkdfs(c);
+            if (byLine) { cellset.add(c); } else { linkdfs(c); }
             if (Array.from(cellset).some(c => {
                 if (!isNear(c)) { return true; }
-                if (scell !== null && c.qnum !== CQNUM.none && c.qnum !== CQNUM.quesmark && scell.qnum !== c.qnum) { return true; }
-                if (scell !== null && c.qnum !== CQNUM.none && c.qnum !== CQNUM.quesmark && scell !== c && OneNumPerRegion) { return true; }
+                if (scell !== null && getqn(c) !== CQNUM.none && getqn(c) !== CQNUM.quesmark && getqn(scell) !== getqn(c)) { return true; }
+                if (scell !== null && getqn(c) !== CQNUM.none && getqn(c) !== CQNUM.quesmark && scell !== c && OneNumPerRegion) { return true; }
+                if (scell !== null && !isGroupable(scell, c)) { return true; }
                 return false;
             })) {
-                ord.set(c, -1);
+                Array.from(cellset).forEach(c => ord.set(c, -1));
                 continue;
             }
             if (!v) {
-                cellset.forEach(cl => {
-                    ord.set(cl, ord.get(c));
+                cellset.forEach(cc => {
+                    ord.set(cc, ord.get(c));
                     if (allSize !== null) {
-                        clg.set(ord.get(cl), [...clg.get(ord.get(cl)), allSize]);
-                        clt.set(ord.get(cl), [...clt.get(ord.get(cl)), allSize]);
-                    } else if (cl.qnum !== CQNUM.none) {
-                        clg.set(ord.get(cl), [...clg.get(ord.get(cl)), cl.qnum]);
-                        clt.set(ord.get(cl), [...clt.get(ord.get(cl)), cl.qnum]);
+                        clg.set(ord.get(cc), [...clg.get(ord.get(cc)), allSize]);
+                        clt.set(ord.get(cc), [...clt.get(ord.get(cc)), allSize]);
+                    } else if (getqn(cc) !== CQNUM.none) {
+                        clg.set(ord.get(cc), [...clg.get(ord.get(cc)), getqn(cc)]);
+                        clt.set(ord.get(cc), [...clt.get(ord.get(cc)), getqn(cc)]);
                     }
-                    fth.set(cl, f);
+                    fth.set(cc, f);
                 });
                 cgn.set(ord.get(c), cellset.size);
                 ctn.set(ord.get(c), cellset.size);
+                csn.set(ord.get(c), cellset.size);
             }
             let fn = function (c, nb, nc) {
-                if (nc.isnull || isSide(nb)) { return; }
+                if (nc.isnull || isNCon(nb)) { return; }
                 if (ord.has(nc) && ord.get(nc) === -1) { return; }
-                if (!isLink(nb) && clg.get(ord.get(c)).includes(cellset.size) && isSideable(c, nb, nc)) {
+                if (!isCon(nb) && clg.get(ord.get(c)).includes(cellset.size) && isSideable(c, nb, nc)) {
                     sidelist.push(nb);
                     return;
                 }
                 if (nc === f || f !== null && ord.get(f) === ord.get(nc) || !isLinkable(c, nb, nc)) { return; }
                 if (ord.get(c) === ord.get(nc)) { return; }
-                if (!isLink(nb) && isSideable(c, nb, nc) && ord.has(nc)) {
+                if (!isCon(nb) && isSideable(c, nb, nc) && ord.has(nc)) {
                     let cl = clg.get(ord.get(c)), cln = clg.get(ord.get(nc));
                     if (OneNumPerRegion && cl.length > 0 && cln.length > 0) {
                         sidelist.push(nb);
@@ -2090,6 +2130,7 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
                     if (!vst.has(ordnc)) {
                         ctn.set(ordc, ctn.get(ordc) + ctn.get(ordnc));
                         clt.set(ordc, [...clt.get(ordc), ...clt.get(ordnc)]);
+                        if (ordc <= low.get(ordnc)) { csn.set(ordc, csn.get(ordc) + ctn.get(ordnc)); }
                         vst.add(ordnc);
                     }
                     if (ordc < low.get(ordnc)) {
@@ -2112,10 +2153,14 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
         sidelist = [];
         linklist = [];
         dfs(cell);
-        sidelist.forEach(b => add_side(b));
+        Array.from(ord).forEach(([c, n]) => {
+            if (n === -1) { return; }
+            if (scell !== null && getqn(cell) > ctn.get(ord.get(cell)) - csn.get(n) && hasAnum) { add_number(c, getqn(cell)); }
+        })
+        sidelist.forEach(b => ord.get(b.sidecell[0]) !== ord.get(b.sidecell[1]) ? add_ncon(b) : undefined);
         linklist.forEach(([c, nb, nc]) => {
-            let ordc = ord.get(c);
-            let ordnc = ord.get(nc);
+            const ordc = ord.get(c);
+            const ordnc = ord.get(nc);
             let siz = function (cl) {
                 if (OneNumPerRegion) {
                     cl = cl.map(n => n === CQNUM.quesmark ? 1 : n);
@@ -2126,38 +2171,34 @@ function SizeRegion_Border({ isLinkable = (c, nb, nc) => !nb.isnull && !nc.isnul
                 }
                 return cl.reduce((a, b) => a + b, 0);
             }
-            let cl = clt.get(ordnc);
-            if (scell === null && siz(cl) > ctn.get(ordnc)) { add_link(nb); }
+            let cl = [...clt.get(ordnc)];
+            if (scell === null && siz(cl) > ctn.get(ordnc)) { add_con(nb); }
             if (scell === null && !cl.includes(CQNUM.quesmark) && OneNumPerRegion) {
-                if (siz(cl) === ctn.get(ordnc) && isSideable(c, nb, nc)) { add_side(nb); }
-                if (siz(cl) !== ctn.get(ordnc) && isLinkable(c, nb, nc)) { add_link(nb); }
+                if (siz(cl) === ctn.get(ordnc) && isSideable(c, nb, nc)) { add_ncon(nb); }
+                if (siz(cl) !== ctn.get(ordnc) && isLinkable(c, nb, nc)) { add_con(nb); }
             }
             if (allSize !== null) {
-                if (ctn.get(ordnc) % allSize === 0 && isSideable(c, nb, nc)) { add_side(nb); }
-                if (ctn.get(ordnc) % allSize !== 0 && isLinkable(c, nb, nc)) { add_link(nb); }
+                if (ctn.get(ordnc) % allSize === 0 && isSideable(c, nb, nc)) { add_ncon(nb); }
+                if (ctn.get(ordnc) % allSize !== 0 && isLinkable(c, nb, nc)) { add_con(nb); }
             }
-            let acl = clt.get(ord.get(cell));
-            let an = ctn.get(ord.get(cell));
+            const acl = clt.get(ord.get(cell));
+            const an = ctn.get(ord.get(cell));
             let ocl = [];
             acl.forEach(n => {
                 if (cl.includes(n)) { cl.splice(cl.indexOf(n), 1); }
                 else { ocl.push(n); }
             });
-            if (siz(ocl) > an - ctn.get(ordnc)) { add_link(nb); }
+            if (siz(ocl) > an - ctn.get(ordnc)) { add_con(nb); }
             if (scell === null && !ocl.includes(CQNUM.quesmark) && OneNumPerRegion) {
-                if (siz(ocl) === an - ctn.get(ordnc) && isSideable(c, nb, nc)) { add_side(nb); }
-                if (siz(ocl) !== an - ctn.get(ordnc) && isLinkable(c, nb, nc)) { add_link(nb); }
+                if (siz(ocl) === an - ctn.get(ordnc) && isSideable(c, nb, nc)) { add_ncon(nb); }
+                if (siz(ocl) !== an - ctn.get(ordnc) && isLinkable(c, nb, nc)) { add_con(nb); }
             }
         });
     });
-    if (scell !== null && ord.size === scell.qnum) {
+    if (scell !== null && ord.size === getqn(scell) && !byLine) {
         let clist = Array.from(ord.keys());
         clist.forEach(c => {
-            adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
-                if (ord.has(nc)) {
-                    add_link(nb);
-                }
-            });
+            adjlist(c.adjborder, c.adjacent).filter(([nb, nc]) => ord.has(nc)).forEach(([nb, nc]) => add_con(nb));
         });
     }
 }
@@ -2273,31 +2314,31 @@ function RectRegion_Border({ doTrial = true, isSizeAble = (w, h, sc, c) => true 
             //  ×      × 
             // ×·  -> ×·×
             //         × 
-            let b1 = dir(cross.adjborder, d);
-            let b2 = dir(cross.adjborder, d + 1);
+            let b1 = offset(cross, .5, 0, d);
+            let b2 = offset(cross, 0, -.5, d);
             if (isLink(b1) && isLink(b2)) {
-                add_link(dir(cross.adjborder, d + 2));
-                add_link(dir(cross.adjborder, d + 3));
+                add_link(offset(cross, -.5, 0, d));
+                add_link(offset(cross, 0, +.5, d));
             }
             //  ┃      ┃ 
             // ×╹  -> ×┃ 
             //         ┃ 
             if (isSide(b1) && isLink(b2)) {
-                add_side(dir(cross.adjborder, d + 2));
+                add_side(offset(cross, -.5, 0, d));
             }
             //  ×      × 
             // ━╸  -> ━━━
             //           
             if (isLink(b1) && isSide(b2)) {
-                add_side(dir(cross.adjborder, d + 3));
+                add_side(offset(cross, 0, +.5, d));
             }
             //  ┃      ┃ 
             //  ╹  -> ━┻━
             //  ×      × 
-            b2 = dir(cross.adjborder, d + 2);
+            b2 = offset(cross, -.5, 0, d);
             if (isSide(b1) && isLink(b2)) {
-                add_side(dir(cross.adjborder, d + 1));
-                add_side(dir(cross.adjborder, d + 3));
+                add_side(offset(cross, 0, -.5, d));
+                add_side(offset(cross, 0, +.5, d));
             }
         }
     }
@@ -2599,6 +2640,295 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+function MirroringTileAssist() {
+    SizeRegion_Cell({
+        isShaded: isBlack,
+        isUnshaded: isGreen,
+        add_shaded: add_black,
+        add_unshaded: add_green,
+        OneNumPerRegion: false,
+    });
+    let cset = new Set();
+    forEachCell(cell => {
+        let clist = [];
+        if (cset.has(cell) || isGreen(cell)) { return; }
+        let dfs = function (c) {
+            if (!isBlack(c) || clist.includes(c)) { return; }
+            clist.push(c);
+            cset.add(c);
+            fourside(dfs, c.adjacent);
+        };
+        dfs(cell);
+        if (!clist.every(c => adjlist(c.adjacent).every(nc => nc.isnull || isGreen(nc) || clist.includes(nc)))) { return; }
+        let oclist = [];
+        clist.forEach(c => adjdiaglist(c).forEach(nc => {
+            if (!nc.isnull && !isGreen(nc) && !clist.includes(nc)) { oclist.push(nc); }
+        }));
+        let cand = clist.flatMap((cc) => {
+            let r = [clist.map(c => [c.bx - cc.bx, c.by - cc.by])];
+            r = [...r, ...r.map(l => l.map(([x, y]) => [-y, x]))];
+            r = [...r, ...r.map(l => l.map(([x, y]) => [-x, y]))];
+            r = [...r, ...r.map(l => l.map(([x, y]) => [x, -y]))];
+            r = r.flatMap(l => oclist.map(oc => l.map(([x, y]) => board.getc(oc.bx + x, oc.by + y))));
+            r = r.filter(l => l.every(c => !c.isnull && !isGreen(c) && (!isNum(c) || c.qnum === clist.length) && !adjlist(c.adjacent).some(nc => !l.includes(nc) && isBlack(nc))));
+            return r;
+        });
+        if (cand.length > 0) {
+            let ic = cand.reduce((a, b) => a.filter(c => b.includes(c)));
+            ic.forEach(c => add_black(c));
+            let uc = cand.map(l => unique(l.flatMap(c => adjlist(c.adjacent)).filter(c => !c.isnull && !l.includes(c))));
+            uc = uc.reduce((a, b) => a.filter(c => b.includes(c)));
+            uc.forEach(c => add_green(c));
+        }
+    });
+}
+
+function _WalkAssist(isOther) {
+    SizeRegion_Border({
+        isLinkable: (c, nb, nc) => !c.isnull && !nc.isnull && !isOther(c) && !isOther(nc),
+        isCon: b => isLine(b) && !b.sidecell.some(c => isOther(c)),
+        isNCon: b => isCross(b) || b.sidecell.some(c => isOther(c)),
+        add_con: add_line,
+        add_ncon: b => !b.sidecell.some(c => isOther(c)) ? add_cross(b) : undefined,
+        byLine: true,
+    });
+    forEachCell(cell => {
+        if (cell.qnum !== 2) { return; }
+        let t = adjlist(cell.adjborder, cell.adjacent).filter(([nb, nc]) => isOther(nc) && !isCross(nb));
+        if (t.length === 1) { add_line(t[0][0]); }
+    });
+    let ccnt = new Map();
+    let cqnum = new Map();
+    let cecnt = new Map();
+    forEachCell(cell => {
+        if (isOther(cell) || ccnt.has(cell)) { return; }
+        let cl = [];
+        let dfs = function (c) {
+            if (c.isnull || isOther(c) || cl.includes(c)) { return; }
+            cl.push(c);
+            adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => isLine(nb) ? dfs(nc) : undefined);
+        };
+        dfs(cell);
+        let ecnt = cl.filter(c => adjlist(c.adjborder, c.adjacent).some(([nb, nc]) => !isLine(nb) && !isCross(nb) && !nc.isnull && !isOther(nc))).length;
+        if (cl.length === 1 && cl[0].lcnt === 0 && adjlist(cl[0].adjborder, cl[0].adjacent).filter(([nb, nc]) => !isLine(nb) && !nc.isnull && !isOther(nc)).length >= 2) { ecnt = 2; }
+        cl.forEach(c => { ccnt.set(c, cl.length); cecnt.set(c, ecnt); });
+        if (cl.some(c => isNum(c))) {
+            let qnum = cl.find(c => isNum(c)).qnum;
+            cl.forEach(c => cqnum.set(c, qnum));
+            if (qnum === cl.length) {
+                cl.forEach(c => adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => !isOther(nc) && !isLine(nb) ? add_cross(nb) : undefined));
+            }
+            if (qnum > cl.length && cl.flatMap(c => adjlist(c.adjborder)).filter(b => isLine(b) && b.sidecell.some(c => isOther(c))).length === 1) {
+                cl.forEach(c => adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => isOther(nc) ? add_cross(nb) : undefined));
+            }
+        }
+    });
+    forEachBorder(border => {
+        if (isEdge(border)) { add_cross(border); }
+        if (border.sidecell.some(c => c.isnull || isOther(c))) { return; }
+        let [n1, n2] = border.sidecell.map(c => ccnt.get(c));
+        let [qn1, qn2] = border.sidecell.map(c => cqnum.get(c));
+        let [cen1, cen2] = border.sidecell.map(c => cecnt.get(c));
+        if (qn1 !== undefined && qn2 !== undefined && qn1 !== qn2) { add_cross(border); }
+        if (qn1 === undefined && qn2 === undefined) { return; }
+        if (n1 + n2 > (qn1 ?? qn2)) { add_cross(border); }
+        if (n1 + n2 !== (qn1 ?? qn2) && cen1 === 1 && cen2 === 1) { add_cross(border); }
+    });
+}
+
+function FireWalkAssist() {
+    _WalkAssist(isFire);
+    CellConnected({
+        isShaded: cr => cr.qsub === CRQSUB.in,
+        isUnshaded: cr => cr.qsub === CRQSUB.out,
+        add_shaded: cr => add_inout(cr, CRQSUB.in),
+        add_unshaded: cr => add_inout(cr, CRQSUB.out),
+        isLinked: (c, nb, nc) => isCross(nb) || c.qsub === CRQSUB.in && nc.qsub === CRQSUB.in,
+        isNotPassable: (c, nb, nc) => {
+            if (nb !== undefined) return nb.line;
+            let d = [0, 1, 2, 3].find(d => offset(c, 1, 1, d) === nc);
+            return !isFire(offset(c, .5, .5, d));
+        },
+        DiagDir: true,
+        Obj: "cross",
+    });
+    CellConnected({
+        isShaded: cr => cr.qsub === CRQSUB.out,
+        isUnshaded: cr => cr.qsub === CRQSUB.in,
+        add_shaded: cr => add_inout(cr, CRQSUB.out),
+        add_unshaded: cr => add_inout(cr, CRQSUB.in),
+        isLinked: (c, nb, nc) => isCross(nb) || c.qsub === CRQSUB.out && nc.qsub === CRQSUB.out,
+        isNotPassable: (c, nb, nc) => {
+            if (nb !== undefined) return nb.line;
+            let d = [0, 1, 2, 3].find(d => offset(c, 1, 1, d) === nc);
+            return !isFire(offset(c, .5, .5, d));
+        },
+        DiagDir: true,
+        Obj: "cross",
+    });
+    forEachCell(cell => {
+        let emptycnt = adjlist(cell.adjborder).filter(b => !isEdge(b) && !isCross(b)).length;
+        let linecnt = adjlist(cell.adjborder).filter(b => isLine(b)).length;
+        // no branch and no cross
+        if (linecnt === 2 && !isFire(cell)) { fourside(add_cross, cell.adjborder); }
+        // no deadend
+        if (emptycnt <= 1) { fourside(add_cross, cell.adjborder); }
+        // cross
+        if (linecnt === 3) { fourside(add_line, cell.adjborder); }
+        // 2 degree path
+        if (emptycnt === 2 && (linecnt === 1 || isClue(cell))) { fourside(add_line, cell.adjborder); }
+        for (let d = 0; d < 4; d++) {
+            if (isFire(cell) && isLine(offset(cell, -.5, 0, d)) && isCross(offset(cell, 0, -.5, d))) { add_line(offset(cell, 0, +.5, d)); }
+            if (isFire(cell) && isLine(offset(cell, -.5, 0, d)) && isCross(offset(cell, 0, +.5, d))) { add_line(offset(cell, 0, -.5, d)); }
+            if (isFire(cell) && isLine(offset(cell, .5, 0, d)) && isLine(offset(cell, -.5, 0, d))) {
+                fourside(add_line, cell.adjborder);
+            }
+            if (isFire(cell) && isCross(offset(cell, .5, 0, d)) && isCross(offset(cell, -.5, 0, d))) {
+                fourside(add_cross, cell.adjborder);
+            }
+        }
+        if (offset(cell, +.5, +.5).qsub === CRQSUB.out && offset(cell, +.5, -.5).qsub === CRQSUB.in &&
+            offset(cell, -.5, -.5).qsub === CRQSUB.out && offset(cell, -.5, +.5).qsub === CRQSUB.in) {
+            cell.setQans(1);
+            cell.draw();
+        }
+        if (offset(cell, +.5, +.5).qsub === CRQSUB.in && offset(cell, +.5, -.5).qsub === CRQSUB.out &&
+            offset(cell, -.5, -.5).qsub === CRQSUB.in && offset(cell, -.5, +.5).qsub === CRQSUB.out) {
+            cell.setQans(2);
+            cell.draw();
+        }
+    });
+    add_inout(board.getobj(0, 0), CRQSUB.out);
+    let crossSet = new Set();
+    let dfs = function (cr) {
+        if (cr.qsub === CRQSUB.none || crossSet.has(cr)) { return; }
+        crossSet.add(cr);
+        for (let d = 0; d < 4; d++) {
+            let ncr = offset(cr, 1, 0, d);
+            let b = offset(cr, .5, 0, d);
+            if (ncr.isnull) { continue; }
+            if (cr.qsub !== CRQSUB.none) {
+                // add line between different i/o
+                (() => {
+                    if (cr.isnull || ncr.isnull) { return; }
+                    if (cr.qsub === CRQSUB.none || ncr.qsub === CRQSUB.none) { return; }
+                    if (cr.qsub === ncr.qsub) { add_cross(b); }
+                    if (cr.qsub !== ncr.qsub) { add_line(b); }
+                })();
+                // extend i/o through cross/line
+                (() => {
+                    if (ncr.isnull) { return; }
+                    if (isntLine(b)) { add_inout(ncr, cr.qsub); }
+                    if (!b.isnull && isLine(b)) { add_inout(ncr, cr.qsub ^ 1); }
+                })();
+                dfs(ncr);
+            }
+        }
+    };
+    forEachCross(cross => dfs(cross));
+}
+
+function WaterWalkAssist() {
+    SingleLoopInCell({
+        isPass: isClue,
+    });
+    let isWater = c => !c.isnull && c.ques === CQUES.ice;
+    _WalkAssist(isWater);
+    forEachCell(cell => {
+        if (!isWater(cell)) { return; }
+        if (adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => isCross(nb) || nc.isnull || isWater(nc))) { fourside(add_cross, cell.adjborder); }
+        for (let d = 0; d < 4; d++) {
+            if (isWater(offset(cell, 1, 0, d)) && isLine(offset(cell, .5, 0, d))) {
+                let f = b => !b.sidecell.some(c => !c.isnull && !isWater(c)) ? add_cross(b) : undefined;
+                [...adjlist(cell.adjborder), ...adjlist(offset(cell, 1, 0, d).adjborder)].forEach(b => f(b));
+            }
+        }
+    });
+}
+
+function IceWalkAssist() {
+    SingleLoopInCell({
+        isPass: isClue,
+    });
+    _WalkAssist(isIce);
+}
+
+function HebiIchigoAssist() {
+    let isEmpty = c => !c.isnull && !isClue(c) && c.anum === CANUM.none;
+    let extendHebi = l => l.flatMap(h => {
+        let [x, y] = h[h.length - 1];
+        let nc = [[1, 0], [0, -1], [-1, 0], [0, 1]].map(([dx, dy]) => [x + dx, y + dy]);
+        nc = nc.map(e => [...h, e]);
+        nc = nc.filter(nh => new Set(nh.map(e => e.join(','))).size === nh.length);
+        return nc;
+    });
+    let extendHebiN = (l, n) => n > 0 ? extendHebi(extendHebiN(l, n - 1)) : l;
+    const HEBI = extendHebiN([[[0, 0], [-1, 0]]], 3);
+    forEachCell(cell => {
+        if (isNum(cell) && cell.qnum === 0) {
+            let d = qdirRemap(cell.qdir);
+            let pcell = offset(cell, 1, 0, d);
+            while (!pcell.isnull && !isClue(pcell)) { add_dot(pcell); pcell = offset(pcell, 1, 0, d); }
+        }
+        if (isNum(cell) && cell.qnum !== 0) {
+            let d = qdirRemap(cell.qdir);
+            let pcell = offset(cell, 1, 0, d);
+            while (isDot(pcell) || isEmpty(pcell) && adjlist(pcell.adjacent).some(nc => nc.anum !== CANUM.none && (nc.anum + cell.qnum) % 2 === 0)) { add_dot(pcell); pcell = offset(pcell, 1, 0, d); }
+            if (!pcell.isnull && !isClue(pcell) && (pcell.anum === CANUM.none || pcell.anum === cell.qnum)) {
+                let npcell = offset(pcell, 1, 0, d);
+                while (isDot(npcell) || isEmpty(npcell) && adjlist(npcell.adjacent).some(nc => nc.anum !== CANUM.none && (nc.anum + cell.qnum) % 2 === 0)) { npcell = offset(npcell, 1, 0, d); }
+                if (npcell.isnull || isClue(npcell) || npcell.anum !== CANUM.none && npcell.anum !== cell.qnum) {
+                    add_number(pcell, cell.qnum);
+                }
+            }
+        }
+        if (cell.anum !== CANUM.none) {
+            let cand = HEBI.flatMap(h => {
+                let [sx, sy] = h[cell.anum - 1];
+                let hl = [0, 1, 2, 3].flatMap(d => {
+                    let nh = h.map(([x, y]) => offset(cell, x - sx, y - sy, d));
+                    if (nh.some((c, i) => c.isnull || isDot(c) || isClue(c) || c.anum !== CANUM.none && c.anum !== i + 1)) { return []; }
+                    let ncl = nh.flatMap(c => adjlist(c.adjacent));
+                    if (ncl.some(c => !nh.includes(c) && c.anum !== CANUM.none)) { return []; }
+                    let hc = nh[0], nc = offset(hc, 1, 0, d);
+                    while (!nc.isnull && !isClue(nc) && nc.anum === CANUM.none) { nc = offset(nc, 1, 0, d); }
+                    if (nc.anum !== CANUM.none) { return []; }
+                    return [nh];
+                });
+                return hl;
+            });
+            if (cand.length > 0) {
+                [0, 1, 2, 3, 4].forEach(i => {
+                    if (cand.every(h => h[i] === cand[0][i])) { add_number(cand[0][i], i + 1); }
+                });
+                let ncl = cand.map(h => h.flatMap(c => adjlist(c.adjacent))
+                    .filter(c => !c.isnull && !isClue(c) && !h.includes(c)));
+                ncl = ncl.reduce((l1, l2) => l1.filter(c => l2.includes(c)));
+                ncl.forEach(c => add_dot(c));
+            }
+        }
+        if (cell.anum === CANUM.none && !isClue(cell)) {
+            let cl = [];
+            let dfs = function (c) {
+                if (c.isnull || isDot(c) || isClue(c) || cl.includes(c) || cl.length >= 5) { return; }
+                cl.push(c);
+                fourside(dfs, c.adjacent);
+            };
+            dfs(cell);
+            if (cl.length < 5) { cl.forEach(c => add_dot(c)); }
+        }
+        for (let d = 0; d < 4; d++) {
+            if (cell.anum === 1 && offset(cell, -1, 0, d).anum === 2) {
+                let pcell = offset(cell, 1, 0, d);
+                while (!pcell.isnull && !isClue(pcell)) {
+                    add_dot(pcell);
+                    pcell = offset(pcell, 1, 0, d);
+                }
+            }
+        }
+    });
+}
+
 function NikojiAssist() {
     NoDeadendBorder();
     CluePerRegion({
@@ -2758,49 +3088,61 @@ function CoffeeMilkAssist() {
     let isWhite = c => c.qnum === 1;
     let isBlack = c => c.qnum === 2;
     let isGray = c => c.qnum === -2;
+    let add_path = c => {
+        if (c.qnum !== CQNUM.none) { return; }
+        if (isntLine(c.adjborder.top)) {
+            add_line(c.adjborder.left);
+            add_line(c.adjborder.right);
+        }
+        if (isntLine(c.adjborder.left)) {
+            add_line(c.adjborder.top);
+            add_line(c.adjborder.bottom);
+        }
+    };
     CellConnected({
         isShaded: isGray,
         isUnshaded: c => adjlist(c.adjborder).every(b => isntLine(b)),
-        add_shaded: c => {
-            if (c.qnum !== CQNUM.none) { return; }
-            if (isntLine(c.adjborder.top)) {
-                add_line(c.adjborder.left);
-                add_line(c.adjborder.right);
-            }
-            if (isntLine(c.adjborder.left)) {
-                add_line(c.adjborder.top);
-                add_line(c.adjborder.bottom);
-            }
-        },
+        add_shaded: add_path,
         add_unshaded: c => adjlist(c.adjborder).forEach(b => add_cross(b)),
         isNotPassable: (c, nb, nc) => isCross(nb),
         isOthers: c => isWhite(c) || isBlack(c),
         cantDivideShade: (s, o) => s === 0 && o > 0,
         OnlyOneConnected: false,
+        BridgeType: "line",
     });
     CellConnected({
         isShaded: isWhite,
         isUnshaded: c => adjlist(c.adjborder).every(b => isntLine(b)),
-        add_shaded: c => {
-            if (c.qnum !== CQNUM.none) { return; }
-            if (isntLine(c.adjborder.top)) {
-                add_line(c.adjborder.left);
-                add_line(c.adjborder.right);
-            }
-            if (isntLine(c.adjborder.left)) {
-                add_line(c.adjborder.top);
-                add_line(c.adjborder.bottom);
-            }
-        },
+        add_shaded: add_path,
         add_unshaded: c => adjlist(c.adjborder).forEach(b => add_cross(b)),
         isNotPassable: (c, nb, nc) => isCross(nb),
         isOthers: c => isBlack(c),
         cantDivideShade: (s, o) => s !== o,
         OnlyOneConnected: false,
+        BridgeType: "line",
     });
+    let nxtc = function (c, d) {
+        let nc = offset(c, 1, 0, d);
+        if (isCross(offset(c, .5, 0, d))) { return board.emptycell; }
+        while (!nc.isnull && nc.qnum === CQNUM.none) {
+            if (isCross(offset(nc, .5, 0, d))) { return board.emptycell; }
+            nc = offset(nc, 1, 0, d);
+        }
+        return nc;
+    }
     forEachCell(cell => {
         if (cell.qnum !== CQNUM.none && !isGray(cell) && adjlist(cell.adjborder).filter(b => !isntLine(b)).length === 1) {
             fourside(add_line, cell.adjborder);
+        }
+        if (isGray(cell) && adjlist(cell.adjborder).filter(b => !isntLine(b)).length === 1) {
+            fourside(add_cross, cell.adjborder);
+        }
+        if (isGray(cell)) {
+            let t = [0, 1, 2, 3].map(d => nxtc(cell, d).qnum);
+            if (cell.lcnt > 0 && t.filter(n => n === 1).length === 1) { add_line(offset(cell, .5, 0, t.indexOf(1))); }
+            if (cell.lcnt > 0 && t.filter(n => n === 2).length === 1) { add_line(offset(cell, .5, 0, t.indexOf(2))); }
+            t = t.filter(n => n > 0);
+            if (t.length === 0 || unique(t).length === 1) { fourside(add_cross, cell.adjborder); }
         }
         for (let d = 0; d < 4; d++) {
             if (cell.qnum === CQNUM.none && isLine(offset(cell, .5, 0, d))) {
@@ -2810,13 +3152,10 @@ function CoffeeMilkAssist() {
             }
             if (cell.qnum === CQNUM.none && isCross(offset(cell, .5, 0, d))) { add_cross(offset(cell, -.5, 0, d)); }
             if (cell.qnum !== CQNUM.none && !isntLine(offset(cell, .5, 0, d))) {
-                let pcell = offset(cell, 1, 0, d);
-                while (!pcell.isnull && pcell.qnum === CQNUM.none) {
-                    pcell = offset(pcell, 1, 0, d);
-                }
-                if (pcell.isnull || isWhite(cell) && isBlack(pcell) || isGray(cell) && isGray(pcell)) {
-                    add_cross(offset(cell, .5, 0, d));
-                }
+                let pcell = nxtc(cell, d);
+                if (pcell.isnull || isWhite(cell) && isBlack(pcell) || isGray(cell) && isGray(pcell)) { add_cross(offset(cell, .5, 0, d)); }
+                let f = c => isGray(c) || c.path !== null && Array.from(c.path.clist).some(c => isGray(c));
+                if (!pcell.isnull && cell.path !== pcell.path && f(cell) && f(pcell)) { add_cross(offset(cell, .5, 0, d)); }
             }
         }
     });
@@ -3037,21 +3376,85 @@ function UsoOneAssist() {
     });
 }
 
+function Yajirushi2Assist() {
+    let isDot = isYellow;
+    let add_dot = add_yellow;
+    let isntDot = c => c.isnull || isClue(c) || isOcell(c) || c.anum !== CANUM.none;
+    let isArrowAble = function (c, d) {
+        if (isDot(c) || isntDot(offset(c, 1, 0, d)) || c.anum !== CANUM.none && d !== qdirRemap(c.anum)) { return false; }
+        let nc = offset(c, 2, 0, d);
+        while (isDot(nc)) { nc = offset(nc, 1, 0, d); }
+        if (nc.isnull || isClue(nc) || nc.anum !== CANUM.none && [-1, 3, 1, 0, 2][nc.anum] !== d) { return false; }
+        return true;
+    };
+    let add_arrow = function (c, d) {
+        if (c === undefined || c.isnull || c.anum !== CANUM.none) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setAnum(d);
+        c.setQsub(CQSUB.none);
+        c.draw();
+    }
+    CellConnected({
+        isShaded: isDot,
+        isUnshaded: c => isOcell(c) || c.anum !== CANUM.none || isClue(c),
+        add_shaded: add_dot,
+        add_unshaded: add_Ocell,
+    });
+    let hasDot = false;
+    forEachCell(cell => { hasDot = hasDot || isDot(cell); });
+    forEachCell(cell => {
+        if (isNum(cell)) {
+            NShadeInClist({
+                isShaded: c => isOcell(c) || c.anum !== CANUM.none,
+                isUnshaded: c => isDot(c) || isClue(c),
+                add_shaded: add_Ocell,
+                add_unshaded: add_dot,
+                clist: adjlist(cell.adjacent),
+                n: cell.qnum
+            })
+        }
+        if (cell.anum !== CANUM.none) {
+            let d = [-1, 1, 3, 2, 0][cell.anum];
+            add_dot(offset(cell, 1, 0, d));
+            let ncell = offset(cell, 2, 0, d);
+            while (isDot(ncell)) { ncell = offset(ncell, 1, 0, d); }
+            if (isOcell(ncell)) {
+                add_arrow(ncell, [3, 2, 4, 1][d]);
+            } else if (!ncell.isnull && !isClue(ncell)) {
+                let mcell = offset(ncell, 1, 0, d);
+                while (isDot(mcell)) { mcell = offset(mcell, 1, 0, d); }
+                if (mcell.isnull || isClue(mcell) || mcell.anum !== CANUM.none && [-1, 3, 1, 0, 2][mcell.anum] !== d) {
+                    add_arrow(ncell, [3, 2, 4, 1][d]);
+                }
+            }
+        }
+        if (cell.anum === CANUM.none && hasDot && adjlist(cell.adjacent).filter(c => !isntDot(c)).length === 1) {
+            add_dot(adjlist(cell.adjacent).find(c => !isntDot(c)));
+        }
+        if ([0, 1, 2, 3].every(d => !isArrowAble(cell, d))) { add_dot(cell); }
+        if (isOcell(cell) && [0, 1, 2, 3].filter(d => isArrowAble(cell, d)).length === 1) {
+            add_arrow(cell, [4, 1, 3, 2][[0, 1, 2, 3].find(d => isArrowAble(cell, d))]);
+        }
+    });
+}
+
 function ToichikaAssist() {
     let isArrowAble = function (c, d) {
-        if (isDot(c) || c.anum !== CANUM.none && d !== [-1, 1, 3, 2, 0][c.anum]) { return false; }
+        if (isDot(c) || c.anum !== CANUM.none && d !== qdirRemap(c.anum)) { return false; }
         let roomset = new Set(Array.from(c.room.clist).flatMap(c => adjlist(c.adjacent).flatMap(nc => nc.isnull ? [] : nc.room)));
-        let nc = offset(c, 1, 0, d);
+        roomset.add(c.room);
+        let nc = offset(c, 1, 0, d), cl = [];
         while (isDot(nc) || roomset.has(nc.room) && nc.anum == CANUM.none) {
+            cl.push(nc);
+            if (Array.from(nc.room.clist).every(c => isDot(c) || cl.includes(c))) { return false; }
             nc = offset(nc, 1, 0, d);
         }
-        if (nc.isnull || roomset.has(nc.room) || nc.anum !== CANUM.none && [-1, 3, 1, 0, 2][nc.anum] !== d) {
-            return false;
-        }
+        if (nc.isnull || roomset.has(nc.room) || nc.anum !== CANUM.none && [-1, 3, 1, 0, 2][nc.anum] !== d) { return false; }
         return true;
     };
     forEachCell(cell => {
-        if (cell.qnum !== CQNUM.none) { add_number(cell, cell.qnum); }
+        if (isNum(cell)) { add_number(cell, cell.qnum); }
         if (cell.anum !== CANUM.none) {
             let d = [-1, 1, 3, 2, 0][cell.anum];
             let roomset = new Set(Array.from(cell.room.clist).flatMap(c => adjlist(c.adjacent).flatMap(nc => nc.isnull ? [] : nc.room)));
@@ -3060,13 +3463,22 @@ function ToichikaAssist() {
                 add_dot(ncell);
                 ncell = offset(ncell, 1, 0, d);
             }
-            let mcell = offset(ncell, 1, 0, d);
-            while (isDot(mcell) || roomset.has(mcell.room)) { mcell = offset(mcell, 1, 0, d); }
-            if (mcell.isnull || mcell.anum !== CANUM.none && [-1, 3, 1, 0, 2][mcell.anum] !== d) {
+            if (Array.from(ncell.room.clist).filter(c => !isDot(c)).length === 1 && !isDot(ncell)) {
                 add_number(ncell, [3, 2, 4, 1][d]);
+            } else {
+                let mcell = offset(ncell, 1, 0, d);
+                while (isDot(mcell) || roomset.has(mcell.room)) { mcell = offset(mcell, 1, 0, d); }
+                if (mcell.isnull || mcell.anum !== CANUM.none && [-1, 3, 1, 0, 2][mcell.anum] !== d) {
+                    add_number(ncell, [3, 2, 4, 1][d]);
+                }
             }
         }
-        if ([0, 1, 2, 3].every(d => !isArrowAble(cell, d))) { add_dot(cell); }
+        if (!isDot(cell) && cell.qnum === CANUM.none && [0, 1, 2, 3].every(d => !isArrowAble(cell, d))) { add_dot(cell); }
+        if (!isDot(cell) && cell.qnum === CANUM.none && [0, 1, 2, 3].filter(d => {
+            let nc = offset(cell, 1, 0, d);
+            while (isDot(nc)) { nc = offset(nc, 1, 0, d); }
+            return nc.anum === [3, 2, 4, 1][d];
+        }).length > 1) { add_dot(cell); }
         if (!isDot(cell) && Array.from(cell.room.clist).filter(c => !isDot(c)).length === 1 &&
             [0, 1, 2, 3].filter(d => isArrowAble(cell, d)).length === 1) {
             add_number(cell, [4, 1, 3, 2][[0, 1, 2, 3].find(d => isArrowAble(cell, d))]);
@@ -4052,7 +4464,7 @@ function WallLogicAssist() {
         if (cell.anum !== CANUM.none) {
             let d = [-1, 3, 1, 0, 2][cell.anum];
             let nc = offset(cell, 1, 0, d);
-            if (!nc.isNull && !isNum(nc)) {
+            if (!nc.isnull && !isNum(nc)) {
                 add_number(nc, cell.anum);
             }
         }
@@ -4636,14 +5048,15 @@ function HashiwokakeroAssist() {
         },
         add_unshaded: c => adjlist(c.adjborder).forEach(b => add_cross(b)),
         isNotPassable: (c, nb, nc) => isCross(nb),
+        BridgeType: "line",
     });
     forEachCell(cell => {
         for (let d = 0; d < 4; d++) {
-            if (cell.qnum === CQNUM.none && isntLine(dir(cell.adjborder, d))) {
-                add_cross(dir(cell.adjborder, d + 2));
+            if (cell.qnum === CQNUM.none && isntLine(offset(cell, .5, 0, d))) {
+                add_cross(offset(cell, -.5, 0, d));
             }
-            if (cell.qnum === CQNUM.none && dir(cell.adjborder, d).line) {
-                add_line(dir(cell.adjborder, d + 2), dir(cell.adjborder, d).line);
+            if (cell.qnum === CQNUM.none && offset(cell, .5, 0, d).line) {
+                add_line(offset(cell, -.5, 0, d), offset(cell, .5, 0, d).line);
             }
         }
         if (cell.qnum === CQNUM.none && cell.lcnt === 2) {
@@ -4657,11 +5070,11 @@ function HashiwokakeroAssist() {
         }
         if (cell.qnum !== CQNUM.none) {
             let l = [0, 1, 2, 3].map(d => {
-                let nc = dir(cell.adjacent, d);
-                if (isCross(dir(cell.adjborder, d))) { return 0; }
+                let nc = offset(cell, 1, 0, d);
+                if (isCross(offset(cell, .5, 0, d))) { return 0; }
                 while (!nc.isnull && nc.qnum === CQNUM.none) {
-                    if (isCross(dir(nc.adjborder, d))) { return 0; }
-                    nc = dir(nc.adjacent, d);
+                    if (isCross(offset(nc, .5, 0, d))) { return 0; }
+                    nc = offset(nc, 1, 0, d);
                 }
                 if (nc.isnull) { return 0; }
                 if (nc.qnum === CQNUM.quesmark) { return 2; }
@@ -4674,11 +5087,11 @@ function HashiwokakeroAssist() {
             });
             for (let d = 0; d < 4; d++) {
                 if (l[d] === 0) {
-                    add_cross(dir(cell.adjborder, d));
+                    add_cross(offset(cell, .5, 0, d));
                 }
                 let n = Math.min(cell.qnum - l.reduce((a, b) => a + b) + l[d], 2);
                 if (cell.qnum >= 0 && n >= 1) {
-                    add_line(dir(cell.adjborder, d), n);
+                    add_line(offset(cell, .5, 0, d), n);
                 }
             }
         }
@@ -4897,7 +5310,7 @@ function SashiganeAssist() {
         // add side around arrow
         if (cell.qdir !== 0 && cell.qdir !== 5) {
             let d = qdirRemap(cell.qdir);
-            [1, 2, 3].forEach(n => add_side(dir(cell.adjborder, d + n)));
+            [1, 2, 3].forEach(n => add_side(offset(cell, .5, 0, d + n)));
         }
         // at most 2 link for each cell
         if (adjlist(cell.adjborder).filter(b => isLink(b)).length === 2) {
@@ -4905,29 +5318,29 @@ function SashiganeAssist() {
         }
         // extend the endpoint of a L
         if (adjlist(cell.adjborder).filter(b => !b.isnull && !isSide(b)).length === 1) {
-            let d = [0, 1, 2, 3].find(n => (b => !b.isnull && !isSide(b))(dir(cell.adjborder, n)));
-            add_link(dir(cell.adjborder, d));
-            let ncell = dir(cell.adjacent, d);
-            while ([d + 1, d - 1].every(n => (b => b.isnull || isSide(b))(dir(ncell.adjborder, n)))) {
-                add_side(dir(ncell.adjborder, d + 1));
-                add_side(dir(ncell.adjborder, d - 1));
-                add_link(dir(ncell.adjborder, d));
-                ncell = dir(ncell.adjacent, d);
+            let d = [0, 1, 2, 3].find(n => (b => !b.isnull && !isSide(b))(offset(cell, .5, 0, n)));
+            add_link(offset(cell, .5, 0, d));
+            let ncell = offset(cell, 1, 0, d);
+            while ([d + 1, d - 1].every(n => (b => b.isnull || isSide(b))(offset(ncell, .5, 0, n)))) {
+                add_side(offset(ncell, 0, -.5, d));
+                add_side(offset(ncell, 0, +.5, d));
+                add_link(offset(ncell, .5, 0, d));
+                ncell = offset(ncell, 1, 0, d);
             }
             if (ncell.qnum !== CQNUM.none) {
-                add_side(dir(ncell.adjborder, d));
+                add_side(offset(ncell, .5, 0, d));
             }
             if (!offset(ncell, 1, -1, d).isnull && [[-.5, -1], [0, -1.5], [1.5, 0], [1, .5]].every(([x, y]) => (b => b.isnull || isSide(b))(offset(ncell, x, y, d)))) {
-                add_side(dir(ncell.adjborder, d));
+                add_side(offset(ncell, .5, 0, d));
             }
             if (!offset(ncell, -1, -1, d).isnull && [[.5, -1], [0, -1.5], [-1.5, 0], [-1, .5]].every(([x, y]) => (b => b.isnull || isSide(b))(offset(ncell, x, y, d)))) {
-                add_side(dir(ncell.adjborder, d));
+                add_side(offset(ncell, .5, 0, d));
             }
             if (!offset(ncell, 1, -1, d).isnull && [[1, -1.5], [1.5, -1], [1.5, 0], [1, .5]].every(([x, y]) => (b => b.isnull || isSide(b))(offset(ncell, x, y, d)))) {
-                add_side(dir(ncell.adjborder, d));
+                add_side(offset(ncell, .5, 0, d));
             }
             if (!offset(ncell, -1, -1, d).isnull && [[-1, -1.5], [-1.5, -1], [-1.5, 0], [-1, .5]].every(([x, y]) => (b => b.isnull || isSide(b))(offset(ncell, x, y, d)))) {
-                add_side(dir(ncell.adjborder, d));
+                add_side(offset(ncell, .5, 0, d));
             }
             if (!offset(ncell, 1, -1, d).isnull && [[-.5, -1], [0, -1.5], [1, -1.5], [1.5, -1]].every(([x, y]) => (b => b.isnull || isSide(b))(offset(ncell, x, y, d)))) {
                 add_side(offset(ncell, .5, 0, d));
@@ -4935,7 +5348,7 @@ function SashiganeAssist() {
             if (!offset(ncell, -1, -1, d).isnull && [[.5, -1], [0, -1.5], [-1, -1.5], [-1.5, -1]].every(([x, y]) => (b => b.isnull || isSide(b))(offset(ncell, x, y, d)))) {
                 add_side(offset(ncell, -.5, 0, d));
             }
-            if ((b => b.isnull || isSide(b))(dir(ncell.adjborder, d))) {
+            if ((b => b.isnull || isSide(b))(offset(ncell, .5, 0, d))) {
                 if ((b => b.isnull || isSide(b))(offset(ncell, -.5, 0, d))) {
                     add_side(offset(ncell, 1, +.5, d));
                     add_side(offset(ncell, 1, -.5, d));
@@ -4952,17 +5365,17 @@ function SashiganeAssist() {
         if (cell.qnum !== CQNUM.none || cell.qdir === 5) {
             let ext = [0, 0, 0, 0], lnk = [0, 0, 0, 0];
             for (let d = 0; d < 4; d++) {
-                while ((c => !c.isnull && c.qnum === CQNUM.none && c.qdir !== 5 && !isSide(dir(c.adjborder, d + 2)) && [d + 1, d - 1].every(n => !isLink(dir(c.adjborder, n))))(offset(cell, 0, -ext[d] - 1, d))) {
+                while ((c => !c.isnull && c.qnum === CQNUM.none && c.qdir !== 5 && !isSide(offset(c, -.5, 0, d)) && [d + 1, d - 1].every(n => !isLink(offset(c, .5, 0, n))))(offset(cell, 0, -ext[d] - 1, d))) {
                     ext[d] = ext[d] + 1;
                 }
                 while (isLink(offset(cell, 0, -lnk[d] - .5, d))) {
                     lnk[d] = lnk[d] + 1;
                 }
-                if (isLink(dir(cell.adjborder, d))) {
-                    add_side(dir(cell.adjborder, d + 2));
+                if (isLink(offset(cell, .5, 0, d))) {
+                    add_side(offset(cell, -.5, 0, d));
                 }
-                if (isSide(dir(cell.adjborder, d))) {
-                    add_link(dir(cell.adjborder, d + 2));
+                if (isSide(offset(cell, .5, 0, d))) {
+                    add_link(offset(cell, -.5, 0, d));
                 }
             }
             for (let d = 0; d < 4; d++) {
@@ -4983,7 +5396,7 @@ function SashiganeAssist() {
                     add_side(offset(cell, -.5, 1, d));
                     add_side(offset(cell, +.5, 1, d));
                 }
-                if (cell.qnum >= 0 && isLink(dir(cell.adjborder, d))) {
+                if (cell.qnum >= 0 && isLink(offset(cell, .5, 0, d))) {
                     for (let i = 1; i < cell.qnum - Math.max(ext[(d + 1) % 4], ext[(d + 3) % 4]); i++) {
                         add_link(offset(cell, 0, -i + .5, d));
                         add_side(offset(cell, -.5, -i, d));
@@ -5028,7 +5441,7 @@ function SashiganeAssist() {
             let fn = c => {
                 for (let d = 0; d < 4; d++) {
                     let fn = b => isLink(b) || b === border;
-                    if (fn(dir(c.adjborder, d)) && fn(dir(c.adjborder, d + 1))) {
+                    if (fn(offset(c, .5, 0, d)) && fn(offset(c, 0, -.5, d))) {
                         return true;
                     }
                 }
@@ -5793,10 +6206,10 @@ function FiveCellsAssist() {
 
 function SchoolTripAssist() {
     let add_bed = function (c, d) { // NUDLR = 01234
-        if (c === undefined || c.isnull || c.qnum !== CQNUM.none || ![CQANS.none, 41, 46].includes(c.qans)) { return; }
+        if (c === undefined || c.isnull || c.qnum !== CQNUM.none || ![CQANS.none, 41, 46].includes(c.qans) || 41 + d === c.qans) { return; }
         if (d === 5 && c.qans === 41) { return; }
         if (step && flg) { return; }
-        flg ||= (41 + d) !== c.qans;
+        flg = true;
         c.setQans(41 + d);
         if (d > 0 && d <= 4) {
             let nc = [null, offset(c, 0, -1), offset(c, 0, 1), offset(c, -1, 0), offset(c, 1, 0)][d];
@@ -5860,7 +6273,7 @@ function SchoolTripAssist() {
                 if (isDot(hc)) { return false; }
                 return true;
             });
-            if (cell.qans === 46 && tmp.length === 2 && tmp[0][0] === tmp[1][1]) {
+            if (cell.qans === 46 && tmp.length === 2 && tmp[0][0] === tmp[1][1] && tmp[0][1] === tmp[1][0]) {
                 add_bed(tmp[0][0], 5);
                 add_bed(tmp[0][1], 5);
             }
@@ -5962,6 +6375,7 @@ function DoubleChocoAssist() {
     SizeRegion_Border({
         isLinkable: (c, nb, nc) => c.ques === nc.ques,
         isSideable: (c, nb, nc) => c.ques === nc.ques,
+        hasAnum: true,
     });
     let cset = new Set();
     forEachCell(cell => {
@@ -6036,12 +6450,8 @@ function DoubleChocoAssist() {
                 let icset = new Set([...cand.reduce((a, b) => a.filter(c => b.includes(c))), ...clist]);
                 let ucset = new Set(cand.flat());
                 Array.from(icset).forEach(c => adjlist(c.adjborder, c.adjacent).forEach(([nb, nc]) => {
-                    if (icset.has(nc)) {
-                        add_link(nb);
-                    }
-                    if (!icset.has(nc) && !ucset.has(nc)) {
-                        add_side(nb);
-                    }
+                    if (icset.has(nc)) { add_link(nb); }
+                    if (!icset.has(nc) && !ucset.has(nc)) { add_side(nb); }
                 }));
             }
         }
@@ -6172,33 +6582,48 @@ function PutteriaAssist() {
 }
 
 function FillominoAssist() {
-    SizeRegion_Border();
+    SizeRegion_Border({
+        isGroupable: (sc, c) => !adjlist(c.adjborder, c.adjacent).some(([nb, nc]) => sc.anum === nc.anum && isSide(nb)),
+        hasAnum: true,
+    });
     forEachCell(cell => {
-        if (cell.qnum !== CQNUM.none && cell.qnum !== CQNUM.quesmark) { add_number(cell, cell.qnum); }
+        if (isNum(cell)) { add_number(cell, cell.qnum); }
         if (cell.anum !== CANUM.none) {
             fourside((nb, nc) => {
                 if (nb.isnull || nc.isnull) { return; }
-                if (nc.anum === cell.anum) {
-                    add_link(nb);
-                }
-                if (nc.anum !== CANUM.none && nc.anum !== cell.anum) {
-                    add_side(nb);
-                }
-                if (nb.qsub === BQSUB.link) {
-                    add_number(nc, cell.anum);
-                }
+                if (nc.anum === cell.anum) { add_link(nb); }
+                if (nc.anum !== CANUM.none && nc.anum !== cell.anum) { add_side(nb); }
+                if (nb.qsub === BQSUB.link) { add_number(nc, cell.anum); }
             }, cell.adjborder, cell.adjacent);
             let clist = [];
             let dfs = function (c) {
                 if (clist.includes(c)) { return; }
                 clist.push(c);
                 fourside((nb, nc) => {
-                    if (!nb.qans && !nc.isnull && (nc.anum === cell.anum || nc.anum === CANUM.none)) { dfs(nc); }
+                    if (!isSide(nb) && !nc.isnull && (nc.anum === cell.anum || nc.anum === CANUM.none)) { dfs(nc); }
                 }, c.adjborder, c.adjacent);
             };
             dfs(cell);
             if (clist.length === cell.anum) {
                 clist.forEach(c => add_number(c, cell.anum));
+            }
+        }
+        if (cell.anum === CANUM.none) {
+            let clist = [], blist = [];
+            let dfs = function (c) {
+                if (clist.includes(c)) { return; }
+                clist.push(c);
+                fourside((nb, nc) => {
+                    if (isLink(nb)) { dfs(nc); }
+                    if (!nc.isnull && !isSide(nb) && !isLink(nb)) { blist.push(nb); }
+                }, c.adjborder, c.adjacent);
+            };
+            dfs(cell);
+            if (clist.every(c => adjlist(c.adjborder, c.adjacent).every(([nb, nc]) => nc.isnull || isSide(nb) || isLink(nb)))) {
+                clist.forEach(c => add_number(c, clist.length));
+            }
+            if (blist.length === 1 && clist.some(c => adjlist(c.adjacent).some(c => !c.isnull && !clist.includes(c) && c.anum === clist.length))) {
+                add_link(blist[0]);
             }
         }
         if (cell.anum === CANUM.none) {
@@ -6225,12 +6650,12 @@ function FillominoAssist() {
                 }
             })
         }
-        if (adjlist(cell.adjborder).every(b => b.isnull || isSide(b))) {
-            add_number(cell, 1);
-        }
-        if (adjlist(cell.adjborder).filter(b => b.isnull || isSide(b)).length === 3 &&
-            adjlist(cell.adjacent).some(c => !c.isnull && c.qnum === 1)) {
-            fourside(b => add_link(b), cell.adjborder);
+        if (adjlist(cell.adjborder).every(b => isntLink(b))) { add_number(cell, 1); }
+        for (let d = 0; d < 4; d++) {
+            let bl = [[-.5, 0], [0, -.5], [0, .5], [1, -.5], [1, .5], [1.5, 0]].map(([x, y]) => offset(cell, x, y, d));
+            if (bl.every(b => isntLink(b))) {
+                add_link(offset(cell, .5, 0, d));
+            }
         }
     });
 }
@@ -6818,12 +7243,12 @@ function PencilsAssist() {
         if (cell.anum !== CANUM.none) {
             add_yellow(cell);
             let d = qdirRemap(cell.anum);
-            add_green(offset(cell, 0, 1, d));
-            add_side(offset(cell, 0, .5, d));
-            add_side(offset(cell, -.5, 1, d));
-            add_side(offset(cell, +.5, 1, d));
+            add_green(offset(cell, -1, 0, d));
+            add_side(offset(cell, -.5, 0, d));
+            add_side(offset(cell, -1, -.5, d));
+            add_side(offset(cell, -1, +.5, d));
             let pc = cell, lc = cell, llc = cell;
-            while (offset(pc, 0, .5, d).qsub === BQSUB.cross || pc === cell) {
+            while (offset(pc, -.5, 0, d).qsub === BQSUB.cross || pc === cell) {
                 let list = adjlist(lc.adjborder, lc.adjacent);
                 list = list.filter(([nb, nc]) => {
                     if (nc === llc) { return false; }
@@ -6844,22 +7269,22 @@ function PencilsAssist() {
                 }, lc.adjborder, lc.adjacent);
                 llc = lc;
                 lc = list[0][1];
-                pc = offset(pc, 0, 1, d);
+                pc = offset(pc, -1, 0, d);
                 add_yellow(lc);
             }
             while (lc.lcnt === 2 || lc === cell && lc.lcnt === 1) {
-                add_cross(offset(pc, 0, .5, d));
-                pc = offset(pc, 0, 1, d);
+                add_cross(offset(pc, -.5, 0, d));
+                pc = offset(pc, -1, 0, d);
                 add_green(pc);
-                add_side(offset(pc, -.5, 0, d));
-                add_side(offset(pc, +.5, 0, d));
+                add_side(offset(pc, 0, -.5, d));
+                add_side(offset(pc, 0, +.5, d));
                 [llc, lc] = [lc, adjlist(lc.adjborder, lc.adjacent).find(([nb, nc]) => !nb.isnull && nb.line && nc !== llc)[1]];
             }
             if (adjlist(lc.adjborder, lc.adjacent).every(([nb, nc]) =>
                 nc === llc || nb.isnull || isCross(nb) || nb.qans)) {
-                add_side(offset(pc, 0, .5, d));
+                add_side(offset(pc, -.5, 0, d));
             }
-            if (pc !== cell && (b => b.isnull || b.qans)(offset(pc, 0, .5, d))) {
+            if (pc !== cell && (b => b.isnull || b.qans)(offset(pc, -.5, 0, d))) {
                 fourside((nb, nc) => {
                     if (isYellow(nc)) {
                         add_cross(nb);
@@ -6873,7 +7298,7 @@ function PencilsAssist() {
         if (adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => {
             if (nc.isnull || nb.qans && isGreen(nc)) { return true; }
             if (cllist.includes(nc) && nc.anum === CANUM.none) { return true; }
-            if (nc.anum !== CANUM.none && offset(nc, 0, 1, qdirRemap(nc.anum)) !== cell) { return true; }
+            if (nc.anum !== CANUM.none && offset(nc, -1, 0, qdirRemap(nc.anum)) !== cell) { return true; }
             return false;
         })) {
             add_yellow(cell);
@@ -7739,6 +8164,17 @@ function TapaAssist() {
         isUnshaded: c => c.qsub === CQSUB.dot || c.qnums.length > 0,
         add_shaded: add_black,
         add_unshaded: add_dot,
+        isNotPassable: (c, nb, nc) => {
+            let d = [0, 1, 2, 3].find(d => offset(c, 1, 0, d) === nc);
+            if (d === undefined) { return true; }
+            if ([[0, -1], [0, 1], [1, -1], [1, 1]].some(([x, y]) => {
+                let cc = offset(c, x, y, d);
+                if (cc.qnums.length === 4) { return true; }
+                if (cc.qnums.length > 0 && cc.qnums.every(n => n === 1)) { return true; }
+                return false;
+            })) { return true; }
+            return false;
+        }
     });
     let check = function (qnums, s) {
         if (s === "11111111") { return qnums.length === 1 && (qnums[0] === 8 || qnums[0] === CQNUM.quesmark); }
@@ -7829,6 +8265,7 @@ function LightandShadowAssist() {
 }
 
 function SlalomAssist() {
+    // TODO: an easier way to check gate number
     const stc = board.getc(board.startpos.bx, board.startpos.by);
     const gates = board.gatemgr.components.length;
     let add_order = function (c, l) {
@@ -8172,7 +8609,7 @@ function CastleWallAssist() {
         }
     });
     forEachCell(cell => {
-        if (cell.qnum !== CQNUM.none) {
+        if (isClue(cell)) {
             // add qsub around b/w clue
             if (cell.ques === CQUES.black || cell.ques === CQUES.white) {
                 for (let d = 0; d < 4; d++) {
@@ -8180,17 +8617,17 @@ function CastleWallAssist() {
                 }
             }
             // finish clue
-            if (cell.qnum !== CQNUM.quesmark) {
+            if (isNum(cell)) {
                 let d = qdirRemap(cell.qdir);
                 let borderlist = [];
-                let pcell = dir(cell.adjacent, d);
+                let pcell = offset(cell, 1, 0, d);
                 let qnum = cell.qnum;
                 while (!pcell.isnull && (pcell.qnum < 0 || pcell.qdir !== cell.qdir)) {
-                    let b = dir(pcell.adjborder, d);
+                    let b = offset(pcell, .5, 0, d);
                     if (!b.isnull && b.sidecell[0].qnum === CQNUM.none && b.sidecell[1].qnum === CQNUM.none) {
                         borderlist.push(b);
                     }
-                    pcell = dir(pcell.adjacent, d);
+                    pcell = offset(pcell, 1, 0, d);
                 }
                 if (!pcell.isnull) {
                     qnum -= pcell.qnum;
@@ -8716,7 +9153,7 @@ function SlantAssist() {
             scnt[i][j] = Math.max(0, board.getobj(2 * j, 2 * i).qnum);
             scnt[i][j] += f(scnt, i - 1, j) + f(scnt, i, j - 1) - f(scnt, i - 1, j - 1);
             ncnt[i][j] = board.getobj(2 * j, 2 * i).qnum >= 0 ? 1 : 0;
-            ncnt[i][j] += f(ncnt, i - 1, j) + f(ncnt, i, j - 1) - f(ncnt, i - 1, j - 1);;
+            ncnt[i][j] += f(ncnt, i - 1, j) + f(ncnt, i, j - 1) - f(ncnt, i - 1, j - 1);
         }
     }
     // check the clue for the four corners of the corresponding rectangle
@@ -8803,16 +9240,6 @@ function SlantAssist() {
 }
 
 function NuribouAssist() {
-    forEachCell(cell => {
-        if (cell.qnum !== CQNUM.none) {
-            add_green(cell);
-        }
-        // surrounded white cell
-        let templist = [offset(cell, 1, 0, 0), offset(cell, 1, 0, 1), offset(cell, 1, 0, 2), offset(cell, 1, 0, 3)];
-        if (cell.qnum === CQNUM.none && templist.filter(c => isBlack(c)).length === 4) {
-            add_black(cell);
-        }
-    });
     StripRegion_cell({
         isShaded: isBlack,
         add_unshaded: add_green,
@@ -8823,40 +9250,42 @@ function NuribouAssist() {
         add_shaded: add_green,
         add_unshaded: c => add_black(c, true),
     });
-    // unreachable cell
-    {
-        let list = [];
-        forEachCell(cell => {
-            if (cell.qnum !== CQNUM.none) {
-                list.push(cell);
-                if (cell.qnum === CQNUM.quesmark) { return; }
-                for (let dx = -cell.qnum + 1; dx <= cell.qnum - 1; dx++) {
-                    for (let dy = -cell.qnum + Math.abs(dx) + 1; dy <= cell.qnum - Math.abs(dx) - 1; dy++) {
-                        let c = offset(cell, dx, dy);
-                        if (c.isnull || list.includes(c)) { continue; }
-                        list.push(c);
-                    }
-                }
-            }
-        });
-        if (!list.some(c => c.qnum === CQNUM.quesmark)) {
-            forEachCell(cell => {
-                if (!list.includes(cell)) {
-                    add_black(cell);
-                }
-            });
+    let clen = new Map();
+    forEachCell(cell => {
+        if (!isBlack(cell) || adjlist(cell.adjacent).filter(c => isBlack(c)).length > 1) { return; }
+        let clist = [cell];
+        let d = [0, 1, 2, 3].find(d => isBlack(offset(cell, 1, 0, d)));
+        if (d === undefined) {
+            if (adjlist(cell.adjacent).every(nc => isntBlack(nc))) { clen.set(cell, 1); }
+            return;
         }
-    }
+        let pcell = offset(cell, 1, 0, d);
+        while (isBlack(pcell)) {
+            clist.push(pcell);
+            pcell = offset(pcell, 1, 0, d);
+        }
+        if (isntBlack(pcell) && isntBlack(offset(cell, -1, 0, d))) {
+            clist.forEach(c => clen.set(c, clist.length));
+        }
+    });
+    forEachCell(cell => {
+        if (!isBlack(cell) || adjlist(cell.adjacent).filter(c => isBlack(c)).length > 1) { return; }
+        if (adjdiaglist(cell).some(c => clen.get(c) === 1) && adjlist(cell.adjacent).filter(c => !isntBlack(c)).length === 1) {
+            add_black(adjlist(cell.adjacent).find(c => !isntBlack(c)));
+        }
+        if (adjdiaglist(cell).some(c => clen.get(c) === 2) && [0, 1, 2, 3].every(d => isntBlack(offset(cell, 1, 0, d)) || isntBlack(offset(cell, 2, 0, d)))) {
+            adjlist(cell.adjacent).forEach(c => add_green(c));
+        }
+        let d = [0, 1, 2, 3].find(d => isBlack(offset(cell, 1, 0, d)));
+        if (d === undefined) { return; }
+        let l = 1;
+        while (isBlack(offset(cell, l, 0, d))) { l++; }
+        if (adjdiaglist(cell).some(c => clen.get(c) === l)) { add_black(offset(cell, l, 0, d)); }
+        if (adjdiaglist(cell).some(c => clen.get(c) === l + 1) && isntBlack(offset(cell, l + 1, 0, d))) { add_green(offset(cell, l, 0, d)); }
+    });
 }
 
 function NurikabeAssist() {
-    forEachCell(cell => {
-        // surrounded white cell
-        let templist = [offset(cell, 1, 0, 0), offset(cell, 1, 0, 1), offset(cell, 1, 0, 2), offset(cell, 1, 0, 3)];
-        if (cell.qnum === CQNUM.none && templist.filter(c => isBlack(c)).length === 4) {
-            add_black(cell);
-        }
-    });
     CellConnected({
         isShaded: isBlack,
         isUnshaded: c => c.qsub === CQSUB.dot || c.qnum !== CQNUM.none,
@@ -8873,30 +9302,6 @@ function NurikabeAssist() {
         add_shaded: add_dot,
         add_unshaded: c => add_black(c, true),
     });
-    // unreachable cell
-    {
-        let list = [];
-        forEachCell(cell => {
-            if (cell.qnum !== CQNUM.none) {
-                list.push(cell);
-                if (cell.qnum === CQNUM.quesmark) { return; }
-                for (let dx = -cell.qnum + 1; dx <= cell.qnum - 1; dx++) {
-                    for (let dy = -cell.qnum + Math.abs(dx) + 1; dy <= cell.qnum - Math.abs(dx) - 1; dy++) {
-                        let c = offset(cell, dx, dy);
-                        if (c.isnull || list.includes(c)) { continue; }
-                        list.push(c);
-                    }
-                }
-            }
-        });
-        if (!list.some(c => c.qnum === CQNUM.quesmark)) {
-            forEachCell(cell => {
-                if (!list.includes(cell)) {
-                    add_black(cell);
-                }
-            });
-        }
-    }
 }
 
 function GuideArrowAssist() {
@@ -8913,7 +9318,7 @@ function GuideArrowAssist() {
             add_green(cell);
             if (cell.qnum !== CQNUM.quesmark) {
                 let d = qdirRemap(cell.qnum);
-                add_green(dir(cell.adjacent, d));
+                add_green(offset(cell, 1, 0, d));
             }
             return;
         }
@@ -8926,7 +9331,7 @@ function GuideArrowAssist() {
             vis.set(c, d);
             for (let d1 = 0; d1 < 4; d1++) {
                 if (d1 === d) { continue; }
-                let c1 = dir(c.adjacent, d1);
+                let c1 = offset(c, 1, 0, d1);
                 if (c1 === undefined || c1.isnull || !isGreen(c1)) { continue; }
                 dfs(c1, (d1 + 2) % 4);
             }
@@ -8938,7 +9343,6 @@ function GuideArrowAssist() {
         });
         forEachCell(cell => {
             if (cell.qsub !== CQSUB.none || cell.qans !== CQANS.none) { return; }
-
             let cnt = 0;
             fourside(c => {
                 if (isGreen(c) && vis.has(c)) { cnt++; }
@@ -8956,7 +9360,7 @@ function GuideArrowAssist() {
                     let cnt = 0;
                     let dd = -1;
                     for (let d1 = 0; d1 < 4; d1++) {
-                        let c1 = dir(cell.adjacent, d1);
+                        let c1 = offset(cell, 1, 0, d1);
                         if (c1 === undefined || c1.isnull || isBlack(c1)) { continue; }
                         cnt++;
                         dd = d1;
@@ -8964,18 +9368,18 @@ function GuideArrowAssist() {
                     if (cnt === 1) { return dd; }
                     return -1;
                 }
-                return qdirRemap(cell.qnum);;
+                return qdirRemap(cell.qnum);
             })();
             if (d === -1) { return; }
             while (true) {
                 if (vis.has(cell)) { break; }
                 vis.set(cell, d);
-                cell = dir(cell.adjacent, d);
+                cell = offset(cell, 1, 0, d);
                 add_green(cell);
                 let cnt = 0;
                 let dd = -1;
                 for (let d1 = 0; d1 < 4; d1++) {
-                    let c1 = dir(cell.adjacent, d1);
+                    let c1 = offset(cell, 1, 0, d1);
                     if (c1 === undefined || c1.isnull || isBlack(c1)) { continue; }
                     if (vis.has(c1) && vis.get(c1) === (d1 + 2) % 4) { continue; }
                     cnt++;
@@ -9463,6 +9867,24 @@ function IcelomAssist() {
         b.setQsub(dir);
         b.draw();
     };
+    let ncnt = 0;
+    forEachCell(cell => isClue(cell) ? ncnt++ : undefined);
+    let getTrailDir = function (t) { // get direction of a trial. 0: forward, 1: backward, 2: unknown, -1: broken
+        let qn = t.flatMap(c => isClue(c) ? c.qnum : []);
+        if (inb.sidecell.includes(t[0])) { qn = [0].concat(qn); }
+        if (outb.sidecell.includes(t[0])) { qn = [ncnt + 1].concat(qn); }
+        if (inb.sidecell.includes(t[t.length - 1])) { qn.push(0); }
+        if (outb.sidecell.includes(t[t.length - 1])) { qn.push(ncnt + 1); }
+        let f = function (l) {
+            l = l.flatMap((n, i) => n === CQNUM.quesmark ? [] : n - i);
+            if (l.length === 0) { return true; }
+            return unique(l).length === 1;
+        };
+        if (f(qn) && f([...qn].reverse())) { return 2; }
+        if (f(qn)) { return 0; }
+        if (f([...qn].reverse())) { return 1; }
+        return -1;
+    };
     let inb = board.getb(board.arrowin.bx, board.arrowin.by);
     let outb = board.getb(board.arrowout.bx, board.arrowout.by);
     add_line(inb);
@@ -9473,25 +9895,41 @@ function IcelomAssist() {
         if (!border.inside && border !== inb && border !== outb) {
             add_cross(border);
         }
-        if (border.qdir != QDIR.none) {
+        if (border.qdir !== QDIR.none) {
             add_arrow(border, border.qdir + 10);   // from qdir to bqsub
             add_line(border);
         }
-        // TODO: number clue
+        if (!isLine(border) && !isCross(border)) {
+            let t = border.sidecell.map(c => {
+                let d = [0, 1, 2, 3].find(d => offset(c, .5, 0, d) === border);
+                let tr = cellTrail(c, d, true);
+                tr.shift();
+                return tr;
+            });
+            t = [...t[0].reverse(), ...t[1]];
+            if (getTrailDir(t) === -1) { add_cross(border); }
+        }
     });
-    let iceSet = new Set();
     forEachCell(cell => {
-        if (cell.lcnt === 1 && !isIce(cell)) {
-            for (let d = 0; d < 4; d++) {
-                let ncell = dir(cell.adjacent, d);
+        if (isClue(cell) && cell.lcnt === 2) { fourside(add_cross, cell.adjborder); }
+        if (isClue(cell) && adjlist(cell.adjborder).filter(b => !isntLine(b)).length === 2) { fourside(add_line, cell.adjborder); }
+        if (cell.lcnt !== 1 || isIce(cell)) { return; }
+        for (let d = 0; d < 4; d++) {
+            if (!isLine(offset(cell, .5, 0, d))) {
+                let ncell = offset(cell, 1, 0, d);
                 while (!ncell.isnull && isIce(ncell)) {
-                    ncell = dir(ncell.adjacent, d);
+                    ncell = offset(ncell, 1, 0, d);
                 }
-                if (ncell.isnull || ncell.lcnt !== 1 || dir(ncell.adjborder, d + 2).line) { continue; }
+                if (ncell.isnull || ncell.lcnt !== 1) { continue; }
                 if (board.linegraph.components.length > 2 &&
                     (cell.path === inb.path && ncell.path === outb.path || cell.path === outb.path && ncell.path === inb.path)) {
-                    add_cross(dir(cell.adjborder, d));
+                    add_cross(offset(cell, .5, 0, d));
                 }
+            } else if (offset(cell, .5, 0, d).qsub === BQSUB.none) {
+                let dl = [[cell.adjborder.right, BQSUB.arrow_rt, BQSUB.arrow_lt], [cell.adjborder.top, BQSUB.arrow_up, BQSUB.arrow_dn], [cell.adjborder.left, BQSUB.arrow_lt, BQSUB.arrow_rt], [cell.adjborder.bottom, BQSUB.arrow_dn, BQSUB.arrow_up],];
+                let dir = getTrailDir(cellTrail(cell, d, true));
+                if (dir === -1 || dir === 2) { continue; }
+                add_arrow(offset(cell, .5, 0, d), dl[d][dir + 1]);
             }
         }
     });
@@ -9541,14 +9979,14 @@ function IcebarnAssist() {
         }
         if (cell.lcnt === 1 && !isIce(cell)) {
             for (let d = 0; d < 4; d++) {
-                let ncell = dir(cell.adjacent, d);
+                let ncell = offset(cell, 1, 0, d);
                 while (!ncell.isnull && isIce(ncell)) {
-                    ncell = dir(ncell.adjacent, d);
+                    ncell = offset(ncell, 1, 0, d);
                 }
-                if (ncell.isnull || ncell.lcnt !== 1 || dir(ncell.adjborder, d + 2).line) { continue; }
+                if (ncell.isnull || ncell.lcnt !== 1 || offset(ncell, -.5, 0, d).line) { continue; }
                 if (board.linegraph.components.length > 2 &&
                     (cell.path === inb.path && ncell.path === outb.path || cell.path === outb.path && ncell.path === inb.path)) {
-                    add_cross(dir(cell.adjborder, d));
+                    add_cross(offset(cell, .5, 0, d));
                 }
             }
         }
@@ -10336,10 +10774,10 @@ function AkariAssist() {
                 emptycellList.push(cell);
             }
             for (let d = 0; d < 4; d++) {
-                let pcell = dir(cell.adjacent, d);
+                let pcell = offset(cell, 1, 0, d);
                 while (!pcell.isnull && pcell.qnum === CQNUM.none) {
                     emptycellList.push(pcell);
-                    pcell = dir(pcell.adjacent, d);
+                    pcell = offset(pcell, 1, 0, d);
                 }
             }
             emptycellList = emptycellList.filter(c => c.qsub !== CQSUB.dot);
@@ -10654,16 +11092,16 @@ function YajisanKazusanAssist() {
             let qnum = cell.qnum;
             let list = [];
             let dn = 0, lc = null;
-            while (!offset(cell, 0, -dn - 1, d).isnull) {
+            while (!offset(cell, dn + 1, 0, d).isnull) {
                 dn++;
-                let c = offset(cell, 0, -dn, d);
+                let c = offset(cell, dn, 0, d);
                 if (isBlack(c)) { qnum--; }
                 if (isBlack(c) || isGreen(c)) { continue; }
                 if (lc === null) {
                     lc = c;
                     continue;
                 }
-                if (lc === offset(c, 0, 1, d)) {
+                if (lc === offset(c, -1, 0, d)) {
                     list.push([lc, c]);
                     lc = null;
                 } else {
@@ -10676,7 +11114,7 @@ function YajisanKazusanAssist() {
                 add_black(cell);
             }
             if (qnum === 0) {
-                add_green(offset(cell, 0, -1, d));
+                add_green(offset(cell, 1, 0, d));
             }
             if (list.length === qnum && isGreen(cell)) {
                 list.forEach(p => {
@@ -10775,26 +11213,26 @@ function YajilinAssist() {
             let qnum = cell.qnum;
             let list = [];
             let dn = 0, lc = [];
-            while ((c => !c.isnull && (c.qnum < 0 || c.qdir !== cell.qdir))(offset(cell, 0, -dn - 1, d))) {
+            while ((c => !c.isnull && (c.qnum < 0 || c.qdir !== cell.qdir))(offset(cell, dn + 1, 0, d))) {
                 dn++;
-                let c = offset(cell, 0, -dn, d);
+                let c = offset(cell, dn, 0, d);
                 if (isBlack(c)) { qnum--; }
                 if (!isEmpty(c)) { continue; }
                 if (lc.length === 0) {
                     lc = [c];
                     continue;
                 }
-                if (lc.length === 1 && lc[0] === offset(c, 0, 1, d)) {
+                if (lc.length === 1 && lc[0] === offset(c, -1, 0, d)) {
                     lc.push(c);
-                } else if ((lc.length === 2 && lc[1] === offset(c, 0, 1, d) && lc[0] === offset(c, 0, 2, d) ||
-                    lc.length === 1 && lc[0] === offset(c, 0, 2, d) && offset(c, 0, 1, d).qnum === CQNUM.none) &&
-                    ([[+.5, 1], [-.5, 1]].some(([x, y]) => isntLine(offset(c, x, y, d))) ||
-                        [[-1.5, 0], [-1, -.5]].some(([x, y]) => isntLine(offset(c, x, y, d))) &&
-                        [[-1.5, 2], [-1, 2.5]].some(([x, y]) => isntLine(offset(c, x, y, d))) &&
-                        offset(c, -1, 0, d).qnum === CQNUM.none && offset(c, -1, 2, d).qnum === CQNUM.none ||
-                        [[+1.5, 0], [+1, -.5]].some(([x, y]) => isntLine(offset(c, x, y, d))) &&
-                        [[+1.5, 2], [+1, 2.5]].some(([x, y]) => isntLine(offset(c, x, y, d))) &&
-                        offset(c, +1, 0, d).qnum === CQNUM.none && offset(c, +1, 2, d).qnum === CQNUM.none)) {
+                } else if ((lc.length === 2 && lc[1] === offset(c, -1, 0, d) && lc[0] === offset(c, -2, 0, d) ||
+                    lc.length === 1 && lc[0] === offset(c, -2, 0, d) && offset(c, -1, 0, d).qnum === CQNUM.none) &&
+                    ([[-1, +.5], [-1, -.5]].some(([x, y]) => isntLine(offset(c, x, y, d))) ||
+                        [[0, -1.5], [+.5, -1]].some(([x, y]) => isntLine(offset(c, x, y, d))) &&
+                        [[-2, -1.5], [-2.5, -1]].some(([x, y]) => isntLine(offset(c, x, y, d))) &&
+                        offset(c, 0, -1, d).qnum === CQNUM.none && offset(c, -2, -1, d).qnum === CQNUM.none ||
+                        [[0, +1.5], [+.5, +1]].some(([x, y]) => isntLine(offset(c, x, y, d))) &&
+                        [[-2, +1.5], [-2.5, +1]].some(([x, y]) => isntLine(offset(c, x, y, d))) &&
+                        offset(c, 0, +1, d).qnum === CQNUM.none && offset(c, -2, +1, d).qnum === CQNUM.none)) {
                     lc.push(c);
                 } else {
                     list.push(lc);
@@ -10802,36 +11240,36 @@ function YajilinAssist() {
                 }
             }
             if (lc.length !== 0) { list.push(lc); }
-            if ((c => c.qnum >= 0 && c.qdir === cell.qdir)(offset(cell, 0, -dn - 1, d))) {
-                qnum -= offset(cell, 0, -dn - 1, d).qnum;
+            if ((c => c.qnum >= 0 && c.qdir === cell.qdir)(offset(cell, dn + 1, 0, d))) {
+                qnum -= offset(cell, dn + 1, 0, d).qnum;
             }
             if (list.length === qnum) {
                 list.forEach(p => {
                     if (p.length === 1) {
                         add_black(p[0]);
                     }
-                    if (p.length === 2 && offset(p[0], 0, -1, d) === p[1]) {
-                        add_cross(offset(p[0], 0, -.5, d));
-                        if (offset(p[0], -1, 0, d).qnum === CQNUM.none && isntLine(offset(p[0], -1, .5, d))) {
-                            add_dot(offset(p[0], -1, -1, d));
+                    if (p.length === 2 && offset(p[0], 1, 0, d) === p[1]) {
+                        add_cross(offset(p[0], .5, 0, d));
+                        if (!isClue(offset(p[0], 0, -1, d)) && [[-.5, -1], [0, -1.5]].some(([x, y]) => isntLine(offset(p[0], x, y, d)))) {
+                            add_dot(offset(p[0], 1, -1, d));
                         }
-                        if (offset(p[0], +1, 0, d) === CQNUM.none && isntLine(offset(p[0], +1, .5, d))) {
-                            add_dot(offset(p[0], +1, -1, d));
+                        if (!isClue(offset(p[0], 0, +1, d)) && [[-.5, +1], [0, +1.5]].some(([x, y]) => isntLine(offset(p[0], x, y, d)))) {
+                            add_dot(offset(p[0], 1, +1, d));
                         }
-                        if (offset(p[0], -1, -1, d) === CQNUM.none && isntLine(offset(p[0], -1, -1.5, d))) {
-                            add_dot(offset(p[0], -1, 0, d));
+                        if (!isClue(offset(p[0], 1, -1, d)) && [[1.5, -1], [1, -1.5]].some(([x, y]) => isntLine(offset(p[0], x, y, d)))) {
+                            add_dot(offset(p[0], 0, -1, d));
                         }
-                        if (offset(p[0], +1, -1, d) === CQNUM.none && isntLine(offset(p[0], +1, -1.5, d))) {
-                            add_dot(offset(p[0], +1, 0, d));
+                        if (!isClue(offset(p[0], 1, +1, d)) && [[1.5, +1], [1, +1.5]].some(([x, y]) => isntLine(offset(p[0], x, y, d)))) {
+                            add_dot(offset(p[0], 0, +1, d));
                         }
                     }
-                    if (p.length === 2 && offset(p[0], 0, -2, d) === p[1]) {
-                        if (isntLine(offset(p[0], -.5, -1, d))) { add_line(offset(p[0], +.5, -1, d)); }
-                        if (isntLine(offset(p[0], +.5, -1, d))) { add_line(offset(p[0], -.5, -1, d)); }
+                    if (p.length === 2 && offset(p[0], 2, 0, d) === p[1]) {
+                        if (isntLine(offset(p[0], 1, -.5, d))) { add_line(offset(p[0], 1, +.5, d)); }
+                        if (isntLine(offset(p[0], 1, +.5, d))) { add_line(offset(p[0], 1, -.5, d)); }
                     }
                     if (p.length === 3) {
-                        if (isntLine(offset(p[0], -.5, -1, d))) { add_dot(offset(p[0], +1, -1, d)); }
-                        if (isntLine(offset(p[0], +.5, -1, d))) { add_dot(offset(p[0], -1, -1, d)); }
+                        if (isntLine(offset(p[0], 1, -.5, d))) { add_dot(offset(p[0], 1, +1, d)); }
+                        if (isntLine(offset(p[0], 1, +.5, d))) { add_dot(offset(p[0], 1, -1, d)); }
                     }
                 });
             }
@@ -10944,6 +11382,26 @@ function VertexSlitherlinkAssist() {
 }
 
 function LitherslinkAssist() {
+    forEachCross(cross => {
+        let qsub;
+        if (cross.qsub === 0 || JSON.parse(cross.qsub).length === 0) {
+            qsub = [];
+            let list = adjlist(cross.adjborder);
+            for (let i = 1; i < 16; i++) {
+                if ([0b0011, 0b0101, 0b1001, 0b0110, 0b1010, 0b1100].includes(i)) { continue; }
+                let t = [];
+                for (let j = 0; j < 4; j++) { if (i & (1 << j)) { t.push(list[j].id); } }
+                if (!t.some(n => n === null)) { qsub.push(t); }
+            }
+        } else { qsub = JSON.parse(cross.qsub); }
+        qsub = qsub.filter(s => s.every(i => !isCross(board.border[i])));
+        fourside(b => {
+            if (b.line) { qsub = qsub.filter(s => s.includes(b.id)); }
+            if (qsub.every(s => s.includes(b.id))) { add_line(b); }
+            if (qsub.every(s => !s.includes(b.id))) { add_cross(b); }
+        }, cross.adjborder);
+        cross.setQsub(JSON.stringify(qsub));
+    });
     forEachCell(cell => {
         NShadeInClist({
             isShaded: isLine,
@@ -10953,6 +11411,32 @@ function LitherslinkAssist() {
             n: cell.qnum,
             clist: adjlist(cell.adjborder),
         });
+        // deduce single clue. it's disabled here because it's overpowered.
+        if (cell.qnum >= 0 && false) {
+            let list = [offset(cell, -.5, -.5), offset(cell, .5, -.5), offset(cell, -.5, .5), offset(cell, .5, .5)];
+            let sum = list.map(cr => JSON.parse(cr.qsub).length).reduce((a, b) => a + b, 0);
+            let comblist = [];
+            JSON.parse(list[0].qsub).forEach(q0 => {
+                if (adjlist(cell.adjborder).filter(b => [].concat(q0).includes(b.id)).length > cell.qnum) { return; }
+                if (2 - adjlist(cell.adjborder).filter(b => [].concat(q0).includes(b.id)).length > 4 - cell.qnum) { return; }
+                JSON.parse(list[1].qsub).forEach(q1 => {
+                    if (adjlist(cell.adjborder).filter(b => [].concat(q0, q1).includes(b.id)).length > cell.qnum) { return; }
+                    if (3 - adjlist(cell.adjborder).filter(b => [].concat(q0, q1).includes(b.id)).length > 4 - cell.qnum) { return; }
+                    if (q0.includes(offset(cell, 0, -.5).id) ^ q1.includes(offset(cell, 0, -.5).id)) { return; }
+                    JSON.parse(list[2].qsub).forEach(q2 => {
+                        if (q0.includes(offset(cell, -.5, 0).id) ^ q2.includes(offset(cell, -.5, 0).id)) { return; }
+                        JSON.parse(list[3].qsub).forEach(q3 => {
+                            if (q2.includes(offset(cell, 0, .5).id) ^ q3.includes(offset(cell, 0, .5).id)) { return; }
+                            if (q1.includes(offset(cell, .5, 0).id) ^ q3.includes(offset(cell, .5, 0).id)) { return; }
+                            if (adjlist(cell.adjborder).filter(b => [].concat(q0, q1, q2, q3).includes(b.id)).length !== cell.qnum) { return; }
+                            comblist.push([q0, q1, q2, q3]);
+                        });
+                    });
+                });
+            });
+            list.forEach((cr, i) => { cr.setQsub(JSON.stringify(JSON.parse(cr.qsub).filter(s => comblist.some(comb => JSON.stringify(comb[i]) === JSON.stringify(s))))); });
+            if (list.map(cr => JSON.parse(cr.qsub).length).reduce((a, b) => a + b, 0) < sum) { flg2 = true; }
+        }
         for (let d = 0; d < 4; d++) {
             let b1 = offset(cell, 1, .5, d);
             let b2 = offset(cell, .5, 1, d);
@@ -10972,6 +11456,13 @@ function LitherslinkAssist() {
                 add_line(offset(cell, .5, 0, d));
                 add_line(offset(cell, 0, .5, d));
             }
+            if (cell.qnum === 3 && isLine(offset(cell, -.5, 0, d)) && isLine(offset(cell, 0, -.5, d)) && offset(cell, 1, 1, d).qnum === 3) {
+                add_line(b1);
+                add_line(b2);
+            }
+            if (cell.qnum === 3 && offset(cell, 1, 0, d).qnum === 3) {
+                add_line(offset(cell, .5, 0, d));
+            }
         }
     });
     forEachCross(cross => {
@@ -10984,11 +11475,25 @@ function LitherslinkAssist() {
             adjlist(cross.adjborder).forEach(b => add_cross(b));
         }
     });
-    forEachBorder(border => {
-        let [c1, c2] = border.sidecross;
-        if (!isLine(border) && c1.path !== null && c1.path === c2.path) {
-            add_cross(border);
+    let DSU = new Map(); // Disjoint Set Union
+    let DSUfind = function (n) {
+        if (DSU.get(n) !== n) { DSU.set(n, DSUfind(DSU.get(n))); }
+        return DSU.get(n);
+    };
+    forEachCross(cross => {
+        DSU.set(cross, cross);
+        for (let d = 0; d < 4; d++) {
+            let ncross = offset(cross, 1, 0, d);
+            if (ncross.isnull || !DSU.has(ncross)) { continue; }
+            if (isLine(offset(cross, .5, 0, d)) || [offset(cross, .5, -.5, d), offset(cross, .5, .5, d)].some(c => c.qnum === 3)) {
+                DSU.set(DSUfind(cross), DSUfind(ncross));
+            }
         }
+    });
+    forEachBorder(border => {
+        let [cr1, cr2] = border.sidecross;
+        if (!isLine(border) && cr1.path !== null && cr1.path === cr2.path) { add_cross(border); }
+        if (!isLine(border) && DSUfind(cr1) === DSUfind(cr2) && !border.sidecell.some(c => c.qnum === 3)) { add_cross(border); }
     });
 }
 

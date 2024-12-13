@@ -47,11 +47,13 @@ Currently enhanced genre:
 * Double Back
 * Double Choco
 * Fillomino
+* Fire walk
 * FiveCells
 * FourCells
 * Goats and Wolves
 * Guide Arrow
 * Hashiwokakero
+* Hebi-Ichigo
 * Herugolf
 * Heteromino
 * Heyablock
@@ -59,6 +61,7 @@ Currently enhanced genre:
 * Hitori
 * Icebarn
 * Icelom
+* Ice Walk
 * Inverse LITSO
 * Islands
 * Juosan
@@ -73,9 +76,11 @@ Currently enhanced genre:
 * Martini
 * Masyu
 * Maxi Loop
+* Mejilink
 * Mid-loop
 * Minarism
 * Minesweeper
+* Mirroring Tile
 * Mochikoro
 * Moon or Sun
 * Myopia
@@ -137,6 +142,8 @@ Currently enhanced genre:
 * Vertex Slitherlink
 * Voxas
 * Wall Logic
+* Water Walk
 * Yajilin
+* Yajirushi 2
 * Yajisan-Kazusan
 * Yin-Yang
