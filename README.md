@@ -21,9 +21,11 @@ Currently enhanced genre:
 * Aquapelago
 * Aquarium
 * Araf
+* Archipelago
 * Arukone
 * Ayeheya
 * Barns
+* Battleship
 * Border Block
 * Bosanowa
 * Bosnian Road
@@ -39,6 +41,7 @@ Currently enhanced genre:
 * Cocktail Lamp
 * Coffee Milk
 * Combi Block
+* Compass
 * Context
 * Country Road
 * Creek
@@ -66,12 +69,14 @@ Currently enhanced genre:
 * Islands
 * Juosan
 * Kakuro
+* Kazunori Room
 * Koburin
 * Kropki
 * Kurodoko
 * Light and Shadow
 * Litherslink
 * LITS
+* Lohkous
 * Look-Air
 * Martini
 * Masyu
@@ -110,10 +115,12 @@ Currently enhanced genre:
 * Regional Yajilin
 * Ring-ring
 * Ripple Effect
+* Rooms of Factors
 * Sashigane
 * School Trip
 * Shakashaka
 * Shikaku
+* Simple Gako
 * Simple Loop
 * Skyscrapers
 * Slalom
@@ -123,6 +130,7 @@ Currently enhanced genre:
 * Snake
 * Square Jam
 * Star Battle
+* Statue Park
 * Stostone
 * Sudoku
 * Sukoro
