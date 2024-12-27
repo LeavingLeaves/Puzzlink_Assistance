@@ -1668,7 +1668,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
             OnlyOneConnected: false,
         });
     }
-    add_inout(board.getobj(0, 0), !hasIce && !hasCross ? CRQSUB.out : .5);
+    add_inout(board.getobj(0, 0), !Directed ? CRQSUB.out : .5);
     // add invisible qsub at cross
     if (!hasIce && !hasCross) {
         forEachCross(cross => {
