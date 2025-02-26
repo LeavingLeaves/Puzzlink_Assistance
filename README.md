@@ -24,6 +24,8 @@ Currently enhanced genre:
 * Archipelago
 * Arukone
 * Ayeheya
+* Balance Loop
+* Balloon Box
 * Barns
 * Battleship
 * Border Block
@@ -47,12 +49,15 @@ Currently enhanced genre:
 * Creek
 * Dominion
 * Dosun-Fuwari
+* Dotchi-Loop
 * Double Back
 * Double Choco
+* Family Photo
 * Fillomino
 * Fire walk
 * FiveCells
 * FourCells
+* Geradeweg
 * Goats and Wolves
 * Guide Arrow
 * Hashiwokakero
@@ -62,9 +67,11 @@ Currently enhanced genre:
 * Heyablock
 * Heyawake
 * Hitori
+* Hotaru Beam
 * Icebarn
 * Icelom
 * Ice Walk
+* International Borders
 * Inverse LITSO
 * Islands
 * Juosan
@@ -111,6 +118,7 @@ Currently enhanced genre:
 * Putteria
 * Rail Pool
 * Rassi Silai
+* Rectangle-Slider
 * Reflect Link
 * Regional Yajilin
 * Ring-ring
@@ -134,6 +142,7 @@ Currently enhanced genre:
 * Stostone
 * Sudoku
 * Sukoro
+* Symmetry Area
 * Tapa
 * Tapa-Like Loop
 * Tasquare
@@ -141,6 +150,7 @@ Currently enhanced genre:
 * Tawamurenga
 * Tentaisho
 * Tents
+* Tetrochain
 * Tetrominous
 * Tilepaint
 * Toichika
