@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      25.2.27.1
+// @version      25.3.1.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -119,161 +119,165 @@ const CRQSUB = {
 }
 
 const GENRELIST = [
-    ["Aho-ni-Narikire", AhoniNarikireAssist],
-    ["Akari", AkariAssist],
-    ["Akichiwake", AkichiwakeAssist],
-    ["All or Nothing", AllorNothingAssist],
-    // ["Angle Loop", AngleLoopAssist],
-    ["Ant Mill", AntMillAssist],
-    ["Aqre", AqreAssist],
-    ["Aquapelago", AquapelagoAssist],
-    ["Aquarium", AquariumAssist],
-    ["Araf", ArafAssist],
-    ["Archipelago", ArchipelagoAssist],
-    ["Arukone", ArukoneAssist],
-    ["Ayeheya", AyeheyaAssist],
-    ["Balance Loop", BalanceLoopAssist],
-    ["Balloon Box", BalloonBoxAssist],
-    ["Barns", BarnsAssist],
-    ["Battleship", BattleshipAssist],
-    ["Border Block", BorderBlockAssist],
-    ["Bosanowa", BosanowaAssist],
-    ["Bosnian Road", BosnianRoadAssist],
-    ["Box", BoxAssist],
-    ["Brownies", BrowniesAssist],
-    ["Canal View", CanalViewAssist],
-    ["Castle Wall", CastleWallAssist],
-    ["Cave", CaveAssist],
-    ["Chained Block", ChainedBlockAssist],
-    ["Choco Banana", ChocoBananaAssist],
-    ["Chocona", ChoconaAssist],
-    ["Circles and Squares", CirclesAndSquaresAssist],
-    ["Cocktail Lamp", CocktailLampAssist],
-    ["Coffee Milk", CoffeeMilkAssist],
-    ["Combi Block", CombiBlockAssist],
-    ["Compass", CompassAssist],
-    ["Context", ContextAssist],
-    ["Country Road", CountryRoadAssist],
-    ["Creek", CreekAssist],
-    ["Dominion", DominionAssist],
-    ["Dosun-Fuwari", DosunFuwariAssist],
-    ["Dotchi-Loop", DotchiLoopAssist],
-    ["Double Back", DoubleBackAssist],
-    ["Double Choco", DoubleChocoAssist],
-    ["Family Photo", FamilyPhotoAssist],
-    ["Fillomino", FillominoAssist],
-    ["Fire Walk", FireWalkAssist],
-    ["FiveCells", FiveCellsAssist],
-    ["FourCells", FourCellsAssist],
-    ["Geradeweg", GeradewegAssist],
-    ["Goats and Wolves", GoatsAndWolvesAssist],
-    ["Guide Arrow", GuideArrowAssist],
-    ["Hashiwokakero", HashiwokakeroAssist],
-    ["Hebi-Ichigo", HebiIchigoAssist],
-    ["Herugolf", HerugolfAssist],
-    ["Heteromino", HeterominoAssist],
-    ["Heyablock", HeyablockAssist],
-    ["Heyawake", HeyawakeAssist],
-    ["Hitori", HitoriAssist],
-    ["Hotaru Beam", HotaruBeamAssist],
-    ["Icebarn", IcebarnAssist],
-    ["Icelom", IcelomAssist],
-    ["Ice Walk", IceWalkAssist],
-    ["International Borders", InternationalBordersAssist],
-    ["Inverse LITSO", InverseLitsoAssist],
-    ["Islands", IslandsAssist],
-    ["Juosan", JuosanAssist],
-    ["Kakuro", KakuroAssist],
-    ["Kazunori Room", KazunoriRoomAssist],
-    ["Koburin", KoburinAssist],
-    ["Kropki", KropkiAssist],
-    ["Kurodoko", KurodokoAssist],
-    ["Light and Shadow", LightandShadowAssist],
-    ["Litherslink", LitherslinkAssist],
-    ["LITS", LitsAssist],
-    ["Lohkous", LohkousAssist],
-    ["Look-Air", LookAirAssist],
-    ["Martini", MartiniAssist],
-    ["Masyu", MasyuAssist],
-    ["Maxi Loop", MaxiLoopAssist],
-    ["Mejilink", MejilinkAssist],
-    ["Mid-loop", MidloopAssist],
-    ["Minarism", MinarismAssist],
-    ["Minesweeper", MinesweeperAssist],
-    ["Mirroring Tile", MirroringTileAssist],
-    ["Mochikoro", MochikoroAssist],
-    ["Moon or Sun", MoonOrSunAssist],
-    ["Myopia", MyopiaAssist],
-    ["Nanameguri", NanameguriAssist],
-    ["Nawabari", NawabariAssist],
-    ["NIKOJI", NikojiAssist],
-    ["Nondango", NondangoAssist],
-    ["Nonogram", NonogramAssist],
-    ["Norinori", NorinoriAssist],
-    ["Norinuri", NorinuriAssist],
-    ["No Three", NothreeAssist],
-    ["Numberlink", NumberlinkAssist],
-    ["Nuribou", NuribouAssist],
-    ["Nurikabe", NurikabeAssist],
-    ["Nuri-Maze", NuriMazeAssist],
-    ["Nurimisaki", NurimisakiAssist],
-    ["One Room One Door", OneRoomOneDoorAssist],
-    ["Paintarea", PaintareaAssist],
-    ["Parquet", ParquetAssist],
-    ["Pencils", PencilsAssist],
-    ["Pentominous", PentominousAssist],
-    ["Pipelink", PipelinkAssist],
-    ["Putteria", PutteriaAssist],
-    ["Rail Pool", RailPoolAssist],
-    ["Rassi Silai", RassiSilaiAssist],
-    ["Rectangle-Slider", RectangleSliderAssist],
-    ["Reflect Link", ReflectLinkAssist],
-    ["Regional Yajilin", RegionalYajilinAssist],
-    ["Ring-ring", RingringAssist],
-    ["Ripple Effect", RippleEffectAssist],
-    ["Rooms of Factors", RoomsOfFactorsAssist],
-    ["Sashigane", SashiganeAssist],
-    ["School Trip", SchoolTripAssist],
-    ["Shakashaka", ShakashakaAssist],
-    ["Shikaku", ShikakuAssist],
-    ["Simple Gako", SimpleGakoAssist],
-    ["Simple Loop", SimpleLoopAssist],
-    ["Skyscrapers", SkyscrapersAssist],
-    ["Slalom", SlalomAssist],
-    ["Slant", SlantAssist],
-    ["Slash Pack", SlashPackAssist],
-    ["Slitherlink", SlitherlinkAssist],
-    ["Snake", SnakeAssist],
-    ["Square Jam", SquareJamAssist],
-    ["Star Battle", StarbattleAssist],
-    ["Statue Park", StatueParkAssist],
-    ["Stostone", StostoneAssist],
-    ["Sudoku", SudokuAssist],
-    ["Sukoro", SukoroAssist],
-    ["Symmetry Area", SymmetryAreaAssist],
-    ["Tapa", TapaAssist],
-    ["Tapa-Like Loop", TapaLikeLoopAssist],
-    ["Tasquare", TasquareAssist],
-    ["Tatamibari", TatamibariAssist],
-    ["Tawamurenga", TawamurengaAssist],
-    ["Tentaisho", TentaishoAssist],
-    ["Tents", TentsAssist],
-    ["Tetrochain", TetrochainAssist],
-    ["Tetrominous", TetrominousAssist],
-    ["Tilepaint", TilepaintAssist],
-    ["Toichika", ToichikaAssist],
-    ["Tren", TrenAssist],
-    ["Uso-one", UsoOneAssist],
-    ["Uso-tatami", UsoTatamiAssist],
-    ["Vertex Slitherlink", VertexSlitherlinkAssist],
-    ["Voxas", VoxasAssist],
-    ["Wall Logic", WallLogicAssist],
-    ["Water Walk", WaterWalkAssist],
-    ["Yajilin", YajilinAssist],
-    ["Yajirushi 2", Yajirushi2Assist],
-    ["Yajisan-Kazusan", YajisanKazusanAssist],
-    ["Yin-Yang", YinyangAssist],
+    ["Aho-ni-Narikire", AhoniNarikireAssist, "aho"],
+    ["Akari", AkariAssist, "akari"],
+    ["Akichiwake", AkichiwakeAssist, "akichi"],
+    ["All or Nothing", AllorNothingAssist, "nothing"],
+    // ["Angle Loop", AngleLoopAssist,"angleloop"],
+    ["Ant Mill", AntMillAssist, "antmill"],
+    ["Aqre", AqreAssist, "aqre"],
+    ["Aquapelago", AquapelagoAssist, "aquapelago"],
+    ["Aquarium", AquariumAssist, "aquarium"],
+    ["Araf", ArafAssist, "araf"],
+    ["Archipelago", ArchipelagoAssist, undefined], // archipelago
+    ["Arukone", ArukoneAssist, "arukone"],
+    ["Ayeheya", AyeheyaAssist, "ayeheya"],
+    ["Balance Loop", BalanceLoopAssist, "balance"],
+    ["Balloon Box", BalloonBoxAssist, undefined], // balloon
+    ["Barns", BarnsAssist, "barns"],
+    ["Battleship", BattleshipAssist, "battleship"],
+    ["Border Block", BorderBlockAssist, "bdblock"],
+    ["Bosanowa", BosanowaAssist, "bosanowa"],
+    ["Bosnian Road", BosnianRoadAssist, undefined], // bosnianroad
+    ["Box", BoxAssist, "box"],
+    ["Brownies", BrowniesAssist, "brownies"],
+    ["Canal View", CanalViewAssist, "canal"],
+    ["Castle Wall", CastleWallAssist, "castle"],
+    ["Cave", CaveAssist, "cave"],
+    ["Chained Block", ChainedBlockAssist, "chainedb"],
+    ["Choco Banana", ChocoBananaAssist, "cbanana"],
+    ["Chocona", ChoconaAssist, "chocona"],
+    ["Circles and Squares", CirclesAndSquaresAssist, "circlesquare"],
+    ["Cocktail Lamp", CocktailLampAssist, "cocktail"],
+    ["Coffee Milk", CoffeeMilkAssist, "coffeemilk"],
+    ["Combi Block", CombiBlockAssist, "cbblock"],
+    ["Compass", CompassAssist, "compass"],
+    ["Context", ContextAssist, "context"],
+    ["Country Road", CountryRoadAssist, "country"],
+    ["Creek", CreekAssist, "creek"],
+    ["Dominion", DominionAssist, "dominion"],
+    ["Dosun-Fuwari", DosunFuwariAssist, "dosufuwa"],
+    ["Dotchi-Loop", DotchiLoopAssist, "dotchi"],
+    ["Double Back", DoubleBackAssist, "doubleback"],
+    ["Double Choco", DoubleChocoAssist, "dbchoco"],
+    ["Family Photo", FamilyPhotoAssist, "familyphoto"],
+    ["Fillomino", FillominoAssist, "fillomino"],
+    ["Fire Walk", FireWalkAssist, "firewalk"],
+    ["FiveCells", FiveCellsAssist, "fivecells"],
+    ["FourCells", FourCellsAssist, "fourcells"],
+    ["Geradeweg", GeradewegAssist, "geradeweg"],
+    ["Goats and Wolves", GoatsAndWolvesAssist, "shwolf"],
+    ["Guide Arrow", GuideArrowAssist, "guidearrow"],
+    ["Hashiwokakero", HashiwokakeroAssist, "hashi"],
+    ["Hebi-Ichigo", HebiIchigoAssist, "hebi"],
+    ["Herugolf", HerugolfAssist, "herugolf"],
+    ["Heteromino", HeterominoAssist, "heteromino"],
+    ["Heyablock", HeyablockAssist, "heyablock"],
+    ["Heyawake", HeyawakeAssist, "heyawake"],
+    ["Hitori", HitoriAssist, "hitori"],
+    ["Hotaru Beam", HotaruBeamAssist, "firefly"],
+    ["Icebarn", IcebarnAssist, "icebarn"],
+    ["Icelom", IcelomAssist, "icelom"],
+    ["Ice Walk", IceWalkAssist, "icewalk"],
+    ["International Borders", InternationalBordersAssist, "interbd"],
+    ["Inverse LITSO", InverseLitsoAssist, undefined], // invlitso
+    ["Islands", IslandsAssist, "shimaguni"],
+    ["Juosan", JuosanAssist, "juosan"],
+    ["Kakuro", KakuroAssist, "kakuro"],
+    ["Kazunori Room", KazunoriRoomAssist, "kazunori"],
+    ["Koburin", KoburinAssist, "koburin"],
+    ["Kropki", KropkiAssist, "kropki"],
+    ["Kurodoko", KurodokoAssist, "kurodoko"],
+    ["Light and Shadow", LightandShadowAssist, "lightshadow"],
+    ["Litherslink", LitherslinkAssist, "lither"],
+    ["LITS", LitsAssist, "lits"],
+    ["Lohkous", LohkousAssist, "lohkous"],
+    ["Look-Air", LookAirAssist, "lookair"],
+    ["Martini", MartiniAssist, "martini"],
+    ["Masyu", MasyuAssist, "masyu"],
+    ["Maxi Loop", MaxiLoopAssist, "maxi"],
+    ["Mejilink", MejilinkAssist, "mejilink"],
+    ["Mid-loop", MidloopAssist, "midloop"],
+    ["Minarism", MinarismAssist, "minarism"],
+    ["Minesweeper", MinesweeperAssist, "mines"],
+    ["Mirroring Tile", MirroringTileAssist, undefined], // mrtile
+    ["Mochikoro", MochikoroAssist, "mochikoro"],
+    ["Moon or Sun", MoonOrSunAssist, "moonsun"],
+    ["Myopia", MyopiaAssist, "myopia"],
+    ["Nanameguri", NanameguriAssist, "nanameguri"],
+    ["Nawabari", NawabariAssist, "nawabari"],
+    ["NIKOJI", NikojiAssist, "nikoji"],
+    ["Nondango", NondangoAssist, "nondango"],
+    ["Nonogram", NonogramAssist, "nonogram"],
+    ["Norinori", NorinoriAssist, "norinori"],
+    ["Norinuri", NorinuriAssist, "norinuri"],
+    ["No Three", NothreeAssist, "nothree"],
+    ["Numberlink", NumberlinkAssist, "numlin"],
+    ["Nuribou", NuribouAssist, "nuribou"],
+    ["Nurikabe", NurikabeAssist, "nurikabe"],
+    ["Nuri-Maze", NuriMazeAssist, "nurimaze"],
+    ["Nurimisaki", NurimisakiAssist, "nurimisaki"],
+    ["One Room One Door", OneRoomOneDoorAssist, "oneroom"],
+    ["Paintarea", PaintareaAssist, "paintarea"],
+    ["Parquet", ParquetAssist, "parquet"],
+    ["Pencils", PencilsAssist, "pencils"],
+    ["Pentominous", PentominousAssist, "pentominous"],
+    ["Pipelink", PipelinkAssist, "pipelink"],
+    ["Putteria", PutteriaAssist, "putteria"],
+    ["Rail Pool", RailPoolAssist, "railpool"],
+    ["Rassi Silai", RassiSilaiAssist, "rassi"],
+    ["Rectangle-Slider", RectangleSliderAssist, "rectslider"],
+    ["Reflect Link", ReflectLinkAssist, "reflect"],
+    ["Regional Yajilin", RegionalYajilinAssist, "yajilin-regions"],
+    ["Ring-ring", RingringAssist, "ringring"],
+    ["Ripple Effect", RippleEffectAssist, "ripple"],
+    ["Rooms of Factors", RoomsOfFactorsAssist, "factors"],
+    ["Sashigane", SashiganeAssist, "sashigane"],
+    ["School Trip", SchoolTripAssist, "shugaku"],
+    ["Scrin", ScrinAssist, "scrin"],
+    ["Shakashaka", ShakashakaAssist, "shakashaka"],
+    ["Shikaku", ShikakuAssist, "shikaku"],
+    ["Simple Gako", SimpleGakoAssist, "simplegako"],
+    ["Simple Loop", SimpleLoopAssist, "simpleloop"],
+    ["Skyscrapers", SkyscrapersAssist, "skyscrapers"],
+    ["Slalom", SlalomAssist, "slalom"],
+    ["Slant", SlantAssist, "gokigen"],
+    ["Slash Pack", SlashPackAssist, "slashpack"],
+    ["Slitherlink", SlitherlinkAssist, "slitherlink"],
+    ["Snake", SnakeAssist, "snake"],
+    ["Square Jam", SquareJamAssist, "squarejam"],
+    ["Star Battle", StarbattleAssist, "starbattle"],
+    ["Statue Park", StatueParkAssist, "statuepark"],
+    ["Stostone", StostoneAssist, "stostone"],
+    ["Sudoku", SudokuAssist, "sudoku"],
+    ["Sukoro", SukoroAssist, "sukoro"],
+    ["Symmetry Area", SymmetryAreaAssist, "symmarea"],
+    ["Tapa", TapaAssist, "tapa"],
+    ["Tapa-Like Loop", TapaLikeLoopAssist, "tapaloop"],
+    ["Tasquare", TasquareAssist, "tasquare"],
+    ["Tatamibari", TatamibariAssist, "tatamibari"],
+    ["Tawamurenga", TawamurengaAssist, "tawa"],
+    ["Tentaisho", TentaishoAssist, "tentaisho"],
+    ["Tents", TentsAssist, "tents"],
+    ["Tetrochain", TetrochainAssist, "tetrochain"],
+    ["Tetrominous", TetrominousAssist, "tetrominous"],
+    ["Tilepaint", TilepaintAssist, "tilepaint"],
+    ["Toichika", ToichikaAssist, "toichika"],
+    ["Tren", TrenAssist, "tren"],
+    ["Uso-one", UsoOneAssist, "usoone"],
+    ["Uso-tatami", UsoTatamiAssist, "usotatami"],
+    ["Vertex Slitherlink", VertexSlitherlinkAssist, "vslither"],
+    ["Voxas", VoxasAssist, "voxas"],
+    ["Wall Logic", WallLogicAssist, "walllogic"],
+    ["Water Walk", WaterWalkAssist, "waterwalk"],
+    ["Yajilin", YajilinAssist, "yajilin"],
+    ["Yajirushi 2", Yajirushi2Assist, undefined], // yajirushi2
+    ["Yajisan-Kazusan", YajisanKazusanAssist, "yajikazu"],
+    ["Yin-Yang", YinyangAssist, "yinyang"],
 ];
+console.log("Puzz.link database link:");
+console.log("https://puzz.link/db/?" + GENRELIST.map(e => "type=" + e[2]).join('&') + "&solved=no&generated=any&variant=no");
+console.log("https://pzplus.tck.mn/db?" + GENRELIST.map(e => "type=" + e[2]).join('&') + "&solved=no&generated=any&variant=no");
 
 // main entrance
 let initDone = false;
@@ -647,6 +651,50 @@ function forEachCross(f = cross => { }) { for (let i = 0; i < board.cross.length
 function forEachRoom(f = room => { }) {
     if (board.roommgr.components === undefined) { return; }
     for (let i = 0; i < board.roommgr.components.length; i++) { f(board.roommgr.components[i]); }
+}
+function patternDeduce({ pattern = ["*"], legend = {}, deduce = { "*": () => { } }, rot = true, flip = true } = {}) {
+    rot ||= flip;
+    let checklist = [], deducelist = [], mx = 0, my = 0;
+    for (let i = 0; i < pattern.length; i++) {
+        for (let j = 0; j < pattern[i].length; j++) {
+            if (legend[pattern[i][j]] !== undefined) {
+                checklist.push([j, i, legend[pattern[i][j]]]);
+                mx = Math.max(mx, j);
+                my = Math.max(my, i);
+            }
+            if (deduce[pattern[i][j]] !== undefined) {
+                deducelist.push([j, i, deduce[pattern[i][j]]]);
+                mx = Math.max(mx, j);
+                my = Math.max(my, i);
+            }
+        }
+    }
+    for (let sx = - mx; sx < board.cols; sx++) {
+        for (let sy = - my; sy < board.rows; sy++) {
+            let tc;
+            tc = (x, y) => board.getc((sx + x) * 2 + 1, (sy + y) * 2 + 1);
+            if (checklist.every(([x, y, f]) => f(tc(x, y)))) { deducelist.forEach(([x, y, f]) => f(tc(x, y))); }
+            tc = (x, y) => board.getc((sx + mx - x) * 2 + 1, (sy + my - y) * 2 + 1);
+            if (rot && checklist.every(([x, y, f]) => f(tc(x, y)))) { deducelist.forEach(([x, y, f]) => f(tc(x, y))); }
+            tc = (x, y) => board.getc((sx + mx - x) * 2 + 1, (sy + y) * 2 + 1);
+            if (flip && checklist.every(([x, y, f]) => f(tc(x, y)))) { deducelist.forEach(([x, y, f]) => f(tc(x, y))); }
+            tc = (x, y) => board.getc((sx + x) * 2 + 1, (sy + my - y) * 2 + 1);
+            if (flip && checklist.every(([x, y, f]) => f(tc(x, y)))) { deducelist.forEach(([x, y, f]) => f(tc(x, y))); }
+        }
+    }
+    for (let sx = 1 - my; sx < board.cols; sx++) {
+        for (let sy = 1 - mx; sy < board.rows; sy++) {
+            let tc;
+            tc = (x, y) => board.getc((sx + y) * 2 + 1, (sy + x) * 2 + 1);
+            if (flip && checklist.every(([x, y, f]) => f(tc(x, y)))) { deducelist.forEach(([x, y, f]) => f(tc(x, y))); }
+            tc = (x, y) => board.getc((sx + my - y) * 2 + 1, (sy + mx - x) * 2 + 1);
+            if (flip && checklist.every(([x, y, f]) => f(tc(x, y)))) { deducelist.forEach(([x, y, f]) => f(tc(x, y))); }
+            tc = (x, y) => board.getc((sx + y) * 2 + 1, (sy + mx - x) * 2 + 1);
+            if (rot && checklist.every(([x, y, f]) => f(tc(x, y)))) { deducelist.forEach(([x, y, f]) => f(tc(x, y))); }
+            tc = (x, y) => board.getc((sx + my - y) * 2 + 1, (sy + x) * 2 + 1);
+            if (rot && checklist.every(([x, y, f]) => f(tc(x, y)))) { deducelist.forEach(([x, y, f]) => f(tc(x, y))); }
+        }
+    }
 }
 
 // set val
@@ -1873,6 +1921,46 @@ function SingleLoopInBorder({ useCrossQsub = true } = {}) {
         }
     });
 }
+function SignleLoopInBlock({ isShaded, isUnshaded, add_shaded, add_unshaded } = {}) {
+    // use line because it's not used for cell. 0: outside, 1: inside
+    const isMarked = c => c.line !== 0;
+    const setSide = (c, n) => c.setLineVal(n);
+    const getSide = c => c.line;
+    const INSIDE = 3;
+    const OUTSIDE = 2;
+    const isInside = c => getSide(c) === INSIDE;
+    const isOutside = c => getSide(c) === OUTSIDE;
+    forEachCell(cell => {
+        if (!isUnshaded(cell) || isMarked(cell)) { return; }
+        let dfs = function () {
+            if (cell.isnull || !isUnshaded(cell) || isMarked(cell)) { return; }
+            for (let d = 0; d < 4; d++) {
+                let ncell = offset(cell, 1, 0, d);
+                if (ncell.isnull) { setSide(cell, OUTSIDE); }
+                if (isMarked(ncell)) { setSide(cell, getSide(ncell)); }
+                if (isShaded(offset(cell, 1, 0, d)) && isShaded(offset(cell, 0, 1, d)) && isMarked(offset(cell, 1, 1, d))) {
+                    setSide(cell, getSide(offset(cell, 1, 1, d)) === OUTSIDE ? INSIDE : OUTSIDE);
+                }
+                if (isMarked(cell) && [[1, -1], [2, 0], [1, 1]].map(([x, y]) => offset(cell, x, y, d)).some(c => isMarked(c) && getSide(cell) !== getSide(c))) { add_shaded(offset(cell, 1, 0, d)); }
+            }
+            if (isMarked(cell)) { forEachSide(cell, (nb, nc) => dfs(nc)); }
+        };
+        dfs(cell);
+    });
+    CellConnected({
+        isShaded: c => isUnshaded(c) && isOutside(c),
+        isUnshaded: c => isShaded(c) || isInside(c),
+        add_shaded: add_unshaded,
+        add_unshaded: () => { },
+        OutsideAsShaded: true,
+    });
+    CellConnected({
+        isShaded: c => isUnshaded(c) && isInside(c),
+        isUnshaded: c => isShaded(c) || isOutside(c),
+        add_shaded: add_unshaded,
+        add_unshaded: () => { },
+    });
+}
 function NoCheckerCell({ isShaded, isUnshaded, add_shaded, add_unshaded } = {}) {
     forEachCell(cell => {
         if (isShaded(cell) || isUnshaded(cell)) { return; }
@@ -2714,7 +2802,76 @@ function GeneralAssist() {
 
 // assist for certain genre
 
-// TODO: Scrin
+function ScrinAssist() {
+    const isXcell = c => c.qsub === 1;
+    const isGreen = c => c.qans === 1;
+    const add_Xcell = function (c) {
+        if (c === undefined || c.isnull || isGreen(c) || isXcell(c)) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setQsub(1);
+        c.draw();
+    };
+    const add_green = function (c) {
+        if (c === undefined || c.isnull || isGreen(c) || isXcell(c)) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setQans(1);
+        c.draw();
+    };
+    RectRegion_Cell({
+        isShaded: isGreen,
+        isUnshaded: isXcell,
+        add_shaded: add_green,
+        add_unshaded: add_Xcell,
+        isSizeAble: (w, h, sc, c) => {
+            if (sc !== null && isNum(sc) && w * h !== sc.qnum) { return false; }
+            let dclist = [[-1, -1], [-1, h], [w, -1], [w, h]].map(([x, y]) => offset(c, x, y));
+            if (dclist.filter(dc => !dc.isnull && !isXcell(dc)).length < 2) { return false; }
+            if (dclist.filter(dc => isGreen(dc)).length > 2) { return false; }
+            sc = null;
+            for (let i = 0; i < w; i++) {
+                for (let j = 0; j < h; j++) {
+                    let pc = offset(c, i, j);
+                    if (isNum(pc) && w * h !== pc.qnum) { return false; }
+                    if (sc !== null && isClue(pc) && sc !== pc) { return false; }
+                    if (sc === null && isClue(pc)) { sc = pc; }
+                }
+            }
+            return true;
+        },
+    });
+    CellConnected({
+        isShaded: isGreen,
+        isUnshaded: isXcell,
+        add_shaded: add_green,
+        add_unshaded: add_Xcell,
+        DiagDir: true,
+    });
+    SignleLoopInBlock({
+        isShaded: isGreen,
+        isUnshaded: isXcell,
+        add_shaded: add_green,
+        add_unshaded: add_Xcell,
+    });
+    add_Xcell(board.getc(board.minbx + 1, board.minby + 1));
+    add_Xcell(board.getc(board.minbx + 1, board.maxby - 1));
+    add_Xcell(board.getc(board.maxbx - 1, board.minby + 1));
+    add_Xcell(board.getc(board.maxbx - 1, board.maxby - 1));
+    forEachCell(cell => {
+        if (isClue(cell)) { add_green(cell); }
+        if (isGreen(cell)) {
+            let clist = getCellChunk(cell, (c, nb, nc) => isGreen(nc));
+            if (!getShape(clist).includes(0)) {
+                let bclist = clist.flatMap(c => adjlist(c.adjacent)).filter(nc => !nc.isnull && !isXcell(nc) && !clist.includes(nc));
+                let dclist = clist.flatMap(c => adjdiaglist(c)).filter(dc => !dc.isnull && !isXcell(dc) && !clist.includes(dc) && !bclist.includes(dc));
+                if (bclist.length === 0 && dclist.length === 2) { dclist.forEach(dc => add_green(dc)); }
+                if (dclist.filter(dc => isGreen(dc)).length === 2) { dclist.forEach(dc => add_Xcell(dc)); }
+                if (dclist.length < 2 && bclist.length === 1) { bclist.forEach(bc => add_green(bc)); }
+            }
+        }
+    });
+}
 
 function GeradewegAssist() {
     SingleLoopInCell({ isPass: isClue, });
@@ -7373,6 +7530,12 @@ function SchoolTripAssist() {
 
 function AntMillAssist() {
     BlackDomino();
+    SignleLoopInBlock({
+        isShaded: isBlack,
+        isUnshaded: isGreen,
+        add_shaded: add_black,
+        add_unshaded: add_green,
+    });
     const squ = 1, crs = 2;
     let isDominoAble = function (border) {
         if (border.isnull) { return false; }
@@ -9775,320 +9938,118 @@ function CastleWallAssist() {
 }
 
 function NurimisakiAssist() {
-    let isEmpty = c => !c.isnull && c.qnum === CQNUM.none && c.qsub === CQSUB.none && c.qans === CQANS.none;
-    let isDot = c => !c.isnull && c.qsub === CQSUB.dot && c.qnum === CQNUM.none;
+    const isCircle = c => !c.isnull && isClue(c);
+    const isDot = c => !c.isnull && c.qsub === CQSUB.dot && !isCircle(c);
+    const isEmpty = c => !c.isnull && !isCircle(c) && !isDot(c) && !isBlack(c);
+    const isntBlack = c => isCircle(c) || isDot(c);
+
     let isDotEmpty = c => isEmpty(c) || isDot(c);
     let isBorderBlack = c => c.isnull || isBlack(c);
     let isConnectBlack = c => isBorderBlack(c) || c.qnum !== CQNUM.none;
-    let isCircle = c => !c.isnull && c.qnum !== CQNUM.none;
     let isDotCircle = c => isDot(c) || isCircle(c);
 
-    forEachCell(cell => {
-        let blackcnt = adjlist(cell.adjacent).filter(c => isBorderBlack(c)).length;
-        let dotcnt = adjlist(cell.adjacent).filter(c => isDot(c)).length;
-
-        // no clue pattern
-
-        // add dot
-        if (isEmpty(cell)) {
-            for (let d = 0; d < 4; d++) {
-                // cannot place black with 2x2 black rule
-                //     : █  
-                // █_█ : _█ -> A is dot
-                //  A█ ; A█ 
-                if (isEmpty(offset(cell, 0, -1, d)) && isBlack(offset(cell, 1, 0, d)) && isBlack(offset(cell, 1, -1, d)) &&
-                    (isBorderBlack(offset(cell, 0, -2, d)) || isBorderBlack(offset(cell, -1, -1, d)))) {
-                    add_dot(cell);
-                }
-                else if (isEmpty(offset(cell, 0, -1, d)) && isBlack(offset(cell, -1, 0, d)) && isBlack(offset(cell, -1, -1, d)) &&
-                    (isBorderBlack(offset(cell, 0, -2, d)) || isBorderBlack(offset(cell, 1, -1, d)))) {
-                    add_dot(cell);
-                }
-                //      :  █   :      :  █
-                // █_█  :  _█  : █_█  :  _█ -> A is dot
-                //  A_█ :  A_█ :  A_  :  A_
-                //      ;      ;   █  ;   █
-                else if (isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 0, -1, d)) && isBlack(offset(cell, 1, -1, d)) &&
-                    (isBorderBlack(offset(cell, 2, 0, d)) || isBorderBlack(offset(cell, 1, 1, d))) &&
-                    (isBorderBlack(offset(cell, 0, -2, d)) || isBorderBlack(offset(cell, -1, -1, d)))) {
-                    add_dot(cell);
-                }
-                //  ██
-                // █__ -> A is dot
-                //  A█ 
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, -1, d)) && isBlack(offset(cell, 1, 0, d)) &&
-                    isBorderBlack(offset(cell, -1, -1, d)) && isBorderBlack(offset(cell, 0, -2, d)) && isBorderBlack(offset(cell, 1, -2, d))) {
-                    add_dot(cell);
-                }
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, -1, -1, d)) && isBlack(offset(cell, -1, 0, d)) &&
-                    isBorderBlack(offset(cell, 1, -1, d)) && isBorderBlack(offset(cell, 0, -2, d)) && isBorderBlack(offset(cell, -1, -2, d))) {
-                    add_dot(cell);
-                }
-                // cannot place black with 2x2 dot rule
-                else if (isBlack(offset(cell, 1, 0, d)) && isBlack(offset(cell, 1, 1, d)) && isDot(offset(cell, -1, 2, d)) &&
-                    isEmpty(offset(cell, 0, 1, d)) && isDotEmpty(offset(cell, -1, 1, d)) && isDotEmpty(offset(cell, 0, 2, d))) {
-                    add_dot(cell);
-                }
-                else if (isBlack(offset(cell, -1, 0, d)) && isBlack(offset(cell, -1, 1, d)) && isDot(offset(cell, 1, 2, d)) &&
-                    isEmpty(offset(cell, 0, 1, d)) && isDotEmpty(offset(cell, 1, 1, d)) && isDotEmpty(offset(cell, 0, 2, d))) {
-                    add_dot(cell);
-                }
-                // cannot place black with 2x2 black rule and 2x2 dot rule
-                else if (isDotEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 0, -2, d)) &&
-                    isBlack(offset(cell, 1, -1, d)) && isBlack(offset(cell, 1, -2, d)) && isBorderBlack(offset(cell, 0, -3, d))) {
-                    add_dot(cell);
-                }
-                else if (isDotEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 0, -2, d)) &&
-                    isBlack(offset(cell, -1, -1, d)) && isBlack(offset(cell, -1, -2, d)) && isBorderBlack(offset(cell, 0, -3, d))) {
-                    add_dot(cell);
-                }
-                else if (isDotEmpty(offset(cell, -1, 0, d)) && isEmpty(offset(cell, -1, -1, d)) &&
-                    isBlack(offset(cell, 0, -1, d)) && isBorderBlack(offset(cell, -1, 1, d)) && isBorderBlack(offset(cell, -1, -2, d))) {
-                    add_dot(cell);
-                }
-                else if (isDotEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
-                    isBlack(offset(cell, 0, -1, d)) && isBorderBlack(offset(cell, 1, 1, d)) && isBorderBlack(offset(cell, 1, -2, d))) {
-                    add_dot(cell);
-                }
-                // cannot place black with 2x3 border pattern
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, -1, d)) && isEmpty(offset(cell, 2, -1, d)) &&
-                    isDotEmpty(offset(cell, 1, 0, d)) && isDotEmpty(offset(cell, 2, 0, d)) &&
-                    isBorderBlack(offset(cell, -1, -1, d)) && isBorderBlack(offset(cell, 3, -1, d)) &&
-                    isBorderBlack(offset(cell, 3, 0, d)) && offset(cell, 0, -2, d).isnull) {
-                    add_dot(cell);
-                }
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, -1, -1, d)) && isEmpty(offset(cell, -2, -1, d)) &&
-                    isDotEmpty(offset(cell, -1, 0, d)) && isDotEmpty(offset(cell, -2, 0, d)) &&
-                    isBorderBlack(offset(cell, 1, -1, d)) && isBorderBlack(offset(cell, -3, -1, d)) &&
-                    isBorderBlack(offset(cell, -3, 0, d)) && offset(cell, 0, -2, d).isnull) {
-                    add_dot(cell);
-                }
-            }
-        }
-        if (isDot(cell)) {
-            // dot cannot be deadend
-            if (blackcnt === 2) {
-                forEachSide(cell, (nb, nc) => add_dot(nc));
-            }
-            for (let d = 0; d < 4; d++) {
-                // avoid 2x2 dot
-                if (isBorderBlack(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 0, 1, d)) &&
-                    isEmpty(offset(cell, -1, 0, d)) && isDot(offset(cell, 1, 1, d))) {
-                    add_dot(offset(cell, -1, 0, d));
-                }
-                else if (isBorderBlack(offset(cell, 0, -1, d)) && isEmpty(offset(cell, -1, 0, d)) && isEmpty(offset(cell, 0, 1, d)) &&
-                    isEmpty(offset(cell, 1, 0, d)) && isDot(offset(cell, -1, 1, d))) {
-                    add_dot(offset(cell, 1, 0, d));
-                }
-                // dot cannot be deadend with 2x2 dot rule
-                else if (isBorderBlack(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isBorderBlack(offset(cell, 2, 0, d)) &&
-                    isBorderBlack(offset(cell, 1, -1, d)) && isEmpty(offset(cell, -1, 0, d))) {
-                    add_dot(offset(cell, -1, 0, d));
-                }
-                else if (isBorderBlack(offset(cell, 0, -1, d)) && isEmpty(offset(cell, -1, 0, d)) && isBorderBlack(offset(cell, -2, 0, d)) &&
-                    isBorderBlack(offset(cell, -1, -1, d)) && isEmpty(offset(cell, 1, 0, d))) {
-                    add_dot(offset(cell, 1, 0, d));
-                }
-            }
-        }
-
-        // add black
-        if (isEmpty(cell)) {
-            // black deadend
-            if (blackcnt >= 3) {
-                add_black(cell);
-            }
-            for (let d = 0; d < 4; d++) {
-                // cannot dot with 2x2 dot rule
-                if (isBorderBlack(offset(cell, -1, 0, d)) && isBorderBlack(offset(cell, 2, 0, d)) && isEmpty(offset(cell, 1, 0, d)) &&
-                    offset(cell, 0, -1, d).isnull && offset(cell, 1, -1, d).isnull) {
-                    add_black(cell);
-                }
-                else if (isBorderBlack(offset(cell, 1, 0, d)) && isBorderBlack(offset(cell, 0, -1, d)) && isDot(offset(cell, -1, 1, d)) &&
-                    isDotEmpty(offset(cell, -1, 0, d)) && isDotEmpty(offset(cell, 0, 1, d))) {
-                    add_black(cell);
-                }
-            }
-        }
-
-        // clue pattern
-
-        // any circle clue
-        if (cell.qnum !== CQNUM.none) {
-            // clue deadend check
-            if (blackcnt === 3) {
-                forEachSide(cell, (nb, nc) => add_dot(nc));
-            }
-            else if (dotcnt === 1) {
-                forEachSide(cell, (nb, nc) => add_black(nc));
-            }
-            for (let d = 0; d < 4; d++) {
-                // avoid 2x2 black pattern
-                if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
-                    isBlack(offset(cell, 0, -2, d)) && isBlack(offset(cell, 1, -2, d))) {
-                    add_black(offset(cell, 0, 1, d));
-                    add_black(offset(cell, -1, 0, d));
-                }
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
-                    isBlack(offset(cell, 2, 0, d)) && isBlack(offset(cell, 2, -1, d))) {
-                    add_black(offset(cell, 0, 1, d));
-                    add_black(offset(cell, -1, 0, d));
-                }
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
-                    isEmpty(offset(cell, 0, -2, d)) && isBlack(offset(cell, 1, -2, d)) &&
-                    (isBorderBlack(offset(cell, 0, -3, d)) || isBorderBlack(offset(cell, -1, -2, d)))) {
-                    add_black(offset(cell, 0, 1, d));
-                    add_black(offset(cell, -1, 0, d));
-                }
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
-                    isEmpty(offset(cell, 2, 0, d)) && isBlack(offset(cell, 2, -1, d)) &&
-                    (isBorderBlack(offset(cell, 3, 0, d)) || isBorderBlack(offset(cell, 2, 1, d)))) {
-                    add_black(offset(cell, 0, 1, d));
-                    add_black(offset(cell, -1, 0, d));
-                }
-                // avoid 2x2 black and 2x2 dot apttern
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isDotEmpty(offset(cell, 1, -1, d)) &&
-                    isEmpty(offset(cell, 1, -2, d)) && isBlack(offset(cell, 0, -2, d)) && isBorderBlack(offset(cell, 1, -3, d))) {
-                    add_black(offset(cell, 0, 1, d));
-                    add_black(offset(cell, -1, 0, d));
-                }
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isDotEmpty(offset(cell, 1, -1, d)) &&
-                    isEmpty(offset(cell, 2, -1, d)) && isBlack(offset(cell, 2, 0, d)) && isBorderBlack(offset(cell, 3, -1, d))) {
-                    add_black(offset(cell, 0, 1, d));
-                    add_black(offset(cell, -1, 0, d));
-                }
-                // avoid border 2x2 black
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
-                    isDotEmpty(offset(cell, 2, 0, d)) && isEmpty(offset(cell, 2, -1, d)) && isBorderBlack(offset(cell, 3, 0, d)) &&
-                    isBorderBlack(offset(cell, 3, -1, d)) && offset(cell, 0, -2, d).isnull) {
-                    add_black(offset(cell, 0, 1, d));
-                    add_black(offset(cell, -1, 0, d));
-                }
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
-                    isDotEmpty(offset(cell, 0, -2, d)) && isEmpty(offset(cell, 1, -2, d)) && isBorderBlack(offset(cell, 0, -3, d)) &&
-                    isBorderBlack(offset(cell, 1, -3, d)) && offset(cell, 2, 0, d).isnull) {
-                    add_black(offset(cell, 0, 1, d));
-                    add_black(offset(cell, -1, 0, d));
-                }
-                // avoid border 2x3 pattern
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
-                    isDotEmpty(offset(cell, 2, 0, d)) && isDotEmpty(offset(cell, 2, -1, d)) && isDotEmpty(offset(cell, 3, 0, d)) &&
-                    isEmpty(offset(cell, 3, -1, d)) && isBorderBlack(offset(cell, 4, 0, d)) &&
-                    isBorderBlack(offset(cell, 4, -1, d)) && offset(cell, 0, -2, d).isnull) {
-                    add_black(offset(cell, 0, 1, d));
-                    add_black(offset(cell, -1, 0, d));
-                }
-                else if (isEmpty(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 1, -1, d)) &&
-                    isDotEmpty(offset(cell, 0, -2, d)) && isDotEmpty(offset(cell, 1, -2, d)) && isDotEmpty(offset(cell, 0, -3, d)) &&
-                    isEmpty(offset(cell, 1, -3, d)) && isBorderBlack(offset(cell, 0, -4, d)) &&
-                    isBorderBlack(offset(cell, 1, -4, d)) && offset(cell, 2, 0, d).isnull) {
-                    add_black(offset(cell, 0, 1, d));
-                    add_black(offset(cell, -1, 0, d));
-                }
-            }
-        }
-        if (isEmpty(cell)) {
-            for (let d = 0; d < 4; d++) {
-                // cannot place black with 2x2 white
-                if (isBlack(offset(cell, 1, 0, d)) && isBlack(offset(cell, 1, 1, d)) && isCircle(offset(cell, -1, 2, d)) &&
-                    isEmpty(offset(cell, 0, 1, d)) && isEmpty(offset(cell, -1, 1, d)) && isEmpty(offset(cell, 0, 2, d))) {
-                    add_dot(cell);
-                }
-                else if (isBlack(offset(cell, -1, 0, d)) && isBlack(offset(cell, -1, 1, d)) && isCircle(offset(cell, 1, 2, d)) &&
-                    isEmpty(offset(cell, 0, 1, d)) && isEmpty(offset(cell, 1, 1, d)) && isEmpty(offset(cell, 0, 2, d))) {
-                    add_dot(cell);
-                }
-                // cannot place dot with 2x2 white
-                else if (isBorderBlack(offset(cell, 1, 0, d)) && isBorderBlack(offset(cell, 0, -1, d)) && isCircle(offset(cell, -1, 1, d)) &&
-                    isEmpty(offset(cell, -1, 0, d)) && isEmpty(offset(cell, 0, 1, d))) {
-                    add_black(cell);
-                }
-            }
-        }
-        if (isDot(cell)) {
-            for (let d = 0; d < 4; d++) {
-                // avoid 2x2 white
-                if (isBorderBlack(offset(cell, 0, -1, d)) && isEmpty(offset(cell, 1, 0, d)) && isEmpty(offset(cell, 0, 1, d)) &&
-                    isDotEmpty(offset(cell, -1, 0, d)) && isCircle(offset(cell, 1, 1, d))) {
-                    add_dot(offset(cell, -1, 0, d));
-                    add_black(offset(cell, 2, 1, d));
-                    add_black(offset(cell, 1, 2, d));
-                }
-                else if (isBorderBlack(offset(cell, 0, -1, d)) && isEmpty(offset(cell, -1, 0, d)) && isEmpty(offset(cell, 0, 1, d)) &&
-                    isDotEmpty(offset(cell, 1, 0, d)) && isCircle(offset(cell, -1, 1, d))) {
-                    add_dot(offset(cell, 1, 0, d));
-                    add_black(offset(cell, -2, 1, d));
-                    add_black(offset(cell, -1, 2, d));
-                }
-            }
-        }
-
-        // circle clue with number
-        if (cell.qnum >= 2) {
-            for (let d = 0; d < 4; d++) {
-                if (isEmpty(offset(cell, 0, -1, d))) {
-                    // avoid eyesight too long
-                    if (isDotCircle(offset(cell, 0, -cell.qnum, d))) {
-                        add_black(offset(cell, 0, -1, d));
-                    }
-                    // situation for clue at the end
-                    else if (isCircle(offset(cell, 0, -cell.qnum + 1, d)) &&
-                        offset(cell, 0, -cell.qnum + 1, d).qnum !== CQNUM.circle && offset(cell, 0, -cell.qnum + 1, d).qnum !== cell.qnum) {
-                        add_black(offset(cell, 0, -1, d));
-                    }
-                }
-                if (isEmpty(offset(cell, 0, -1, d))) {
-                    for (let j = 2; j < cell.qnum; j++) {
-                        // eyesight not enough long
-                        if (j !== cell.qnum - 1 && isConnectBlack(offset(cell, 0, -j, d))) {
-                            add_black(offset(cell, 0, -1, d));
-                            break;
-                        }
-                        if (isBorderBlack(offset(cell, 0, -j, d))) {
-                            add_black(offset(cell, 0, -1, d));
-                            break;
-                        }
-                        // avoid 2x2 dot
-                        if (isDot(offset(cell, 1, -j + 1, d)) && isDot(offset(cell, 1, -j, d))) {
-                            add_black(offset(cell, 0, -1, d));
-                            break;
-                        }
-                        if (isDot(offset(cell, -1, -j + 1, d)) && isDot(offset(cell, -1, -j, d))) {
-                            add_black(offset(cell, 0, -1, d));
-                            break;
-                        }
-                    }
-                }
-                // extend eyesight
-                if (isDot(offset(cell, 0, -1, d))) {
-                    for (let j = 2; j < cell.qnum; j++) {
-                        add_dot(offset(cell, 0, -j, d));
-                    }
-                    add_black(offset(cell, 0, -cell.qnum, d));
-                }
-            }
-        }
-    });
-    // 2x2 rules
-    No2x2Cell({
-        isShaded: isBlack,
-        add_unshaded: add_dot,
-    });
-    No2x2Cell({
-        isShaded: c => c.qsub === CQSUB.dot,
-        add_unshaded: add_black,
-    });
     CellConnected({
-        isShaded: isDotCircle,
+        isShaded: isntBlack,
         isUnshaded: isBlack,
         add_shaded: add_dot,
         add_unshaded: add_black,
     });
     CellConnected({
         isShaded: isDot,
-        isUnshaded: isConnectBlack,
+        isUnshaded: c => isBlack(c) || isCircle(c),
         add_shaded: add_dot,
         add_unshaded: add_black,
+    });
+
+    const legend = {
+        "#": c => c.isnull || isBlack(c),
+        "█": isBlack,
+        "O": isCircle,
+        ".": isDot,
+        "~": isntBlack,
+        "-": c => !c.isnull,
+        "_": c => !c.isnull && !isClue(c) && !isBlack(c),
+        "*": c => !c.isnull && !isCircle(c),
+        "X": c => c.isnull || !isClue(c) && !isDot(c),
+        "2": c => c.qnum === 2,
+        "3": c => c.qnum === 3,
+        "+": c => c.qnum > 3,
+    };
+    const deduce = {
+        "*": add_dot,
+        "X": add_black,
+    };
+    const patterns = [
+        [" X ", "XOX", " ~ "],
+        [" # ", "#O#", " * "],
+        [" # ", "#X#"],
+        [" # ", "*.*", " # "],
+        [" # ", "#.*", " * "],
+        ["██", "█*"],
+        ["~~", "~X"],
+        ["#_█", " *█"],
+        ["#_*", " ██"],
+        ["#__*", " ██ "],
+        ["#_.*", " ## "],
+        ["#XX#", " ## "],
+        ["#__#", " █* "],
+        ["#_█ ", " *_#"],
+        ["#_█", " *_", "  #"],
+        ["#  ", "_█ ", "*_#"],
+        [" ##", "#__", " *█"],
+        ["█* ", "█_ ", "  ~"],
+        [" * ", "#. ", "  ~"],
+        [" # ", "#X ", "  ~"],
+        ["#__#", "#_* ", " #  "],
+        [" ### ", "#___#", " *  #"],
+        ["█_  ", "█ OX", "  X "],
+        [" █_  ", "#_ OX", "   X "],
+        ["█_  ", "_ OX", "# X "],
+        ["#__  ", " █ OX", "   X "],
+        ["#__  ", "#_ OX", " # X "],
+        ["#__#", "#_  ", "# OX", "  X "],
+        [" ##  ", "#__  ", "#_ OX", "   X "],
+        [" ###  ", "#___  ", "#__ OX", "    X "],
+        ["#.  ", "  OX", "  X "],
+        ["#__ ", "#*█O", "#__ "],
+        [" #  ", "#~  ", "  OX", "  X "],
+        ["#-   ", "#X_2X", " ##X "],
+        ["#-   ", "#XX_2", " ##  "],
+        ["#_*", "# _", " 3 "],
+        ["█_ ", "* 3", "*  "],
+        [" █_ ", "** +"],
+        ["#X3", "#X ", "#_*"],
+        ["#X+", "#X ", "#_*"],
+        ["#__ ", "#* 3", "#__ "],
+        ["3 ", "#X", " #"],
+        ["+ ", "#X", " #"],
+    ];
+    patterns.forEach(pattern => patternDeduce({ pattern: pattern, legend: legend, deduce: deduce, }));
+
+    forEachCell(cell => {
+        if (isNum(cell)) {
+            for (let d = 0; d < 4; d++) {
+                if (!(() => {
+                    let c = offset(cell, cell.qnum - 1, 0, d);
+                    if (c.isnull || isNum(c) && c.qnum !== cell.qnum) { return false; }
+                    if (isntBlack(offset(cell, cell.qnum, 0, d))) { return false; }
+                    for (let i = 1; i < cell.qnum; i++) {
+                        let pc = offset(cell, i, 0, d);
+                        if (pc.isnull || isBlack(pc)) { return false; }
+                        if (i !== cell.qnum - 1 && isCircle(pc)) { return false; }
+                        if (isntBlack(offset(pc, -1, -1, d)) && isntBlack(offset(pc, 0, -1, d))) { return false; }
+                        if (isntBlack(offset(pc, -1, 1, d)) && isntBlack(offset(pc, 0, 1, d))) { return false; }
+                    }
+                    return true;
+                })()) { add_black(offset(cell, 1, 0, d)); }
+                if (isDot(offset(cell, 1, 0, d))) {
+                    add_black(offset(cell, cell.qnum, 0, d));
+                    for (let i = 1; i < cell.qnum; i++) {
+                        add_dot(offset(cell, i, 0, d));
+                    }
+                }
+            }
+        }
     });
 }
 

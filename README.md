@@ -126,6 +126,7 @@ Currently enhanced genre:
 * Rooms of Factors
 * Sashigane
 * School Trip
+* Scrin
 * Shakashaka
 * Shikaku
 * Simple Gako
