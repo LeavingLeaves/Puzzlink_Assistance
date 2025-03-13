@@ -114,6 +114,7 @@ Currently enhanced genre:
 * Parquet
 * Pencils
 * Pentominous
+* Persistence of Memory
 * Pipelink
 * Putteria
 * Rail Pool
