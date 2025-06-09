@@ -47,15 +47,18 @@ Currently enhanced genre:
 * Context
 * Country Road
 * Creek
+* Detour
 * Dominion
 * Dosun-Fuwari
 * Dotchi-Loop
 * Double Back
 * Double Choco
+* Easy as ABC
 * Family Photo
 * Fillomino
 * Fire walk
 * FiveCells
+* Forest Walk
 * FourCells
 * Geradeweg
 * Goats and Wolves
@@ -163,6 +166,7 @@ Currently enhanced genre:
 * Voxas
 * Wall Logic
 * Water Walk
+* Wittgenstein Briquet
 * Yajilin
 * Yajirushi 2
 * Yajisan-Kazusan
