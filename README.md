@@ -77,17 +77,20 @@ Currently enhanced genre:
 * International Borders
 * Inverse LITSO
 * Islands
+* Isowatari
 * Juosan
 * Kakuro
 * Kazunori Room
 * Koburin
 * Kropki
+* Kurarin
 * Kurodoko
 * Light and Shadow
 * Litherslink
 * LITS
 * Lohkous
 * Look-Air
+* Loop Special
 * Martini
 * Masyu
 * Maxi Loop
@@ -147,6 +150,7 @@ Currently enhanced genre:
 * Stostone
 * Sudoku
 * Sukoro
+* Sumiwake
 * Symmetry Area
 * Tapa
 * Tapa-Like Loop
