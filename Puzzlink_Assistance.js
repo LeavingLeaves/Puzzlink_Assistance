@@ -1632,14 +1632,15 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
             }
         }
     });
-    let allPassed = true;
-    forEachCell(cell => { allPassed &&= isPass(cell) && cell.lcnt > 0; });
+    let CellNotPassed = [];
+    forEachCell(cell => { if (isPass(cell) && cell.lcnt === 0) { CellNotPassed.push(cell); } });
     forEachCell(cell => {
         // avoid forming multiple loop
         if (cell.path !== null && !isIce(cell) && !hasCross) {
             for (let d = 0; d < 4; d++) {
-                let ncell = cellTrail(cell, d).pop();
-                if (cell.lcnt === 1 && ncell.lcnt === 1 && cell.path === ncell.path && (board.linegraph.components.length > 1 || !allPassed)) {
+                let ctr = cellTrail(cell, d);
+                let ncell = ctr[ctr.length - 1];
+                if (cell.lcnt === 1 && ncell.lcnt === 1 && cell.path === ncell.path && (board.linegraph.components.length > 1 || CellNotPassed.some(c => !ctr.includes(c)))) {
                     add_notpath(offset(cell, .5, 0, d));
                 }
                 if (cell === ncell && board.linegraph.components.length > 1) {
