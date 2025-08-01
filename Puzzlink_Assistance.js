@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      25.7.28.1
+// @version      25.8.1.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -1557,8 +1557,8 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
         return [[c.adjborder.top, BQSUB.arrow_up, BQSUB.arrow_dn], [c.adjborder.bottom, BQSUB.arrow_dn, BQSUB.arrow_up],
         [c.adjborder.left, BQSUB.arrow_lt, BQSUB.arrow_rt], [c.adjborder.right, BQSUB.arrow_rt, BQSUB.arrow_lt]];
     };
-    let has_in = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && b.line && b.qsub === i_arr);
-    let has_out = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && b.line && b.qsub === o_arr);
+    let hasIn = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && b.line && b.qsub === i_arr);
+    let hasOut = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && b.line && b.qsub === o_arr);
     let initied = false;
     forEachCross(cross => { initied ||= cross.qsub === CRQSUB.in || cross.qsub === CRQSUB.none; })
     if (!initied) {
@@ -1718,7 +1718,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
                     ncell = offset(ncell, 1, 0, d);
                 }
                 if (ncell.isnull || ncell.lcnt !== 1 || offset(ncell, -.5, 0, d).line) { continue; }
-                if (has_in(cell) && has_in(ncell) || has_out(cell) && has_out(ncell)) {
+                if (hasIn(cell) && hasIn(ncell) || hasOut(cell) && hasOut(ncell)) {
                     add_cross(offset(cell, .5, 0, d));
                 }
             }
@@ -1747,16 +1747,16 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
     if (Directed) {
         // used to avoid all in/out arrow region
         CellConnected({
-            isShaded: c => !has_out(c) && has_in(c),
-            isUnshaded: c => has_out(c),
+            isShaded: c => !hasOut(c) && hasIn(c),
+            isUnshaded: c => hasOut(c),
             add_shaded: () => { },
             add_unshaded: c => forEachSide(c, (nb, nc) => add_cross(nb)),
             isNotPassable: (c, nb, nc) => isCross(nb),
             OnlyOneConnected: false,
         });
         CellConnected({
-            isShaded: c => !has_in(c) && has_out(c),
-            isUnshaded: c => has_in(c),
+            isShaded: c => !hasIn(c) && hasOut(c),
+            isUnshaded: c => hasIn(c),
             add_shaded: () => { },
             add_unshaded: c => forEachSide(c, (nb, nc) => add_cross(nb)),
             isNotPassable: (c, nb, nc) => isCross(nb),
@@ -1843,15 +1843,15 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
     forEachCross(cross => dfs(cross));
 }
 function SingleLoopInBorder({ useCrossQsub = true } = {}) {
-    let add_bg_color = function (c, color) {
+    let add_bgcolor = function (c, color) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none || c.qsub === color) { return; }
         if (step && flg) { return; }
         flg = true;
         c.setQsub(color);
         c.draw();
     }
-    let add_green = function (c) { add_bg_color(c, CQSUB.green); }
-    let add_yellow = function (c) { add_bg_color(c, CQSUB.yellow); }
+    let add_green = function (c) { add_bgcolor(c, CQSUB.green); }
+    let add_yellow = function (c) { add_bgcolor(c, CQSUB.yellow); }
     let isYellow = c => c.isnull || c.qsub === CQSUB.yellow;
     CellConnected({
         isShaded: isGreen,
@@ -10844,17 +10844,6 @@ function GuideArrowAssist() {
             add_green(offset(cell, 1, 0, d));
             add_arrow(cell, [4, 1, 3, 2][d]);
         }
-        // direction consistency
-        let f = function (c, d) {
-            if (c.isnull || !isGreen(c)) { return; }
-            adjlist(c.adjacent).forEach((nc, dd) => {
-                if (nc.isnull || !isGreen(nc) || nc === goalcell || nc.anum !== CANUM.none || d === dd) { return; }
-                add_arrow(nc, [4, 1, 3, 2][(dd + 2) % 4]);
-                f(nc, (dd + 2) % 4);
-            });
-        };
-        if (cell === goalcell) { f(cell, -1); return; }
-        if (cell.anum !== CANUM.none) { f(cell, qdirRemap(cell.anum)); }
         if (!isGreen(cell) && adjlist(cell.adjacent).filter(c => c === goalcell || c.anum !== CANUM.none).length > 1) { add_black(cell); }
         // single out
         if (isGreen(cell)) {
@@ -10866,6 +10855,19 @@ function GuideArrowAssist() {
             }
         }
     });
+    forEachCell(cell => {
+        // direction consistency
+        let f = function (c, d) {
+            if (c.isnull || !isGreen(c)) { return; }
+            adjlist(c.adjacent).forEach((nc, dd) => {
+                if (nc.isnull || !isGreen(nc) || nc === goalcell || nc.anum !== CANUM.none || d === dd) { return; }
+                add_arrow(nc, [4, 1, 3, 2][(dd + 2) % 4]);
+                f(nc, (dd + 2) % 4);
+            });
+        };
+        if (cell === goalcell) { f(cell, -1); return; }
+        if (cell.anum !== CANUM.none) { f(cell, qdirRemap(cell.anum)); }
+    })
     let cset = new Set();
     forEachCell(cell => {
         if (cell.anum === CANUM.none || cset.has(cell) || offset(cell, 1, 0, qdirRemap(cell.anum)).anum !== CANUM.none) { return; }
