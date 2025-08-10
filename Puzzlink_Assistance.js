@@ -10816,15 +10816,15 @@ function NurikabeAssist() {
 }
 
 function GuideArrowAssist() {
+    const goalcell = board.getc(board.goalpos.bx, board.goalpos.by);
     let add_arrow = function (c, n) {
-        if (c === undefined || c.isnull || c.anum !== CANUM.none) { return; }
+        if (c === undefined || c.isnull || c.anum !== CANUM.none || c === goalcell) { return; }
         if (step && flg) { return; }
         if (c.qnum !== CQNUM.none) { flg2 = true; }
         else { flg = true; }
         c.setAnum(n);
         c.draw();
     };
-    let goalcell = board.getc(board.goalpos.bx, board.goalpos.by);
     BlackNotAdjacent();
     GreenConnected();
     GreenNoLoopInCell();
@@ -10839,6 +10839,7 @@ function GuideArrowAssist() {
     // use anum to save the direction
     forEachCell(cell => {
         if (cell === goalcell || cell.qnum !== CQNUM.none) { add_green(cell); }
+        if (cell === goalcell) { return; }
         if (cell.qnum !== CQNUM.none && cell.qnum !== CQNUM.quesmark) {
             let d = qdirRemap(cell.qnum);
             add_green(offset(cell, 1, 0, d));
