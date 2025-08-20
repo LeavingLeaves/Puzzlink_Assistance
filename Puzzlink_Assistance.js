@@ -840,6 +840,11 @@ const add_Xcell = function (c, notOnNum = true) {
     c.draw();
     flg ||= c.qsub === CQSUB.cross;
 };
+const gray_clue = function (c) {
+    if (c === undefined || c.isnull || c.qnum === CQNUM.none && c.qnums.length === 0) { return; }
+    c.setQcmp(1);
+    c.draw();
+}
 
 // single rule deduction
 function NShadeInClist({ isShaded = isBlack, isUnshaded = isGreen, add_shaded = add_black, add_unshaded = add_green,
@@ -10813,6 +10818,18 @@ function NurikabeAssist() {
         add_shaded: add_dot,
         add_unshaded: c => add_black(c, true),
     });
+    const isntDot = c => c.isnull || isBlack(c);
+    forEachCell(cell => {
+        if (cell.qnum !== 2) { return; }
+        for (let d = 0; d < 4; d++) {
+            //  █      █ 
+            // █2  -> █2 
+            //          █
+            if (isntDot(offset(cell, -1, 0, d)) && isntDot(offset(cell, 0, -1, d))) {
+                add_black(offset(cell, 1, 1, d));
+            }
+        }
+    });
 }
 
 function GuideArrowAssist() {
@@ -12272,10 +12289,12 @@ function AkariAssist() {
             // finished clue
             if (cell.qnum === lightcnt) {
                 forEachSide(cell, (nb, nc) => add_dot(nc));
+                gray_clue(cell);
             }
             // finish clue
             if (cell.qnum === emptycnt + lightcnt) {
                 forEachSide(cell, (nb, nc) => add_light(nc));
+                gray_clue(cell);
             }
             // dot at corner
             if (cell.qnum - lightcnt + 1 === emptycnt) {
