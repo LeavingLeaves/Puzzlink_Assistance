@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      25.8.20.1
+// @version      25.8.24.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -6896,11 +6896,39 @@ function NumberlinkAssist() {
                 if (nc.path === null && nc.qnum !== CQNUM.none && nc.qnum !== num || nc.path !== null && Array.from(nc.path.clist).some(c => c.qnum !== CQNUM.none && c.qnum !== num)) {
                     add_cross(nb);
                 }
+                // using uniquity
+                if (nc.path === null && nc.qnum === num || nc.path !== null && nc.path !== cell.path && Array.from(nc.path.clist).some(c => c.qnum === num)) {
+                    add_line(nb);
+                }
             });
         }
         let l = adjlist(cell.adjborder, cell.adjacent).filter(([nb, nc]) => isLine(nb) || !nc.isnull && !isCross(nb));
         if (cell.qnum === CQNUM.none && cell.lcnt === 1 && l.length === 2 || cell.qnum !== CQNUM.none && l.length === 1) {
             l.forEach(([nb, nc]) => add_line(nb));
+        }
+        // using uniquity
+        for (let d = 0; d < 4; d++) {
+            // + : No clue here
+            // ·━· ·    ·━· ·
+            // ┃        ┃ ×  
+            // · + · -> ·×+━·
+            //            ┃  
+            // · · ·    · · ·
+            if (isLine(offset(cell, .5, 0, d)) && isLine(offset(cell, 0, .5, d)) && !isClue(offset(cell, 1, 1, d))) {
+                add_line(offset(cell, 1.5, 1, d));
+                add_line(offset(cell, 1, 1.5, d));
+            }
+            //   × ×      × ×
+            // ·×+ + -> ·×+━+
+            // ┃        ┃ ┃
+            // · + ·    · + ·
+            if ((isLine(offset(cell, -1, .5, d)) && isntLine(offset(cell, 1, -.5, d)) ||
+                isLine(offset(cell, .5, -1, d)) && isntLine(offset(cell, -.5, 1, d))) &&
+                isntLine(offset(cell, -.5, 0, d)) && isntLine(offset(cell, 0, -.5, d)) &&
+                [cell, offset(cell, 1, 0, d), offset(cell, 0, 1, d)].every(c => !c.isnull && !isClue(c))) {
+                add_line(offset(cell, .5, 0, d));
+                add_line(offset(cell, 0, .5, d));
+            }
         }
     });
     // using uniquity
@@ -6909,6 +6937,7 @@ function NumberlinkAssist() {
             forEachSide(cross, (nb, nc) => add_cross(nb));
         }
     });
+
 }
 
 function SukoroAssist() {
