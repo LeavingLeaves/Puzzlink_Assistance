@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      25.8.24.1
+// @version      25.9.6.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -16,7 +16,7 @@
 'use strict';
 
 const MAXLOOP = 50;
-let flg = true, flg2 = true, step = false;
+let flg = true, flg2 = true, step = false, hasInvCrQsub = false;
 let board;
 let GENRENAME;
 // used for showing pattern
@@ -356,6 +356,7 @@ function assist() {
     console.time("Assisted. Elapsed Time");
     flg = true;
     board = ui.puzzle.board;
+    hasInvCrQsub = false;
     for (let loop = 0; loop < MAXLOOP; loop++) {
         if (!flg && !flg2) { break; }
         flg = flg2 = false;
@@ -363,6 +364,9 @@ function assist() {
             GENRELIST.find(g => g[0] === GENRENAME)[1]();
         } else { GeneralAssist(); }
         if (flg && step) { break; }
+    }
+    if (hasInvCrQsub) {
+        forEachCross(cross => cross.setQsub(CRQSUB.none));
     }
     ui.puzzle.redraw();
     console.timeEnd("Assisted. Elapsed Time");
@@ -1771,6 +1775,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
     add_inout(board.getobj(0, 0), Directed && (hasCross || hasIce) ? .5 : CRQSUB.out);
     // add invisible qsub at cross
     if (!hasIce && !hasCross) {
+        hasInvCrQsub = true;
         forEachCross(cross => {
             // no checker
             if (cross.qsub === CRQSUB.none) {
@@ -1883,6 +1888,7 @@ function SingleLoopInBorder({ useCrossQsub = true } = {}) {
     });
     // use qsub for each cross to track what it can be
     if (useCrossQsub) {
+        hasInvCrQsub = true;
         forEachCross(cross => {
             let qsub;
             if (cross.qsub === 0 || JSON.parse(cross.qsub).length === 0) {
@@ -12985,6 +12991,7 @@ function VertexSlitherlinkAssist() {
 }
 
 function LitherslinkAssist() {
+    hasInvCrQsub = true;
     forEachCross(cross => {
         let qsub;
         if (cross.qsub === 0 || JSON.parse(cross.qsub).length === 0) {
@@ -13014,7 +13021,7 @@ function LitherslinkAssist() {
             n: cell.qnum,
             clist: adjlist(cell.adjborder),
         });
-        // deduce single clue. it's disabled here because it's overpowered.
+        // deduce single clue with invisible cross qsub. it's disabled here because it's overpowered.
         if (cell.qnum >= 0 && false) {
             let list = [offset(cell, -.5, -.5), offset(cell, .5, -.5), offset(cell, -.5, .5), offset(cell, .5, .5)];
             let sum = list.map(cr => JSON.parse(cr.qsub).length).reduce((a, b) => a + b, 0);
@@ -13144,7 +13151,7 @@ function SlitherlinkAssist() {
         if (blist.filter(b => !isCross(b)).length === cell.qnum) {
             blist.forEach(b => add_line(b));
         }
-        // deduce single clue
+        // deduce single clue with invisible cross qsub
         if (cell.qnum >= 0) {
             let list = [offset(cell, -.5, -.5), offset(cell, .5, -.5), offset(cell, -.5, .5), offset(cell, .5, .5)];
             let sum = list.map(cr => JSON.parse(cr.qsub).length).reduce((a, b) => a + b, 0);
