@@ -33,6 +33,7 @@ Currently enhanced genre:
 * Bosnian Road
 * Box
 * Brownies
+* Bunnyhop
 * Canal View
 * Castle Wall
 * Cave
@@ -85,6 +86,7 @@ Currently enhanced genre:
 * Kropki
 * Kurarin
 * Kurodoko
+* La Paz
 * Light and Shadow
 * Litherslink
 * LITS
@@ -151,6 +153,7 @@ Currently enhanced genre:
 * Sudoku
 * Sukoro
 * Sumiwake
+* Sheep Wolf Slitherlink
 * Symmetry Area
 * Tapa
 * Tapa-Like Loop

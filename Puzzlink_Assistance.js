@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      25.9.6.1
+// @version      25.10.26.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -141,6 +141,7 @@ const GENRELIST = [
     ["Bosnian Road", BosnianRoadAssist, undefined], // bosnianroad
     ["Box", BoxAssist, "box"],
     ["Brownies", BrowniesAssist, "brownies"],
+    ["Bunnyhop", BunnyhopAssist, "bunnyhop"],
     ["Canal View", CanalViewAssist, "canal"],
     ["Castle Wall", CastleWallAssist, "castle"],
     ["Cave", CaveAssist, "cave"],
@@ -193,6 +194,7 @@ const GENRELIST = [
     ["Kropki", KropkiAssist, "kropki"],
     ["Kurarin", KurarinAssist, "kurarin"],
     ["Kurodoko", KurodokoAssist, "kurodoko"],
+    ["La Paz", LaPazAssist, "lapaz"],
     ["Light and Shadow", LightandShadowAssist, "lightshadow"],
     ["Litherslink", LitherslinkAssist, "lither"],
     ["LITS", LitsAssist, "lits"],
@@ -259,6 +261,7 @@ const GENRELIST = [
     ["Sudoku", SudokuAssist, "sudoku"],
     ["Sukoro", SukoroAssist, "sukoro"],
     ["Sumiwake", SumiwakeAssist, "sumiwake"],
+    ["Sheep Wolf Slitherlink", SWSlitherlinkAssist, "swslither"],
     ["Symmetry Area", SymmetryAreaAssist, "symmarea"],
     ["Tapa", TapaAssist, "tapa"],
     ["Tapa-Like Loop", TapaLikeLoopAssist, "tapaloop"],
@@ -2900,6 +2903,175 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+
+function BunnyhopAssist() {
+    const isEmpty = c => !c.isnull && c.ques !== CQUES.wall;
+    const isSide = function (c, d) {
+        d = d % 4;
+        const ln = [1, 2, 2, 1][d], b = offset(c, 0.5, 0, d);
+        return b !== undefined && !b.isnull && b.line === ln;
+    };
+    const isCross = function (c, d) {
+        if (c.isnull || c.ques === CQUES.wall) { return true; }
+        d = d % 4;
+        const nd = [8, 1, 4, 2][d];
+        return (c.qsub & nd) > 0;
+    };
+    const isSideC = function (c, q) {
+        if (c.isnull || c.ques === CQUES.wall) { return false; }
+        q = q % 4;
+        const nq = [32, 16, 48, 64][q];
+        return (c.qsub & 0b1110000) === nq || isSide(c, q) || isSide(c, q + 1);
+    };
+    const isCrossC = (c, q) => isCross(c, q) && isCross(c, q + 1);
+    const add_cross = function (c, d) { // 0~3: R U L D
+        d = d % 4;
+        if (c.isnull || c.ques === CQUES.wall || isCross(c, d) || isSide(c, d)) { return; }
+        if (step && flg) { return; }
+        const nd = [8, 1, 4, 2][d];
+        c.setQsub(c.qsub | nd);
+        c.draw();
+        flg ||= true;
+    };
+    const add_sidec = function (c, q) { // 0~3: UR UL DL DR
+        q = q % 4;
+        if (c.isnull || c.ques === CQUES.wall || isSideC(c, q) || (isCross(c, q) && isCross(c, q + 1))) { return; }
+        if ([0, 1, 2, 3].some(d => isSide(c, d))) { return; }
+        if (step && flg) { return; }
+        const nq = [32, 16, 48, 64][q], oq = (c.qsub & 0b1110000);
+        if (oq > 0) {
+            const t = [nq, oq].sort().join(',');
+            if (t === '16,32') { add_side(c, 1); }
+            if (t === '16,48') { add_side(c, 2); }
+            if (t === '32,64') { add_side(c, 0); }
+            if (t === '48,64') { add_side(c, 3); }
+            return;
+        }
+        c.setQsub(c.qsub | nq);
+        c.draw();
+        flg ||= true;
+    };
+    const add_side = function (c, d) {
+        d = d % 4;
+        if (c.isnull || c.ques === CQUES.wall || isCross(c, d) || isSide(c, d)) { return; }
+        if (step && flg) { return; }
+        const ln = [1, 2, 2, 1][d], b = offset(c, 0.5, 0, d);
+        if (b === undefined || b.isnull || b.line) { return; }
+        b.setLineVal(ln);
+        b.draw();
+        c.setQsub(c.qsub & 0b1111);
+        c.draw();
+        flg ||= true;
+    };
+    forEachCell(cell => {
+        if (!isEmpty(cell)) { return; }
+        for (let d = 0; d < 4; d++) {
+            if (!isSide(cell, d) && ui.puzzle.board.linegraph.components.length > 1) {
+                let [cr1, cr2] = offset(cell, 0.5, 0, d).sidecross;
+                if (cr1.path !== null && cr1.path === cr2.path) { add_cross(cell, d); }
+            }
+            if (isCross(cell, d) && isCross(cell, d + 1) && isCross(cell, d + 2)) { add_side(cell, d + 3); }
+            if (isSide(cell, d)) { [1, 2, 3].forEach(dd => add_cross(cell, d + dd)); }
+            if (isCrossC(cell, d)) { add_sidec(cell, d + 2); }
+            if (isSideC(cell, d)) { add_cross(cell, d + 2); add_cross(cell, d + 3); }
+            let temp = [[0, 0, 0], [1, 0, 2], [1, 0, 3], [1, 1, 1], [1, 1, 2], [0, 1, 0], [0, 1, 1], [0, 0, 3]];
+            if (temp.slice(1, 7).every(([dx, dy, dd]) => isCross(offset(cell, dx, dy, d), d + dd))) {
+                add_cross(cell, d);
+                add_cross(cell, d + 3);
+            }
+            if (temp.slice(2).every(([dx, dy, dd]) => isCross(offset(cell, dx, dy, d), d + dd))) {
+                add_cross(cell, d);
+                add_cross(offset(cell, 1, 0, d), d + 2);
+            }
+            if (temp.slice(0, 6).every(([dx, dy, dd]) => isCross(offset(cell, dx, dy, d), d + dd))) {
+                add_cross(cell, d + 3);
+                add_cross(offset(cell, 0, 1, d), d + 1);
+            }
+            temp = [[1, 0, 2], [1, 1, 1], [0, 1, 0]].filter(([dx, dy, q]) => !isCrossC(offset(cell, dx, dy, d), d + q));
+            if (isSideC(cell, d + 3) && temp.length === 1) {
+                let [dx, dy, q] = temp[0];
+                add_sidec(offset(cell, dx, dy, d), d + q);
+            }
+            if (isSideC(cell, d + 3) && isSideC(offset(cell, 1, 0, d), d + 2)) {
+                [[1, 1, 1], [1, 1, 2], [0, 1, 0], [0, 1, 1]].forEach(([dx, dy, dd]) => add_cross(offset(cell, dx, dy, d), d + dd));
+            }
+            if (isSideC(cell, d + 3) && isSideC(offset(cell, 1, 1, d), d + 1)) {
+                [[1, 0, 2], [1, 0, 3], [0, 1, 0], [0, 1, 1]].forEach(([dx, dy, dd]) => add_cross(offset(cell, dx, dy, d), d + dd));
+            }
+        }
+    });
+}
+
+function LaPazAssist() {
+    forEachCell(cell => {
+        if (isClue(cell)) { add_green(cell); }
+        if (adjlist(cell.adjborder).every(b => isSide(b))) { add_black(cell); }
+        if (isBlack(cell)) {
+            forEachSide(cell, (nb, nc) => { add_side(nb); add_green(nc); });
+        }
+        if (isNum(cell)) {
+            let f = function (l, ind, d, t = false) {
+                if (t && l.filter(c => isBlack(c)).length === l[ind].qnum) {
+                    l.forEach(c => add_green(c));
+                    return;
+                }
+                if (t) {
+                    l.forEach(c => {
+                        if (isNum(c) && c.qnum !== cell.qnum) {
+                            add_side(offset(c, -.5, 0, d));
+                            add_side(offset(c, +.5, 0, d));
+                        }
+                    });
+                }
+                let g = [];
+                for (let i = 0; i < l.length; i++) {
+                    if (isGreen(l[i])) { continue; }
+                    if (i + 1 === ind && isSide(offset(cell, +.5, 0, d))) { continue; }
+                    if (ind + 1 === i && isSide(offset(cell, -.5, 0, d))) { continue; }
+                    if (i + 1 < l.length && !isntBlack(l[i + 1])) {
+                        g.push([l[i], l[i + 1]]);
+                        i++;
+                        continue;
+                    }
+                    if (i + 1 == ind && i + 2 < l.length && !isntBlack(l[i + 2])) {
+                        g.push([l[i], l[i + 2]]);
+                        i += 2;
+                        continue;
+                    }
+                    g.push([l[i]]);
+                }
+                if (t && g.length === l[ind].qnum) {
+                    g.forEach(e => {
+                        if (e.length === 1) { add_black(e[0]); }
+                        if (e.length === 2 && offset(e[0], 1, 0, d) === e[1]) { add_side(offset(e[0], .5, 0, d)); }
+                    });
+                }
+                if (g.length < l[ind].qnum || l.filter(c => isBlack(c)).length > l[ind].qnum) {
+                    add_side(offset(cell, -.5, 0, d));
+                    add_side(offset(cell, +.5, 0, d));
+                }
+            };
+            let row = [], col = [];
+            for (let i = 0; i < board.cols; i++) { row.push(board.getc(i * 2 + 1, cell.by)); }
+            for (let i = 0; i < board.rows; i++) { col.push(board.getc(cell.bx, i * 2 + 1)); }
+            f(row, (cell.bx - 1) / 2, 0, isSide(offset(cell, 0, -.5)) && isSide(offset(cell, 0, +.5)));
+            f(col, (cell.by - 1) / 2, -1, isSide(offset(cell, -.5, 0)) && isSide(offset(cell, +.5, 0)));
+        }
+        for (let d = 0; d < 4; d++) {
+            if (isNum(cell) && isNum(offset(cell, 1, 0, d)) && cell.qnum !== offset(cell, 1, 0, d).qnum) {
+                add_side(offset(cell, .5, 0, d));
+            }
+            if ([[0, -.5], [0, .5], [-.5, 0]].every(([dx, dy]) => isSide(offset(cell, dx, dy, d)))) {
+                add_green(offset(cell, 1, 0, d));
+            }
+            if (isGreen(cell) && [[0, -.5], [0, .5], [-.5, 0]].every(([dx, dy]) => isSide(offset(cell, dx, dy, d)))) {
+                add_side(offset(cell, 1.5, 0, d));
+                add_side(offset(cell, 1, -.5, d));
+                add_side(offset(cell, 1, +.5, d));
+            }
+        }
+    });
+}
 
 function IsowatariAssist() {
     const size = ui.puzzle.board.clusterSize.count;
@@ -10462,7 +10634,7 @@ function NurimisakiAssist() {
         ["#__#", " █* "],
         ["#_█ ", " *_#"],
         ["#_█", " *_", "  #"],
-        ["#  ", "_█ ", "*_#"],
+        ["#_*", " █_", "  #"],
         [" ##", "#__", " *█"],
         ["█* ", "█_ ", "  ~"],
         [" * ", "#. ", "  ~"],
@@ -13105,6 +13277,23 @@ function LitherslinkAssist() {
         if (!isLine(border) && cr1.path !== null && cr1.path === cr2.path) { add_cross(border); }
         if (!isLine(border) && DSUfind(cr1) === DSUfind(cr2) && !border.sidecell.some(c => c.qnum === 3)) { add_cross(border); }
     });
+}
+
+function SWSlitherlinkAssist() {
+    let add_bg_color = function (c, color) {
+        if (c === undefined || c.isnull || c.qsub !== CQSUB.none || c.qsub === color) { return; }
+        if (step && flg) { return; }
+        flg = true;
+        c.setQsub(color);
+        c.draw();
+    }
+    let add_green = function (c) { add_bg_color(c, CQSUB.green); }
+    let add_yellow = function (c) { add_bg_color(c, CQSUB.yellow); }
+    forEachCell(cell => {
+        if (cell.qnum === 5) { add_green(cell); }
+        if (cell.qnum === 6) { add_yellow(cell); }
+    });
+    SlitherlinkAssist();
 }
 
 function SlitherlinkAssist() {
