@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      25.10.26.1
+// @version      25.11.3.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -15,8 +15,8 @@
 
 'use strict';
 
-const MAXLOOP = 50;
-let flg = true, flg2 = true, step = false, hasInvCrQsub = false;
+const MAXLOOP = 50, TIMEOUTLIMIT = 30 * 1000;
+let stpcnt = 0, stp2cnt = 0, starttime, step = false, hasInvCrQsub = false;
 let board;
 let GENRENAME;
 // used for showing pattern
@@ -353,29 +353,46 @@ window.addEventListener(
 function assiststep() {
     step = true;
     assist();
-    step = false;
 }
 function assist() {
-    console.time("Assisted. Elapsed Time");
-    flg = true;
+    stpcnt = 1;
     board = ui.puzzle.board;
     hasInvCrQsub = false;
-    for (let loop = 0; loop < MAXLOOP; loop++) {
-        if (!flg && !flg2) { break; }
-        flg = flg2 = false;
-        if (GENRELIST.some(g => g[0] === GENRENAME)) {
-            GENRELIST.find(g => g[0] === GENRENAME)[1]();
-        } else { GeneralAssist(); }
-        if (flg && step) { break; }
+    let stpt = -1;
+    starttime = (new Date()).valueOf();
+    let process_step = function (loop = 0) {
+        try {
+            if (!stpcnt && !stp2cnt || loop > MAXLOOP) { after_process(); return; }
+            stpt += stpcnt;
+            stpcnt = stp2cnt = 0;
+            if (GENRELIST.some(g => g[0] === GENRENAME)) {
+                GENRELIST.find(g => g[0] === GENRENAME)[1]();
+            } else { GeneralAssist(); }
+            if (step && stpcnt) { after_process(); return; }
+            setTimeout(() => { process_step(loop + 1); }, 0);
+        } catch (error) {
+            console.log(error.message);
+            after_process();
+        };
     }
-    if (hasInvCrQsub) {
-        forEachCross(cross => cross.setQsub(CRQSUB.none));
+    let after_process = function () {
+        step = false;
+        if (hasInvCrQsub) {
+            forEachCross(cross => cross.setQsub(CRQSUB.none));
+        }
+        ui.puzzle.redraw();
+        console.log(`Total deduction: ${stpt + stpcnt}`);
+        console.log(`Elapsed Time: ${(new Date()).valueOf() - starttime} ms`);
+        let isVariant = ui.puzzle.config.list.variant.val;
+        window.parent.postMessage(ui.puzzle.check().complete && !isVariant ? "Solved" : "Not Solved", "*");
+        if (ui.puzzle.check().complete) { printBoard(); }
     }
-    ui.puzzle.redraw();
-    console.timeEnd("Assisted. Elapsed Time");
-    let isVariant = ui.puzzle.config.list.variant.val;
-    window.parent.postMessage(ui.puzzle.check().complete && !isVariant ? "Solved" : "Not Solved", "*");
-    if (ui.puzzle.check().complete) { printBoard(); }
+    process_step();
+}
+function stepcheck(b = true) {
+    if (b) { stpcnt++; }
+    if (step && stpcnt) { throw new Error("Step finished."); }
+    if ((new Date()).valueOf() - starttime > TIMEOUTLIMIT) { throw new Error("Timeout."); }
 }
 function printBoard() {
     // only some genres are able (i.e. looks good) to show in text.
@@ -721,78 +738,69 @@ function patternDeduce({ pattern = ["*"], legend = {}, deduce = { "*": () => { }
 // set val
 const add_link = function (b) {
     if (b === undefined || b.isnull || b.line || b.qans || b.qsub !== BQSUB.none) { return; }
-    if (step && flg) { return; }
     b.setQsub(BQSUB.link);
     b.draw();
-    flg ||= b.qsub === BQSUB.link;
+    stepcheck(isLink(b));
 };
 const add_cross = function (b) {
     if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none) { return; }
-    if (step && flg) { return; }
     b.setQsub(BQSUB.cross);
     b.draw();
-    flg ||= isCross(b);
+    stepcheck(isCross(b));
 };
 const add_line = function (b) {
     if (b === undefined || b.isnull || b.line || isCross(b)) { return; }
-    if (step && flg) { return; }
     b.setLine(1);
     b.draw();
-    flg ||= b.line;
+    stepcheck(isLine(b));
 };
 const add_side = function (b) {
     if (b === undefined || b.isnull || b.qans || b.qsub === BQSUB.link) { return; }
-    if (step && flg) { return; }
     b.setQans(1);
     b.draw();
-    flg ||= b.qans;
+    stepcheck(b.qans);
 };
 const add_black = function (c, notOnNum = false) {
     if (c === undefined || c.isnull || c.lcnt !== 0 || c.qsub === CQSUB.dot || c.qans !== CQANS.none) { return; }
     if (notOnNum && (c.qnum !== CQNUM.none || c.qnums.length > 0)) { return; }
-    if (step && flg) { return; }
-    flg = true;
     c.setQans(CQANS.black);
     c.draw();
+    stepcheck(isBlack(c));
 };
 const add_dot = function (c, notOnNum = true) {
     if (c === undefined || c.isnull || c.qans !== CQANS.none || c.qsub !== CQSUB.none || c.anum !== CANUM.none) { return; }
     if (notOnNum && (c.qnum !== CQNUM.none || c.qnums.length > 0)) { return; }
-    if (step && flg) { return; }
-    flg ||= c.lcnt === 0;
     c.setQsub(CQSUB.dot);
     c.draw();
+    stepcheck(isDot(c) && c.lcnt === 0);
 };
 const add_green = function (c) {
     if (c === undefined || c.isnull || c.qans !== CQANS.none || c.qsub !== CQSUB.none) { return; }
-    if (step && flg) { return; }
-    flg = true;
     c.setQsub(CQSUB.green);
     c.draw();
+    stepcheck(isGreen(c));
 };
 const add_yellow = function (c) {
     if (c === undefined || c.isnull || c.qans !== CQANS.none || c.qsub !== CQSUB.none) { return; }
-    if (step && flg) { return; }
-    flg = true;
     c.setQsub(CQSUB.yellow);
     c.draw();
+    stepcheck(isYellow(c));
 };
 const add_inout = function (cr, qsub) {
     if (qsub === 3) { qsub = 1; }
     if (qsub === 0) { qsub = 2; }
     if (cr.isnull || cr.qsub !== CRQSUB.none || qsub === undefined) { return; }
-    flg2 = true;
     cr.setQsub(qsub);
     cr.draw();
-}
+    stp2cnt += cr.qsub === qsub;
+};
 const add_number = function (c, n) {
     if (c === undefined || c.isnull || c.anum !== CANUM.none) { return; }
-    if (step && flg) { return; }
-    if (c.qnum !== CQNUM.none) { flg2 = true; }
-    else { flg = true; }
     if (typeof (c.snum) === "object") { c.snum.forEach((_, i) => c.setSnum(i, -1)); }
     c.setAnum(n);
     c.draw();
+    if (c.qnum !== CQNUM.none) { stp2cnt += c.anum === n; }
+    else { stepcheck(c.anum === n);; }
 };
 const add_candidate = function (c, l) { // it discards when there are more than 4 cands.
     if (c === undefined || c === null || c.isnull || c.anum !== CANUM.none) { return; }
@@ -804,10 +812,9 @@ const add_candidate = function (c, l) { // it discards when there are more than 
     while (l.length < 4) { l.push(-1); }
     if (c.snum.join(',') === l.join(',')) { return; }
     // if (l.length > 4) { l = [-1, -1, -1, -1, ...l]; }
-    if (step && flg) { return; }
-    flg = true;
     l.forEach((n, i) => c.setSnum(i, n));
     c.draw();
+    stepcheck(true);
 }
 const add_candidate_L4 = function (c, l) { // it only records the lowest 4 cands.
     if (c === undefined || c === null || c.isnull || c.anum !== CANUM.none) { return; }
@@ -826,26 +833,23 @@ const add_candidate_L4 = function (c, l) { // it only records the lowest 4 cands
     if (l.length === 1) { add_number(c, l[0]); return; }
     while (l.length < 4) { l.push(-1); }
     if (c.snum.join(',') === l.join(',')) { return; }
-    if (step && flg) { return; }
-    flg = true;
     l.forEach((n, i) => c.setSnum(i, n));
     c.draw();
+    stepcheck(true);
 }
 const add_Ocell = function (c, notOnNum = true) {
     if (c === undefined || c.isnull || c.anum !== CANUM.none || c.qsub !== CQSUB.none) { return; }
     if (notOnNum && (c.qnum !== CQNUM.none || c.qnums.length > 0)) { return; }
-    if (step && flg) { return; }
     c.setQsub(CQSUB.circle);
     c.draw();
-    flg ||= c.qsub === CQSUB.circle;
+    stepcheck(c.qsub === CQSUB.circle);
 };
 const add_Xcell = function (c, notOnNum = true) {
     if (c === undefined || c.isnull || c.anum !== CANUM.none || c.qsub !== CQSUB.none) { return; }
     if (notOnNum && (c.qnum !== CQNUM.none || c.qnums.length > 0)) { return; }
-    if (step && flg) { return; }
     c.setQsub(CQSUB.cross);
     c.draw();
-    flg ||= c.qsub === CQSUB.cross;
+    stepcheck(c.qsub === CQSUB.cross);
 };
 const gray_clue = function (c) {
     if (c === undefined || c.isnull || c.qnum === CQNUM.none && c.qnums.length === 0) { return; }
@@ -1559,10 +1563,9 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
     add_notpass = c => { }, add_pass = c => { }, add_notpath = add_cross, add_path = add_line, Directed = false, hasCross = false } = {}) {
     let add_arrow = function (b, dir) {
         if (b === undefined || b.isnull || b.qsub !== BQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         b.setQsub(dir);
         b.draw();
+        stepcheck(true);
     };
     let genlist = c => {
         if (c.adjborder === undefined) { return []; }
@@ -1858,10 +1861,9 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
 function SingleLoopInBorder({ useCrossQsub = true } = {}) {
     let add_bgcolor = function (c, color) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none || c.qsub === color) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(color);
         c.draw();
+        stepcheck(true);
     }
     let add_green = function (c) { add_bgcolor(c, CQSUB.green); }
     let add_yellow = function (c) { add_bgcolor(c, CQSUB.yellow); }
@@ -2927,17 +2929,15 @@ function BunnyhopAssist() {
     const add_cross = function (c, d) { // 0~3: R U L D
         d = d % 4;
         if (c.isnull || c.ques === CQUES.wall || isCross(c, d) || isSide(c, d)) { return; }
-        if (step && flg) { return; }
         const nd = [8, 1, 4, 2][d];
         c.setQsub(c.qsub | nd);
         c.draw();
-        flg ||= true;
+        stepcheck(true);
     };
     const add_sidec = function (c, q) { // 0~3: UR UL DL DR
         q = q % 4;
         if (c.isnull || c.ques === CQUES.wall || isSideC(c, q) || (isCross(c, q) && isCross(c, q + 1))) { return; }
         if ([0, 1, 2, 3].some(d => isSide(c, d))) { return; }
-        if (step && flg) { return; }
         const nq = [32, 16, 48, 64][q], oq = (c.qsub & 0b1110000);
         if (oq > 0) {
             const t = [nq, oq].sort().join(',');
@@ -2949,19 +2949,18 @@ function BunnyhopAssist() {
         }
         c.setQsub(c.qsub | nq);
         c.draw();
-        flg ||= true;
+        stepcheck(true);
     };
     const add_side = function (c, d) {
         d = d % 4;
         if (c.isnull || c.ques === CQUES.wall || isCross(c, d) || isSide(c, d)) { return; }
-        if (step && flg) { return; }
         const ln = [1, 2, 2, 1][d], b = offset(c, 0.5, 0, d);
         if (b === undefined || b.isnull || b.line) { return; }
         b.setLineVal(ln);
         b.draw();
         c.setQsub(c.qsub & 0b1111);
         c.draw();
-        flg ||= true;
+        stepcheck(true);
     };
     forEachCell(cell => {
         if (!isEmpty(cell)) { return; }
@@ -3183,10 +3182,9 @@ function WittgensteinBriquetAssist() {
     const isDot = c => !c.isnull && c.qsub === 2;
     const add_dot = function (c) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none || isClue(c) || c.lcnt > 0) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(2);
         c.draw();
+        stepcheck(true);
     };
     CellConnected({
         isShaded: c => isDot(c) || isClue(c),
@@ -3231,11 +3229,10 @@ function EasyAsAbcAssist() {
     const LN = board.indicator.count, LEN = board.cols;
     const add_Xcell = function (c) {
         if (c === undefined || c.isnull || c.anum !== CANUM.none || c.qsub !== CQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.snum.forEach((_, i) => c.setSnum(i, -1));
         c.setQsub(CQSUB.cross);
         c.draw();
+        stepcheck(true);
     };
     const add_candidate = function (c, l) {
         if (c === undefined || c === null || c.isnull || c.anum !== CANUM.none) { return; }
@@ -3257,10 +3254,9 @@ function EasyAsAbcAssist() {
         if (c.snum.some(n => n !== -1)) { l = l.filter(n => c.snum.includes(n)); }
         while (l.length < 4) { l.push(-1); }
         if (c.snum.join(',') === l.join(',')) { return; }
-        if (step && flg) { return; }
-        flg = true;
         l.forEach((n, i) => c.setSnum(i, n));
         c.draw();
+        stepcheck(true);
     }
     const deduceRow = function (clist, lclue, rclue) {
         let cand = [];
@@ -3305,17 +3301,15 @@ function PersistenceOfMemoryAssist() {
     const isGray = c => c.ques === 6;
     const add_Ocell = function (c) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(CQSUB.circle);
         c.draw();
+        stepcheck(true);
     };
     const add_Xcell = function (c) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(CQSUB.cross);
         c.draw();
+        stepcheck(true);
     };
     SingleSnakeInCell({
         isShaded: isOcell,
@@ -3363,17 +3357,15 @@ function ScrinAssist() {
     const isGreen = c => c.qans === 1;
     const add_Xcell = function (c) {
         if (c === undefined || c.isnull || isGreen(c) || isXcell(c)) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(1);
         c.draw();
+        stepcheck(true);
     };
     const add_green = function (c) {
         if (c === undefined || c.isnull || isGreen(c) || isXcell(c)) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQans(1);
         c.draw();
+        stepcheck(true);
     };
     RectRegion_Cell({
         isShaded: isGreen,
@@ -3740,7 +3732,7 @@ function RectangleSliderAssist() {
         if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none) { return; }
         b.setQsub(BQSUB.cross);
         b.draw();
-        flg2 ||= isCross(b);
+        stp2cnt += isCross(b);
     };
     CellConnected({
         isShaded: isClue,
@@ -4876,17 +4868,15 @@ function SlashPackAssist() {
         qsub = (qsub | c.qsub);
         if (qsub === 0b111) { return; }
         if (c === undefined || c.isnull || qsub === c.qsub) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(qsub);
         c.draw();
+        stepcheck(true);
     };
     let add_slash = function (c, qans) {    // 0:/, 1:\
         if (c === undefined || c.isnull || c.qans !== CQANS.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQans(qans % 2 === 0 ? CQANS.lslash : CQANS.rslash);
         c.draw();
+        stepcheck(true);
     };
     forEachCell(cell => {
         if (isClue(cell)) { add_qsub(cell, 0b110); }
@@ -5199,17 +5189,15 @@ function ReflectLinkAssist() {
 function UsoOneAssist() {
     let add_Ocell = function (c) {
         if (c === undefined || c.isnull || c.qcmp !== 0) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQcmp(1);
         c.draw();
+        stepcheck(true);
     };
     let add_Xcell = function (c) {
         if (c === undefined || c.isnull || c.qcmp !== 0) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQcmp(2);
         c.draw();
+        stepcheck(true);
     };
     let isOcell = c => c.qcmp === 1;
     let isXcell = c => c.qcmp === 2;
@@ -5270,11 +5258,10 @@ function Yajirushi2Assist() {
     };
     let add_arrow = function (c, d) {
         if (c === undefined || c.isnull || c.anum !== CANUM.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setAnum(d);
         c.setQsub(CQSUB.none);
         c.draw();
+        stepcheck(true);
     }
     CellConnected({
         isShaded: isDot,
@@ -5458,10 +5445,9 @@ function AngleLoopAssist() {
         let [x1, y1, x2, y2] = [cr1.bx, cr1.by, cr2.bx, cr2.by];
         if (x1 > x2 || x1 === x2 && y1 > y2) { [x1, y1, x2, y2] = [x2, y2, x1, y1]; }
         if (x1 === x2 && y1 === y2) { return; }
-        if (step && flg) { return; }
-        flg = 1;
         ui.puzzle.board.segment.addSegmentByAddr(x1, y1, x2, y2); // BUG: no "path" for some segment
         ui.puzzle.painter.drawSegments();
+        stepcheck(true);
     };
     let getSegment = function (cr1, cr2) {
         let [x1, y1, x2, y2] = [cr1.bx, cr1.by, cr2.bx, cr2.by];
@@ -5953,10 +5939,9 @@ function MejilinkAssist() {
 function JuosanAssist() {
     let add_bar = function (c, n) { // 12:| 13:-
         if (c === undefined || c.isnull || c.qans !== CQANS.none || ![12, 13].includes(n)) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQans(n);
         c.draw();
+        stepcheck(true);
     };
     forEachCell(cell => {
         if ([[-2, -1], [-1, 1], [1, 2]].some(l => l.every(x => (c => !c.isnull && c.qans === 12)(offset(cell, x, 0))))) {
@@ -6072,17 +6057,15 @@ function RassiSilaiAssist() {
     });
     let add_Ocell = function (c) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(CQSUB.circle);
         c.draw();
+        stepcheck(true);
     };
     let add_Xcell = function (c) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(CQSUB.cross);
         c.draw();
+        stepcheck(true);
     };
     forEachBorder(border => {
         if (isBound(border)) { add_cross(border); }
@@ -6140,10 +6123,9 @@ function RassiSilaiAssist() {
 function BosanowaAssist() {
     let add_bn = function (b, n) {
         if (b === undefined || b.isnull || b.qsub !== -1) { return; }
-        if (step && flg) { return; }
-        flg = true;
         b.setQsub(n);
         b.draw();
+        stepcheck(true);
     };
     forEachCell(cell => {
         if (cell.ques !== 0) { return; }
@@ -6881,10 +6863,9 @@ function HashiwokakeroAssist() {
     let add_line = function (b, n = 1) {
         if (b === undefined || b.isnull || n <= b.line || isCross(b)) { return; }
         if (![1, 2].includes(n)) { return; }
-        if (step && flg) { return; }
         b.setLineVal(n);
         b.draw();
-        flg ||= b.line;
+        stepcheck(b.line);
     };
     CellConnected({
         isShaded: c => c.lcnt > 0 || c.qnum !== CQNUM.none,
@@ -6955,17 +6936,15 @@ function HashiwokakeroAssist() {
 function CountryRoadAssist() {
     let add_Ocell = function (c) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(CQSUB.circle);
         c.draw();
+        stepcheck(true);
     };
     let add_Xcell = function (c) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(CQSUB.cross);
         c.draw();
+        stepcheck(true);
     };
     CellConnected_InRegion({
         isShaded: c => c.qsub === CQSUB.circle,
@@ -7121,18 +7100,16 @@ function NumberlinkAssist() {
 function SukoroAssist() {
     let add_Ocell = function (c) {
         if (c === undefined || c.isnull || c.anum !== CANUM.none || c.qsub !== CQSUB.none || c.qnum !== CQNUM.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(CQSUB.circle);
         c.draw();
+        stepcheck(true);
     };
     let add_number = function (c, n) {
         if (c === undefined || c.isnull || c.anum !== CANUM.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setAnum(n);
         c.setQsub(CQSUB.none);
         c.draw();
+        stepcheck(true);
     };
     CellConnected({
         isShaded: c => c.anum !== CANUM.none || c.qsub === CQSUB.circle,
@@ -7260,10 +7237,9 @@ function SashiganeAssist() {
 function TentsAssist() {
     let add_tent = function (c) {
         if (c === undefined || c.isnull || isDot(c) || c.qnum !== CQNUM.none || c.anum !== CANUM.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setAnum(2);
         c.draw();
+        stepcheck(true);
     };
     let isTentAble = (nb, nc) => !nc.isnull && nc.bx > 0 && nc.by > 0 && !isDot(nc) && nc.qnum === CQNUM.none && !isCross(nb);
     forEachCell(cell => {
@@ -7620,10 +7596,9 @@ function OneRoomOneDoorAssist() {
 function DosunFuwariAssist() {
     let add_ball = function (c, t) {// 1 for balloon, 2 for iron ball
         if (c === undefined || c.isnull || c.qsub === CQSUB.dot || c.qans !== CQANS.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQans(t);
         c.draw();
+        stepcheck(true);
     };
     let nb = new Set(), ni = new Set();
     for (let x = 0; x < board.cols; x++) {
@@ -8030,8 +8005,6 @@ function SchoolTripAssist() {
     let add_bed = function (c, d) { // NUDLR = 01234
         if (c === undefined || c.isnull || c.qnum !== CQNUM.none || ![CQANS.none, 41, 46].includes(c.qans) || 41 + d === c.qans) { return; }
         if (d === 5 && c.qans === 41) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQans(41 + d);
         if (d > 0 && d <= 4) {
             let nc = [null, offset(c, 0, -1), offset(c, 0, 1), offset(c, -1, 0), offset(c, 1, 0)][d];
@@ -8039,24 +8012,23 @@ function SchoolTripAssist() {
             nc.setQans(46 + nd);
         }
         c.draw();
+        stepcheck(true);
     };
     let add_black = function (c) {
         if (c.qnum !== CQNUM.none || c.qnums.length > 0) { return; }
         if (c === undefined || c.isnull || c.lcnt !== 0 || c.qans !== CQANS.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQans(CQANS.black);
         if (c.qsub === CQSUB.dot) {
             c.setQsub(CQSUB.none);
         }
         c.draw();
+        stepcheck(true);
     };
     let add_dot = function (c) {
         if (c === undefined || c.isnull || c.qnum !== CQNUM.none || [CQANS.black, 41, 42, 43, 44, 45].includes(c.qans) || c.qsub !== CQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg ||= c.lcnt === 0;
         c.setQsub(CQSUB.dot);
         c.draw();
+        stepcheck(c.lcnt === 0);
     };
     let isEmpty = c => !c.isnull && c.qans === CQANS.none && c.qnum === CQNUM.none;
     CellConnected({
@@ -9097,18 +9069,16 @@ function TatamibariAssist() {
 function PencilsAssist() {
     let add_tip = function (c, dir) {  // 1=↑, 2=↓, 3=←, 4=→
         if (c === undefined || c.isnull || isGreen(c) || c.anum !== CANUM.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(CQSUB.yellow);
         c.setAnum(dir);
         c.draw();
+        stepcheck(true);
     }
     let add_cross = function (b) {
         if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none || b.qans || b.ques) { return; }
-        if (step && flg) { return; }
         b.setQsub(BQSUB.cross);
         b.draw();
-        flg ||= isCross(b);
+        stepcheck(isCross(b));
     };
     for (let i = 0; i < board.border.length; i++) {
         let border = board.border[i];
@@ -9319,10 +9289,9 @@ function PencilsAssist() {
 function MoonOrSunAssist() {
     let add_Xcell = function (c) {
         if (c === undefined || c.isnull || c.qnum === CQNUM.none || c.lcnt > 0) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(CQSUB.cross);
         c.draw();
+        stepcheck(true);
     };
     let roomType = c => {
         if (c.anum !== CANUM.none) return c.anum;
@@ -9457,6 +9426,17 @@ function ShikakuAssist() {
 }
 
 function SquareJamAssist() {
+    NoCrossingBorder();
+    forEachBorder(border => {
+        if (border.sidecross.every(cr => cr.lcnt > 0 || isEdge(cr))) { add_side(border); }
+    });
+    forEachCell(cell => {
+        for (let d = 0; d < 4; d++) {
+            if (isntLink(offset(cell, -.5, 0, d)) && (isLink(offset(cell, 0, -.5, d)) || isLink(offset(cell, 0, .5, d)))) {
+                add_link(offset(cell, .5, 0, d));
+            }
+        }
+    });
     RectRegion_Border({
         isSizeAble: (w, h, sc, c) => {
             if (w !== h) { return false; }
@@ -9470,7 +9450,6 @@ function SquareJamAssist() {
             return sc === null || w === sc.qnum;
         }
     });
-    NoCrossingBorder();
 }
 
 function TasquareAssist() {
@@ -9800,10 +9779,9 @@ function NorinoriAssist() {
 function AllorNothingAssist() {
     let add_color = function (c, color) {
         if (c.isnull || c.qsub !== CQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(color);
         c.draw();
+        stepcheck(true);
     };
     let add_gray = function (c) { add_color(c, CQSUB.gray); };
     let add_yellow = function (c) { add_color(c, CQSUB.yellow); };
@@ -10216,17 +10194,15 @@ function TapaAssist() {
 function LightandShadowAssist() {
     let add_black = function (c) {
         if (c.isnull || c.qans !== CQANS.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQans(CQANS.black);
         c.draw();
+        stepcheck(true);
     };
     let add_white = function (c) {
         if (c.isnull || c.qans !== CQANS.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQans(CQANS.white);
         c.draw();
+        stepcheck(true);
     };
     forEachCell(cell => {
         if (cell.qnum !== CQNUM.none && cell.ques === 1) {
@@ -10257,15 +10233,14 @@ function SlalomAssist() {
     const gatecnt = board.gatemgr.components.length;
     let add_order = function (c, n) {
         if (c === undefined || c.isnull || c.ques === 1 || c.anum !== CANUM.none || n === CANUM.none) { return; }
-        flg2 = true;
+        stp2cnt++;
         c.setAnum(n);
     };
     let add_arrow = function (b, dir) {
         if (b === undefined || b.isnull || b.qsub !== BQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         b.setQsub(dir);
         b.draw();
+        stepcheck(true);
     };
     stc.anum = 0;
     SingleLoopInCell({
@@ -10358,7 +10333,6 @@ function StarbattleAssist() {
     let add_star = add_black;
     let add_cir = function (b) {
         if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none) { return; }
-        if (step && flg) { return; }
         if (b.bx % 2 === 0 && b.by % 2 === 0) {
             if (adjlist(b.adjborder).some(b => isCircle(b))) { return; }
         }
@@ -10372,7 +10346,7 @@ function StarbattleAssist() {
         }
         b.setQsub(1);
         b.draw();
-        flg ||= b.qsub === 1;
+        stepcheck(b.qsub === 1);
     };
     if (board.rows === starcount * 4) {
         let ct = board.getobj(board.cols, board.rows);
@@ -10859,10 +10833,9 @@ function CreekAssist() {
 function SlantAssist() {
     let add_slash = function (c, qans) {
         if (c === undefined || c.isnull || c.qans !== CQANS.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQans(qans % 2 === 0 ? CQANS.lslash : CQANS.rslash);
         c.draw();
+        stepcheck(true);
     };
     let isNotSide = function (c) {
         return c.bx > board.minbx && c.bx < board.maxbx && c.by > board.minby && c.by < board.maxby;
@@ -11043,11 +11016,10 @@ function GuideArrowAssist() {
     const goalcell = board.getc(board.goalpos.bx, board.goalpos.by);
     let add_arrow = function (c, n) {
         if (c === undefined || c.isnull || c.anum !== CANUM.none || c === goalcell) { return; }
-        if (step && flg) { return; }
-        if (c.qnum !== CQNUM.none) { flg2 = true; }
-        else { flg = true; }
         c.setAnum(n);
         c.draw();
+        if (c.qnum !== CQNUM.none) { stp2cnt++; }
+        else { stepcheck(true); }
     };
     BlackNotAdjacent();
     GreenConnected();
@@ -11129,10 +11101,9 @@ function GuideArrowAssist() {
 function YinyangAssist() {
     let add_color = function (c, color) {
         if (c === undefined || c.isnull || c.anum !== CANUM.none || color !== CANUM.wcir && color !== CANUM.bcir) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setAnum(color);
         c.draw();
+        stepcheck(true);
     };
     let add_black = function (c) {
         add_color(c, CANUM.bcir);
@@ -11545,10 +11516,9 @@ function AquapelagoAssist() {
 function IcelomAssist() {
     let add_arrow = function (b, dir) {
         if (b === undefined || b.isnull || b.qsub !== BQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         b.setQsub(dir);
         b.draw();
+        stepcheck(true);
     };
     let ncnt = 0;
     forEachCell(cell => isClue(cell) ? ncnt++ : undefined);
@@ -11621,10 +11591,9 @@ function IcelomAssist() {
 function IcebarnAssist() {
     let add_arrow = function (b, dir) {
         if (b === undefined || b.isnull || b.qsub !== BQSUB.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         b.setQsub(dir);
         b.draw();
+        stepcheck(true);
     };
     let inb = board.getb(board.arrowin.bx, board.arrowin.by);
     let outb = board.getb(board.arrowout.bx, board.arrowout.by);
@@ -11947,11 +11916,10 @@ function ShakashakaAssist() {
     let isEmpty = c => !c.isnull && !isClue(c);
     let add_tri = function (c, ndir) { // 0 = ◣, 1 = ◢, 2 = ◥, 3 = ◤
         if (c === undefined || c.isnull || isClue(c) || isDot(c) || c.qans !== CQANS.none) { return; }
-        if (step && flg) { return; }
-        flg = true;
         ndir = (ndir % 4 + 4) % 4;
         c.setQans(ndir + 2);
         c.draw();
+        stepcheck(true);
     };
     // see https://scrapbox.io/wandsbox/%E3%82%B7%E3%83%A3%E3%82%AB%E3%82%B7%E3%83%A3%E3%82%AB%E3%81%AE%E6%A0%BC%E5%AD%90%E7%82%B9%E3%81%AB%E7%9D%80%E7%9B%AE%E3%81%99%E3%82%8B
     // in this link the cross is just black in the upper link https://scrapbox.io/wandsbox/%E3%82%B7%E3%83%A3%E3%82%AB%E3%82%B7%E3%83%A3%E3%82%AB%E8%A3%9C%E5%8A%A9%E8%A8%98%E5%8F%B7%C3%97%E3%81%AE%E6%8F%90%E6%A1%88
@@ -11961,15 +11929,15 @@ function ShakashakaAssist() {
     let isDiffCr = (cr1, cr2) => isCrBlack(cr1) && isCrWhite(cr2) || isCrWhite(cr1) && isCrBlack(cr2);
     let add_crblack = function (cr) {
         if (cr === undefined || cr === null || cr.isnull || !isCrEmpty(cr)) { return; }
-        flg2 = true;
         cr.setQsub(2);
         cr.draw();
+        stp2cnt++;
     }
     let add_crwhite = function (cr) {
         if (cr === undefined || cr === null || cr.isnull || !isCrEmpty(cr)) { return; }
-        flg2 = true;
         cr.setQsub(1);
         cr.draw();
+        stp2cnt++;
     }
     if (board.border.length === 0) { // re-add border
         board.hasborder = 1;
@@ -13116,13 +13084,13 @@ function VertexSlitherlinkAssist() {
     let isCrDot = cr => !cr.isnull && cr.qsub === 1;
     let add_crcrs = function (cr) {
         if (cr === undefined || cr === null || cr.isnull || !isCrEmpty(cr)) { return; }
-        flg = true;
+        stpcnt = true;
         cr.setQsub(2);
         cr.draw();
     }
     let add_crdot = function (cr) {
         if (cr === undefined || cr === null || cr.isnull || !isCrEmpty(cr)) { return; }
-        flg = true;
+        stpcnt = true;
         cr.setQsub(1);
         cr.draw();
     }
@@ -13217,7 +13185,7 @@ function LitherslinkAssist() {
                 });
             });
             list.forEach((cr, i) => { cr.setQsub(JSON.stringify(JSON.parse(cr.qsub).filter(s => comblist.some(comb => JSON.stringify(comb[i]) === JSON.stringify(s))))); });
-            if (list.map(cr => JSON.parse(cr.qsub).length).reduce((a, b) => a + b, 0) < sum) { flg2 = true; }
+            if (list.map(cr => JSON.parse(cr.qsub).length).reduce((a, b) => a + b, 0) < sum) { stp2cnt++; }
         }
         for (let d = 0; d < 4; d++) {
             let b1 = offset(cell, 1, .5, d);
@@ -13282,10 +13250,9 @@ function LitherslinkAssist() {
 function SWSlitherlinkAssist() {
     let add_bg_color = function (c, color) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none || c.qsub === color) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(color);
         c.draw();
+        stepcheck(true);
     }
     let add_green = function (c) { add_bg_color(c, CQSUB.green); }
     let add_yellow = function (c) { add_bg_color(c, CQSUB.yellow); }
@@ -13300,10 +13267,9 @@ function SlitherlinkAssist() {
     SingleLoopInBorder();
     let add_bg_color = function (c, color) {
         if (c === undefined || c.isnull || c.qsub !== CQSUB.none || c.qsub === color) { return; }
-        if (step && flg) { return; }
-        flg = true;
         c.setQsub(color);
         c.draw();
+        stepcheck(true);
     }
     let add_green = function (c) { add_bg_color(c, CQSUB.green); }
     let add_yellow = function (c) { add_bg_color(c, CQSUB.yellow); }
@@ -13364,7 +13330,7 @@ function SlitherlinkAssist() {
                 });
             });
             list.forEach((cr, i) => { cr.setQsub(JSON.stringify(JSON.parse(cr.qsub).filter(s => comblist.some(comb => JSON.stringify(comb[i]) === JSON.stringify(s))))); });
-            if (list.map(cr => JSON.parse(cr.qsub).length).reduce((a, b) => a + b, 0) < sum) { flg2 = true; }
+            if (list.map(cr => JSON.parse(cr.qsub).length).reduce((a, b) => a + b, 0) < sum) { stp2cnt++; }
         }
         for (let d = 0; d < 4; d++) {
             //            ×  
