@@ -17,6 +17,7 @@
 
 const MAXLOOP = 50, TIMEOUTLIMIT = 30 * 1000;
 let stpcnt = 0, stp2cnt = 0, starttime, step = false, hasInvCrQsub = false;
+let loopDir = -1; // 0:CCW CRQSUB.inout:CW
 let board;
 let GENRENAME;
 // used for showing pattern
@@ -212,6 +213,7 @@ const GENRELIST = [
     ["Mochikoro", MochikoroAssist, "mochikoro"],
     ["Moon or Sun", MoonOrSunAssist, "moonsun"],
     ["Myopia", MyopiaAssist, "myopia"],
+    ["Nagareru-Loop", NagareruLoopAssist, "nagare"],
     ["Nanameguri", NanameguriAssist, "nanameguri"],
     ["Nawabari", NawabariAssist, "nawabari"],
     ["NIKOJI", NikojiAssist, "nikoji"],
@@ -371,7 +373,8 @@ function assist() {
             if (step && stpcnt) { after_process(); return; }
             setTimeout(() => { process_step(loop + 1); }, 0);
         } catch (error) {
-            console.log(error.message);
+            if (error.message !== "Step finished." && error.message !== "Timeout.") { console.error(error); }
+            else { console.log(error.message); }
             after_process();
         };
     }
@@ -653,11 +656,11 @@ const genPolyomino = function (n) {
     if (PolyominoBank.length > n) { return PolyominoBank[n]; }
     let p = genPolyomino(n - 1);
     let normalize = l => {
-        let mx = l.reduce((r, c) => Math.min(r, c[0]), Infinity);
-        let my = l.reduce((r, c) => Math.min(r, c[1]), Infinity);
+        let mx = Math.min(...l.map(c => c[0]));
+        let my = Math.min(...l.map(c => c[1]));
         l = l.map(([x, y]) => [x - mx, y - my]);
-        mx = l.reduce((r, c) => Math.max(r, c[0]), 0);
-        my = l.reduce((r, c) => Math.max(r, c[1]), 0);
+        mx = Math.max(...l.map(c => c[0]));
+        my = Math.max(...l.map(c => c[1]));
         let ll = [l, l.map(([x, y]) => [mx - x, y])];
         ll = [...ll, ...ll.map(l => l.map(([x, y]) => [x, my - y]))];
         ll = [...ll, ...ll.map(l => l.map(([x, y]) => [y, x]))];
@@ -820,7 +823,7 @@ const add_candidate_L4 = function (c, l) { // it only records the lowest 4 cands
     if (c === undefined || c === null || c.isnull || c.anum !== CANUM.none) { return; }
     l = unique(l.filter(n => n !== -1)).sort((a, b) => a - b);
     if (c.snum.some(n => n !== -1)) {
-        let maxn = c.snum.reduce((a, b) => Math.max(a, b), -1);
+        let maxn = Math.max(...c.snum);
         if (l.length === 4) {
             l = l.concat(c.snum.filter(n => n > l[3]));
             l = l.concat([maxn + 1, maxn + 2, maxn + 3]);
@@ -1675,7 +1678,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
             if (!isPassable(nc) || !isPathable(nb)) { add_notpath(nb); }
             if (!nc.isnull && isPassable(nc) && isPathable(nb)) { emptycnt++; }
             linecnt += isPath(nb);
-        },);
+        });
         if (linecnt > 0) { add_pass(cell); }
         // no branch and no cross
         if (linecnt === 2 && !isIce(cell) && !hasCross) { forEachSide(cell, (nb, nc) => add_notpath(nb)); }
@@ -1779,6 +1782,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
         });
     }
     add_inout(board.getobj(0, 0), Directed && (hasCross || hasIce) ? .5 : CRQSUB.out);
+    const ARR_CRQ = [[BQSUB.arrow_up, CRQSUB.in, false], [BQSUB.arrow_dn, CRQSUB.out, false], [BQSUB.arrow_lt, CRQSUB.out, true], [BQSUB.arrow_rt, CRQSUB.in, true]];
     // add invisible qsub at cross
     if (!hasIce && !hasCross) {
         hasInvCrQsub = true;
@@ -1799,20 +1803,25 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
             }
         });
     }
-    let di = -1;
     if (Directed && !hasIce && !hasCross) {
+        // determine loop direction
         forEachBorder(border => {
-            let l = [[BQSUB.arrow_up, CRQSUB.out], [BQSUB.arrow_dn, CRQSUB.in], [BQSUB.arrow_lt, CRQSUB.in], [BQSUB.arrow_rt, CRQSUB.out]];
-            if (di !== -1) { return; }
-            if ([11, 12, 13, 14].includes(border.qsub)) {
-                if (border.sidecross[0].qsub !== CRQSUB.none) {
-                    di = ((border.sidecross[0].qsub) ^ (l.filter(([bq, crq]) => border.qsub === bq)[0][1]));
-                }
-                if (border.sidecross[1].qsub !== CRQSUB.none) {
-                    di = ((border.sidecross[1].qsub) ^ (l.filter(([bq, crq]) => border.qsub === bq)[0][1]) ^ CRQSUB.inout);
-                }
+            if (loopDir !== -1) { return; }
+            if (![11, 12, 13, 14].includes(border.qsub)) { return; }
+            if (border.sidecross[0].qsub !== CRQSUB.none) {
+                loopDir = ((border.sidecross[0].qsub) ^ (ARR_CRQ.find(([bq, crq, vert]) => border.qsub === bq)[1]));
+            }
+            if (border.sidecross[1].qsub !== CRQSUB.none) {
+                loopDir = ((border.sidecross[1].qsub) ^ (ARR_CRQ.find(([bq, crq, vert]) => border.qsub === bq)[1]) ^ CRQSUB.inout);
             }
         });
+        if (loopDir !== -1) {
+            forEachBorder(border => {
+                if (![11, 12, 13, 14].includes(border.qsub)) { return; }
+                add_inout(border.sidecross[0], ARR_CRQ.find(([bq, crq, vert]) => border.qsub === bq)[1] ^ loopDir);
+                add_inout(border.sidecross[1], ARR_CRQ.find(([bq, crq, vert]) => border.qsub === bq)[1] ^ loopDir ^ CRQSUB.inout);
+            });
+        }
     }
     let crossSet = new Set();
     let dfs = function (cr) {
@@ -1829,11 +1838,8 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
                     if (cr.qsub === CRQSUB.none || ncr.qsub === CRQSUB.none) { return; }
                     if (cr.qsub === ncr.qsub) { add_cross(b); }
                     if (cr.qsub !== ncr.qsub) { add_line(b); }
-                    if (cr.qsub !== ncr.qsub && di !== -1) {
-                        let l = [[BQSUB.arrow_up, CRQSUB.out, false], [BQSUB.arrow_dn, CRQSUB.in, false],
-                        [BQSUB.arrow_lt, CRQSUB.in, true], [BQSUB.arrow_rt, CRQSUB.out, true]];
-                        l = l.filter(([bq, crq, vert]) => (crq ^ di) === b.sidecross[0].qsub && vert === b.isvert);
-                        add_arrow(b, l[0][0]);
+                    if (cr.qsub !== ncr.qsub && !b.isnull && loopDir !== -1) {
+                        add_arrow(b, ARR_CRQ.find(([bq, crq, vert]) => (crq ^ loopDir) === b.sidecross[0].qsub && vert === b.isvert)[0]);
                     }
                 })();
                 // extend i/o through cross/line
@@ -1844,12 +1850,9 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
                     if (!b.isnull && isLine(b) && b.qsub !== BQSUB.none && Directed) {
                         add_inout(ncr, cr.qsub + ([BQSUB.arrow_up, BQSUB.arrow_lt, BQSUB.arrow_dn, BQSUB.arrow_rt][d] === b.qsub ? 1 : -1));
                     }
-                    if ([11, 12, 13, 14].includes(b.qsub) && di !== -1 && !hasIce && !hasCross) {
-                        let l = [[BQSUB.arrow_up, CRQSUB.out], [BQSUB.arrow_dn, CRQSUB.in],
-                        [BQSUB.arrow_lt, CRQSUB.in], [BQSUB.arrow_rt, CRQSUB.out]];
-                        l = l.filter(([bq, crq]) => bq === b.qsub);
-                        add_inout(b.sidecross[0], l[0][1] ^ di);
-                        add_inout(b.sidecross[1], l[0][1] ^ di ^ CRQSUB.inout);
+                    if ([11, 12, 13, 14].includes(b.qsub) && !b.isnull && loopDir !== -1 && !hasIce && !hasCross) {
+                        add_inout(b.sidecross[0], ARR_CRQ.find(([bq, crq]) => bq === b.qsub)[1] ^ loopDir);
+                        add_inout(b.sidecross[1], ARR_CRQ.find(([bq, crq]) => bq === b.qsub)[1] ^ loopDir ^ CRQSUB.inout);
                     }
                 })();
                 dfs(ncr);
@@ -2085,44 +2088,39 @@ function SightNumber({ isShaded, isUnshaded, add_shaded, add_unshaded } = {}) {
     forEachCell(cell => {
         let qnum = cell.qnum;
         if (qnum === CQNUM.none || qnum === CQNUM.quesmark) { return; }
-        let seencnt = (isShaded(cell) ? 1 : 0);
-        let farthest = [0, 0, 0, 0];
+        let addone = (isShaded(cell) ? 1 : 0);
+        let cand = [[], [], [], []];
         // count seen shaded cells
         for (let d = 0; d < 4; d++) {
-            let pcell = offset(cell, 1, 0, d);
-            while (!pcell.isnull && isShaded(pcell)) {
-                farthest[d]++;
-                seencnt++;
+            let pcell = cell, cnt = 0;
+            while (!pcell.isnull && !isUnshaded(pcell) && cnt <= qnum) {
                 pcell = offset(pcell, 1, 0, d);
-            }
-            while (!pcell.isnull && !isUnshaded(pcell)) {
-                farthest[d]++;
-                pcell = offset(pcell, 1, 0, d);
+                if (!isShaded(pcell)) { cand[d].push(cnt); }
+                cnt++;
             }
         }
-        // not extend too much
-        for (let d = 0; d < 4; d++) {
-            let pcell = offset(cell, 1, 0, d);
-            while (!pcell.isnull && isShaded(pcell)) {
-                pcell = offset(pcell, 1, 0, d);
-            }
-            if (pcell.isnull || isUnshaded(pcell)) { continue; }
-            let tcell = pcell;
-            pcell = offset(pcell, 1, 0, d);
-            let n = 0;
-            while (!pcell.isnull && isShaded(pcell)) {
-                n++;
-                pcell = offset(pcell, 1, 0, d);
-            }
-            if (n + seencnt + 1 > qnum) {
-                add_unshaded(tcell);
+        if (cand.some(e => e.length === 0)) { return; }
+        let comb = [];
+        for (let l1 of cand[0]) {
+            if (l1 + addone > qnum) { break; }
+            for (let l2 of cand[1]) {
+                if (l1 + l2 + addone > qnum) { break; }
+                for (let l3 of cand[2]) {
+                    if (l1 + l2 + l3 + addone > qnum) { break; }
+                    let l4 = qnum - (l1 + l2 + l3 + addone);
+                    if (!cand[3].includes(l4)) { continue; }
+                    comb.push([l1, l2, l3, l4]);
+                }
             }
         }
-        // must extend this way
-        let maxn = farthest.reduce((a, b) => a + b) + (isUnshaded(cell) ? 0 : 1);
         for (let d = 0; d < 4; d++) {
-            for (let j = 1; j <= qnum - maxn + farthest[d]; j++) {
-                add_shaded(offset(cell, j, 0, d));
+            let shadedmax = Math.max(...comb.map(c => c[d]), 0);
+            let shadedmin = Math.min(...comb.map(c => c[d]), board.rows, board.cols);
+            for (let i = 1; i <= shadedmin; i++) {
+                add_shaded(offset(cell, i, 0, d));
+            }
+            if (shadedmax === shadedmin) {
+                add_unshaded(offset(cell, shadedmax + 1, 0, d));
             }
         }
     });
@@ -2563,10 +2561,10 @@ function RectRegion_Cell({ isShaded, isUnshaded, add_shaded, add_unshaded, isSiz
             add_unshaded(cell);
         }
         if (!isShaded(cell) || rectlist.length === 0) { return; }
-        let ml = rectlist.reduce((m, obj) => Math.max(m, obj.dl), -board.cols);
-        let mu = rectlist.reduce((m, obj) => Math.max(m, obj.du), -board.rows);
-        let mr = rectlist.reduce((m, obj) => Math.min(m, obj.dr), +board.cols);
-        let md = rectlist.reduce((m, obj) => Math.min(m, obj.dd), +board.rows);
+        let ml = Math.max(...rectlist.map(obj => obj.dl));
+        let mu = Math.max(...rectlist.map(obj => obj.du));
+        let mr = Math.min(...rectlist.map(obj => obj.dr));
+        let md = Math.min(...rectlist.map(obj => obj.dd));
         for (let j = ml; j <= mr; j++) { add_shaded(offset(cell, j, 0)); }
         for (let j = mu; j <= md; j++) { add_shaded(offset(cell, 0, j)); }
         if (rectlist.every(obj => obj.dl === ml)) { add_unshaded(offset(cell, ml - 1, 0)); }
@@ -2689,10 +2687,10 @@ function RectRegion_Border({ doTrial = true, isSizeAble = (w, h, sc, c) => true 
             }
         }
         if (rectlist.length === 0) { return; }
-        let ml = rectlist.reduce((m, obj) => Math.max(m, obj.dl), -board.cols);
-        let mu = rectlist.reduce((m, obj) => Math.max(m, obj.du), -board.rows);
-        let mr = rectlist.reduce((m, obj) => Math.min(m, obj.dr), +board.cols);
-        let md = rectlist.reduce((m, obj) => Math.min(m, obj.dd), +board.rows);
+        let ml = Math.max(...rectlist.map(obj => obj.dl));
+        let mu = Math.max(...rectlist.map(obj => obj.du));
+        let mr = Math.min(...rectlist.map(obj => obj.dr));
+        let md = Math.min(...rectlist.map(obj => obj.dd));
         for (let j = ml; j < mr; j++) { add_link(offset(cell, j + .5, 0)); }
         for (let j = mu; j < md; j++) { add_link(offset(cell, 0, j + .5)); }
         if (rectlist.every(obj => obj.dl === ml)) { add_side(offset(cell, ml - .5, 0)); }
@@ -2905,6 +2903,89 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+
+function NagareruLoopAssist() {
+    let add_arrow = function (b, dir) {
+        if (b === undefined || b.isnull || b.qsub !== BQSUB.none) { return; }
+        b.setQsub(dir);
+        b.draw();
+        stepcheck(true);
+    };
+    let genlist = c => {
+        if (c.isnull || c.adjborder === undefined) { return []; }
+        return [[c.adjborder.top, BQSUB.arrow_up, BQSUB.arrow_dn], [c.adjborder.bottom, BQSUB.arrow_dn, BQSUB.arrow_up],
+        [c.adjborder.left, BQSUB.arrow_lt, BQSUB.arrow_rt], [c.adjborder.right, BQSUB.arrow_rt, BQSUB.arrow_lt]];
+    };
+    let hasIn = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && b.line && b.qsub === i_arr);
+    let hasOut = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && b.line && b.qsub === o_arr);
+    SingleLoopInCell({
+        isPassable: c => c.ques !== 1,
+        isPass: c => c.qdir !== 0 && c.ques === 0,
+        Directed: true,
+    });
+    let flowMap = new Map();
+    forEachCell(cell => {
+        if (cell.ques === 0 && [1, 2].includes(cell.qdir)) {
+            add_cross(cell.adjborder.left);
+            add_cross(cell.adjborder.right);
+        }
+        if (cell.ques === 0 && [3, 4].includes(cell.qdir)) {
+            add_cross(cell.adjborder.top);
+            add_cross(cell.adjborder.bottom);
+        }
+        if (cell.ques !== 0) {
+            forEachSide(cell, b => add_cross(b));
+        }
+        let lar = [BQSUB.arrow_rt, BQSUB.arrow_up, BQSUB.arrow_lt, BQSUB.arrow_dn];
+        if (cell.ques === 0 && cell.qdir !== 0) {
+            let d = qdirRemap(cell.qdir);
+            add_arrow(offset(cell, 0.5, 0, d), lar[d]);
+        }
+        if (cell.ques !== 0 && cell.qdir !== 0) {
+            let d = qdirRemap(cell.qdir);
+            let pcell = offset(cell, 1, 0, d);
+            while (!pcell.isnull && pcell.ques === 0) {
+                if (!flowMap.has(pcell)) { flowMap.set(pcell, []); }
+                flowMap.get(pcell).push(d);
+                if (isLine(offset(pcell, 0, -.5, d))) { add_cross(offset(pcell, 0, +.5, d)); }
+                if (isLine(offset(pcell, 0, +.5, d))) { add_cross(offset(pcell, 0, -.5, d)); }
+                if (isLine(offset(pcell, +.5, 0, d))) { add_arrow(offset(pcell, +.5, 0, d), lar[d]); }
+                if (isntLine(offset(pcell, -.5, 0, d)) && isntLine(offset(pcell, +.5, 0, d))) {
+                    add_cross(offset(pcell, 0, -.5, d));
+                    add_cross(offset(pcell, 0, +.5, d));
+                }
+                if (offset(pcell, 0, -.5, d).qsub === lar[(d + 1) % 4]) { add_line(offset(pcell, -.5, 0, d)); }
+                if (offset(pcell, 0, +.5, d).qsub === lar[(d + 3) % 4]) { add_line(offset(pcell, -.5, 0, d)); }
+                if (offset(pcell, 0, -.5, d).qsub === lar[(d + 3) % 4]) { add_line(offset(pcell, +.5, 0, d)); }
+                if (offset(pcell, 0, +.5, d).qsub === lar[(d + 1) % 4]) { add_line(offset(pcell, +.5, 0, d)); }
+                if (hasIn(offset(pcell, 0, -1, d)) && !isLine(offset(pcell, 0, -.5, d)) && isntLine(offset(pcell, +.5, 0, d))) { add_cross(offset(pcell, 0, -.5, d)); }
+                if (hasIn(offset(pcell, 0, +1, d)) && !isLine(offset(pcell, 0, +.5, d)) && isntLine(offset(pcell, +.5, 0, d))) { add_cross(offset(pcell, 0, +.5, d)); }
+                if (hasOut(offset(pcell, 0, -1, d)) && !isLine(offset(pcell, 0, -.5, d)) && isntLine(offset(pcell, -.5, 0, d))) { add_cross(offset(pcell, 0, -.5, d)); }
+                if (hasOut(offset(pcell, 0, +1, d)) && !isLine(offset(pcell, 0, +.5, d)) && isntLine(offset(pcell, -.5, 0, d))) { add_cross(offset(pcell, 0, +.5, d)); }
+                if ((offset(pcell, -.5, -.5, d).qsub === (CRQSUB.out ^ loopDir) || offset(pcell, +.5, -.5, d).qsub === (CRQSUB.in ^ loopDir)) && isntLine(offset(pcell, +.5, 0, d))) { add_cross(offset(pcell, 0, -.5, d)); }
+                if ((offset(pcell, -.5, +.5, d).qsub === (CRQSUB.in ^ loopDir) || offset(pcell, +.5, +.5, d).qsub === (CRQSUB.out ^ loopDir)) && isntLine(offset(pcell, +.5, 0, d))) { add_cross(offset(pcell, 0, +.5, d)); }
+                if ((offset(pcell, -.5, -.5, d).qsub === (CRQSUB.in ^ loopDir) || offset(pcell, +.5, -.5, d).qsub === (CRQSUB.out ^ loopDir)) && isntLine(offset(pcell, -.5, 0, d))) { add_cross(offset(pcell, 0, -.5, d)); }
+                if ((offset(pcell, -.5, +.5, d).qsub === (CRQSUB.out ^ loopDir) || offset(pcell, +.5, +.5, d).qsub === (CRQSUB.in ^ loopDir)) && isntLine(offset(pcell, -.5, 0, d))) { add_cross(offset(pcell, 0, +.5, d)); }
+                pcell = offset(pcell, 1, 0, d);
+            }
+        }
+    });
+    forEachCell(cell => {
+        if (!flowMap.has(cell)) { return; }
+        let dirs = flowMap.get(cell);
+        if (dirs.includes(0) && dirs.includes(2) || dirs.includes(1) && dirs.includes(3)) {
+            forEachSide(cell, b => add_cross(b));
+        }
+        for (let d = 0; d < 4; d++) {
+            if (dirs.includes(d) && dirs.includes((d + 1) % 4)) {
+                if (isCross(offset(cell, +.5, 0, d))) { add_cross(offset(cell, 0, +.5, d)); }
+                if (isCross(offset(cell, 0, +.5, d))) { add_cross(offset(cell, +.5, 0, d)); }
+                if (isCross(offset(cell, -.5, 0, d))) { add_cross(offset(cell, 0, -.5, d)); }
+                if (isCross(offset(cell, 0, -.5, d))) { add_cross(offset(cell, -.5, 0, d)); }
+            }
+        }
+    });
+}
 
 function BunnyhopAssist() {
     const isEmpty = c => !c.isnull && c.ques !== CQUES.wall;
@@ -3449,8 +3530,8 @@ function GeradewegAssist() {
                 return true;
             });
             if (cand.length === 0) { continue; }
-            let l1m = cand.reduce((r, p) => Math.min(r, p[0]), Infinity);
-            let l2m = cand.reduce((r, p) => Math.min(r, p[1]), Infinity);
+            let l1m = Math.min(...cand.map(p => p[0]));
+            let l2m = Math.min(...cand.map(p => p[1]));
             for (let i = 0; i < l1m; i++) { add_line(offset(cell, i + .5, 0, d)); }
             for (let i = 0; i < l2m; i++) { add_line(offset(cell, i + .5, 0, d + 2)); }
             if (cand.every(p => p[0] === l1m)) { add_cross(offset(cell, l1m + .5, 0, d)); }
@@ -3524,7 +3605,7 @@ function BalanceLoopAssist() {
         dl = [0, 1, 2, 3].map(d => unique(cand.map(e => e[d])));
         dl.forEach((e, d) => {
             if (e.length === 0) { return; }
-            let minl = e.reduce((a, b) => Math.min(a, b));
+            let minl = Math.min(...e);
             for (let l = 0; l < minl; l++) { add_line(offset(cell, l + .5, 0, d)); }
             if (e.length === 1) { add_cross(offset(cell, e[0] + .5, 0, d)); }
         });
@@ -4060,7 +4141,7 @@ function BattleshipAssist() {
         });
     }
     let pieces = ui.puzzle.board.bank.pieces;
-    let minn = Array.from(pieces).reduce((m, p) => Math.min(m, p.str.replaceAll("0", "").length), Infinity);
+    let minn = Math.min(...Array.from(pieces).map(p => p.str.replaceAll("0", "").length));
     for (let p of pieces) { p.setQcmp(0); }
     forEachCell(cell => cell.qnum === 0 ? add_green(cell) : undefined);
     forEachCell(cell => {
@@ -4133,7 +4214,7 @@ function BattleshipAssist() {
 function StatueParkAssist() {
     GreenConnected();
     let pieces = ui.puzzle.board.bank.pieces;
-    let minn = Array.from(pieces).reduce((m, p) => Math.min(m, p.str.replaceAll("0", "").length), Infinity);
+    let minn = Math.min(...Array.from(pieces).map(p => p.str.replaceAll("0", "").length));
     let totn = Array.from(pieces).reduce((m, p) => m + p.str.replaceAll("0", "").length, 0);
     if (Array.from(board.cell).filter(c => !isntBlack(c)).length === totn) {
         forEachCell(c => !isntBlack(c) ? add_black(c) : add_green(c));
@@ -4264,10 +4345,10 @@ function LohkousAssist() {
             }
         }
         if (qnums.length === 1) {
-            let lx = clist.map(c => c.bx).reduce((a, b) => Math.min(a, b));
-            let rx = clist.map(c => c.bx).reduce((a, b) => Math.max(a, b));
-            let ly = clist.map(c => c.by).reduce((a, b) => Math.min(a, b));
-            let ry = clist.map(c => c.by).reduce((a, b) => Math.max(a, b));
+            let lx = Math.min(...clist.map(c => c.bx));
+            let rx = Math.max(...clist.map(c => c.bx));
+            let ly = Math.min(...clist.map(c => c.by));
+            let ry = Math.max(...clist.map(c => c.by));
             for (let i = lx; i <= rx; i++) {
                 for (let j = ly; j <= ry; j++) {
                     if (i < rx) { add_link(board.getb(i + 1, j)); }
@@ -5174,8 +5255,8 @@ function ReflectLinkAssist() {
             return true;
         });
         if (cand.length > 0) {
-            let mx = cand.reduce((res, n) => Math.min(res, n), Infinity);
-            let my = cell.qnum - 1 - cand.reduce((res, n) => Math.max(res, n), 0);
+            let mx = Math.min(...cand);
+            let my = cell.qnum - 1 - Math.max(...cand);
             for (let i = 0; i < mx; i++) { add_line(offset(cell, i + .5, 0, d)); }
             for (let i = 0; i < my; i++) { add_line(offset(cell, 0, i + .5, d)); }
             if (mx + my + 1 === cell.qnum) {
@@ -5590,8 +5671,8 @@ function AquariumAssist() {
     if (ui.puzzle.config.list.aquarium_regions.val) { // Water in one region must have the same surface level
         forEachRoom(room => {
             let cl = Array.from(room.clist);
-            let ub = cl.reduce((n, c) => isDot(c) ? Math.max(n, c.by) : n, -1);
-            let lb = cl.reduce((n, c) => isBlack(c) ? Math.min(n, c.by) : n, Infinity);
+            let ub = Math.max(...cl.map(c => isDot(c) ? c.by : -1));
+            let lb = Math.min(...cl.map(c => isBlack(c) ? c.by : Infinity));
             cl.forEach(c => {
                 if (c.by <= ub) { add_dot(c); }
                 if (c.by >= lb) { add_black(c); }
@@ -5709,7 +5790,7 @@ function BorderBlockAssist() {
         OnlyOneConnected: false,
         BridgeType: "link",
     });
-    let maxQnum = Array.from(board.cell).reduce((a, b) => Math.max(a, b.qnum), 0);
+    let maxQnum = Math.max(...Array.from(board.cell).map(c => c.qnum));
     for (let i = 1; i <= maxQnum; i++) {
         CellConnected({
             isShaded: c => c.qnum === i,
@@ -5828,10 +5909,10 @@ function AhoniNarikireAssist() {
                 });
             }
             dfs(cell);
-            let lbx = l.reduce((a, b) => Math.min(a, b.bx), Infinity);
-            let rbx = l.reduce((a, b) => Math.max(a, b.bx), 0);
-            let lby = l.reduce((a, b) => Math.min(a, b.by), Infinity);
-            let rby = l.reduce((a, b) => Math.max(a, b.by), 0);
+            let lbx = Math.min(...l.map(c => c.bx));
+            let rbx = Math.max(...l.map(c => c.bx));
+            let lby = Math.min(...l.map(c => c.by));
+            let rby = Math.max(...l.map(c => c.by));
             for (let i = lbx; i <= rbx; i += 2) {
                 for (let j = lby; j <= lby; j += 2) {
                     if (i < rbx) { add_link(board.getb(i + 1, j)); }
@@ -6793,7 +6874,7 @@ function RailPoolAssist() {
         if (cell.ques === CQUES.wall) { return; }
         let qnums = Array.from(cell.room.clist).flatMap(c => c.qnums);
         if (qnums.length !== 0 && !qnums.includes(CQNUM.quesmark)) {
-            let maxd = qnums.reduce((a, b) => Math.max(a, b));
+            let maxd = Math.max(...qnums);
             for (let d = 0; d < 2; d++) {
                 let cand = [];
                 if (!isntLine(offset(cell, -.5, 0, d)) && !isntLine(offset(cell, +.5, 0, d)) && !isLine(offset(cell, 0, -.5, d)) && !isLine(offset(cell, 0, +.5, d))) {
@@ -6811,8 +6892,8 @@ function RailPoolAssist() {
                     }
                 }
                 if (cand.length > 0) {
-                    let lm = cand.reduce((a, b) => Math.max(a, b[0]), -Infinity);
-                    let rm = cand.reduce((a, b) => Math.min(a, b[1]), Infinity);
+                    let lm = Math.max(...cand.map(e => e[0]));
+                    let rm = Math.min(...cand.map(e => e[1]));
                     for (let dd = lm; dd < rm; dd++) {
                         add_line(offset(cell, 0, dd + .5, d));
                     }
@@ -8265,7 +8346,7 @@ function MyopiaAssist() {
                 }
                 if (temp.some((b, i) => b.line && arr[i])) { break; }
             }
-            let l = dist.reduce((a, b) => Math.min(a, b), Math.min(board.rows, board.cols));
+            let l = Math.min(...dist, board.rows, board.cols);
             for (let di = 0.5; di <= l; di++) {
                 let temp = [0, 1, 2, 3].map(n => offset(cell, 0, -di, n));
                 temp.forEach((b, i) => {
@@ -8449,7 +8530,7 @@ function FillominoAssist() {
     });
     let remove_cand = (c, m) => {
         let l = c.snum.filter(n => n !== m);
-        if (!c.snum.includes(-1)) { l.push(c.snum.reduce((a, b) => Math.max(a, b)) + 1); }
+        if (!c.snum.includes(-1)) { l.push(Math.max(...c.snum) + 1); }
         add_candidate_L4(c, l);
     }
     let cset = new Set();
@@ -8720,7 +8801,7 @@ function MidloopAssist() {
                 let cand = Array(Math.max(board.rows, board.cols)).fill(0).map((_, i) => i);
                 cand = cand.filter(i => isSegmentAble(offset(obj, -i - .5, 0, d), i * 2 + 1, d));
                 if (cand.length === 0) { continue; }
-                let t = cand.reduce((a, b) => Math.min(a, b));
+                let t = Math.min(...cand);
                 for (let i = 1; i <= t; i++) {
                     add_line(offset(obj, -i, 0, d));
                     add_line(offset(obj, +i, 0, d));
@@ -8750,7 +8831,7 @@ function MidloopAssist() {
                 }
                 if (d !== -1) {
                     if (cand.length === 0) { continue; }
-                    let t = cand.reduce((a, b) => Math.min(a, b));
+                    let t = Math.min(...cand);
                     for (let i = 0; i < t; i++) {
                         add_line(offset(obj, -i - .5, 0, d));
                         add_line(offset(obj, +i + .5, 0, d));
@@ -9066,6 +9147,57 @@ function TatamibariAssist() {
     NoCrossingBorder();
 }
 
+function PencilsAssist_New() {
+    let add_tip = function (c, d) {  // 0=→, 1=↑, 2=←, 3=↓
+        if (c === undefined || c.isnull || isGreen(c) || c.anum !== CANUM.none) { return; }
+        c.setQsub(CQSUB.yellow);
+        c.setAnum([4, 1, 3, 2][d]);
+        c.draw();
+        stepcheck(true);
+    }
+    let add_cross = function (b) {
+        if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none || b.qans || b.ques) { return; }
+        b.setQsub(BQSUB.cross);
+        b.draw();
+        stepcheck(isCross(b));
+    };
+    let isTipAble = (c, d) => !c.isnull && !isGreen(c) && (!cllist.includes(c) || c.anum === [4, 1, 3, 2][d]);
+    let isPencilAble = (c, l, d) => {
+        if (!isTipAble(offset(c, l, 0, d), d)) { return false; }
+        if (isCross(offset(c, -.5, 0, d)) || isCross(offset(c, l - .5, 0, d))) { return false; }
+        for (let i = 0; i < l; i++) {
+            if (isCross(offset(c, i, -.5, d)) || isCross(offset(c, i, +.5, d)) || isYellow(offset(c, i, 0, d))) { return false; }
+            if (offset(c, i, 0, d).qnum > 0 && offset(c, i, 0, d).qnum !== l) { return false; }
+            if (i > 0 && isSide(offset(c, i - .5, 0, d))) { return false; }
+        }
+        return true;
+    };
+    forEachCell(cell => {
+        if (cell.qdir !== 0) { add_tip(cell, cell.qdir); }
+        if (cell.qnum !== CQNUM.none) { add_green(cell); }
+        if (cell.qnum === 1) { forEachSide(cell, (nb, nc) => add_side(nb)); }
+        if (cell.lcnt > 0) { add_yellow(cell); }
+        if (cell.lcnt === 0 && adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => nb.isnull || nb.qans || isCross(nb) || isGreen(nc) || nc.lcnt === 2 || nc.lcnt === 1 && nc.anum !== CANUM.none)) {
+            add_green(cell);
+        }
+        if (adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => {
+            if (nc.isnull || nb.qans && isGreen(nc)) { return true; }
+            if (cllist.includes(nc) && nc.anum === CANUM.none) { return true; }
+            if (nc.anum !== CANUM.none && offset(nc, -1, 0, qdirRemap(nc.anum)) !== cell) { return true; }
+            return false;
+        })) {
+            add_yellow(cell);
+        }
+        if (isYellow(cell) && adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans && !isCross(b)).length === 1) {
+            add_line(adjlist(cell.adjborder).find(b => !b.isnull && !b.qans && !isCross(b)));
+        }
+        if ([0, 1, 2, 3].every(d => !isTipAble(offset(cell, 1, 0, d), d)) &&
+            adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans).length === 1) {
+            add_cross(adjlist(cell.adjborder).find(b => !b.isnull && !b.qans));
+        }
+    });
+}
+
 function PencilsAssist() {
     let add_tip = function (c, dir) {  // 1=↑, 2=↓, 3=←, 4=→
         if (c === undefined || c.isnull || isGreen(c) || c.anum !== CANUM.none) { return; }
@@ -9089,52 +9221,37 @@ function PencilsAssist() {
     // record cells with line that belongs to a tip
     let cllist = [];
     forEachCell(cell => {
-        if (cell.anum !== CANUM.none) {
-            let dfs = function (c) {
-                if (c.isnull || cllist.includes(c)) { return; }
-                cllist.push(c);
-                forEachSide(c, (nb, nc) => {
-                    if (!nb.isnull && nb.line) {
-                        dfs(nc);
-                    }
-                });
-            }
-            dfs(cell);
+        if (cell.anum === CANUM.none) { return; }
+        let dfs = function (c) {
+            if (c.isnull || cllist.includes(c)) { return; }
+            cllist.push(c);
+            forEachSide(c, (nb, nc) => { if (!nb.isnull && nb.line) { dfs(nc); } });
         }
+        dfs(cell);
     });
-    let isTipAble = function (c, dir) {
-        if (c.isnull || cllist.includes(c) && c.anum !== dir || isGreen(c)) {
-            return false;
-        }
-        return true;
-    }
+    let isTipAble = (c, dir) => !c.isnull && !isGreen(c) && (!cllist.includes(c) || c.anum === dir);
     forEachCell(cell => {
-        if (cell.qdir !== 0) {
-            add_tip(cell, cell.qdir);
-        }
-        if (cell.qnum !== CQNUM.none) {
-            add_green(cell);
-        }
-        if (cell.qnum === 1) {
-            forEachSide(cell, (nb, nc) => add_side(nb));
-        }
+        if (cell.qdir !== 0) { add_tip(cell, cell.qdir); }
+        if (cell.qnum !== CQNUM.none) { add_green(cell); }
+        if (cell.qnum === 1) { forEachSide(cell, (nb, nc) => add_side(nb)); }
         if (cell.qnum > 1) {
             // extend clue
             for (let d = 0; d < 2; d++) {
-                let ll = 0, rr = 0;
+                let ll = 0, rr = 0; // min dist
                 while (isCross(offset(cell, ll - .5, 0, d)) &&
-                    offset(cell, ll - 1, 0, d).qsub !== CQSUB.yellow) { ll--; }
+                    !isYellow(offset(cell, ll - 1, 0, d))) { ll--; }
                 while (isCross(offset(cell, rr + .5, 0, d)) &&
-                    offset(cell, rr + 1, 0, d).qsub !== CQSUB.yellow) { rr++; }
-                let lc = ll, rc = rr;
-                while ((c => !c.isnull && c.qsub !== CQSUB.yellow && (c.qnum < 0 || c.qnum === cell.qnum))(offset(cell, lc - 1, 0, d)) &&
-                    !offset(cell, lc - .5, 0, d).qans && lc > 1 - cell.qnum + rr) {
+                    !isYellow(offset(cell, rr + 1, 0, d))) { rr++; }
+                let lc = ll, rc = rr;   // max dist
+                while ((c => !c.isnull && !isYellow(c) && (c.qnum < 0 || c.qnum === cell.qnum))(offset(cell, lc - 1, 0, d)) &&
+                    !offset(cell, lc - .5, 0, d).qans && rr - lc + 1 < cell.qnum) {
                     lc--;
                 }
-                while ((c => !c.isnull && c.qsub !== CQSUB.yellow && (c.qnum < 0 || c.qnum === cell.qnum))(offset(cell, rc + 1, 0, d)) &&
-                    !offset(cell, rc + .5, 0, d).qans && rc < cell.qnum - 1 + ll) {
+                while ((c => !c.isnull && !isYellow(c) && (c.qnum < 0 || c.qnum === cell.qnum))(offset(cell, rc + 1, 0, d)) &&
+                    !offset(cell, rc + .5, 0, d).qans && rc - ll + 1 < cell.qnum) {
                     rc++;
                 }
+                // the only direction to extend (between vertical and horizontal)
                 if ((b => b.isnull || b.qans)(offset(cell, 0, .5, d)) && (b => b.isnull || b.qans)(offset(cell, 0, -.5, d))) {
                     for (let j = rc - cell.qnum + 1; j <= lc + cell.qnum - 1; j++) {
                         add_green(offset(cell, j, 0, d));
@@ -9155,6 +9272,7 @@ function PencilsAssist() {
                         }
                     }
                 }
+                // wrong direction
                 if (rc - lc + 1 === cell.qnum && !isTipAble(offset(cell, rc + 1, 0, d), d === 0 ? 4 : 1) &&
                     !isTipAble(offset(cell, lc - 1, 0, d), d === 0 ? 3 : 2)) {
                     add_side(offset(cell, +.5, 0, d));
@@ -9833,7 +9951,19 @@ function AllorNothingAssist() {
 }
 
 function AqreAssist() {
-    BlackConnected();
+    CellConnected({
+        isShaded: isBlack,
+        isUnshaded: isGreen,
+        add_shaded: add_black,
+        add_unshaded: add_green,
+        isNotPassable: (c, nb, nc) => {
+            let d = [0, 1, 2, 3].find(d => offset(c, 0.5, 0, d) === nb);
+            if (isBlack(offset(c, 2, 0, d)) && isBlack(offset(c, 3, 0, d)) || isBlack(offset(c, -1, 0, d)) && isBlack(offset(c, -2, 0, d))) { return true; }
+            let clist = Array.from(c.room.clist), clue = c.room.top.qnum;
+            if (c.room === nc.room && clue > 0 && clist.filter(c => isBlack(c)).length + 1 === clue && isntBlack(c) && isntBlack(nc)) { return true; }
+            return false;
+        },
+    });
     forEachCell(cell => {
         let fn = function (c1, c2, c3) {
             if (c1.isnull || c2.isnull || c3.isnull) { return; }
@@ -9873,7 +10003,7 @@ function KurodokoAssist() {
     GreenConnected();
     BlackNotAdjacent();
     SightNumber({
-        isShaded: isGreen,
+        isShaded: c => isGreen(c) || isClue(c),
         isUnshaded: isBlack,
         add_shaded: add_green,
         add_unshaded: add_black,

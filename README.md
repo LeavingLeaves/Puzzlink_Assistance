@@ -104,6 +104,7 @@ Currently enhanced genre:
 * Mochikoro
 * Moon or Sun
 * Myopia
+* Nagareru-Loop
 * Nanameguri
 * Nawabari
 * NIKOJI
