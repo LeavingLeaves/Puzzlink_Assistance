@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      25.11.3.1
+// @version      25.11.19.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
