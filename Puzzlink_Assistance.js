@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      25.11.19.1
+// @version      25.11.24.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -360,6 +360,7 @@ function assist() {
     stpcnt = 1;
     board = ui.puzzle.board;
     hasInvCrQsub = false;
+    loopDir = -1;
     let stpt = -1;
     starttime = (new Date()).valueOf();
     let process_step = function (loop = 0) {
@@ -542,6 +543,7 @@ const isSide = b => !b.isnull && (b.qans === 1 || !b.inside || b.ques === 1 || b
 const isLink = b => !b.isnull && b.qsub === BQSUB.link;
 const isntLink = b => b.isnull || isSide(b);
 const isLine = b => !b.isnull && b.line === 1;
+const isLineAux = b => !b.isnull && b.line === -1;
 const isntLine = b => b.isnull || b.qsub === BQSUB.cross;
 const isCross = b => !b.isnull && b.qsub === BQSUB.cross;
 const isBound = b => b.ques === 1;
@@ -746,16 +748,21 @@ const add_link = function (b) {
     stepcheck(isLink(b));
 };
 const add_cross = function (b) {
-    if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none) { return; }
+    if (b === undefined || b.isnull || b.line && !isLineAux(b) || b.qsub !== BQSUB.none) { return; }
+    if (isLineAux(b)) { b.setLineVal(0); }
     b.setQsub(BQSUB.cross);
     b.draw();
     stepcheck(isCross(b));
 };
 const add_line = function (b) {
-    if (b === undefined || b.isnull || b.line || isCross(b)) { return; }
+    if (b === undefined || b.isnull || b.line && !isLineAux(b) || isCross(b)) { return; }
     b.setLine(1);
     b.draw();
     stepcheck(isLine(b));
+};
+const add_lineaux = function (b) {
+    if (b === undefined || b.isnull || b.line || isCross(b)) { return; }
+    b.setLineVal(-1);
 };
 const add_side = function (b) {
     if (b === undefined || b.isnull || b.qans || b.qsub === BQSUB.link) { return; }
@@ -1079,7 +1086,7 @@ function RoomPassOnce({ LengthClue = false, MaybeNotPassed = false } = {}) {
             oblist.forEach(b => b.sidecell.every(c => !ocl.includes(c)) ? add_cross(b) : undefined);
         }
         // parity
-        if (ocl.length === 1 && LengthClue && qnum > 0 && oblist.filter(b => b.line).length < 2 && board.roommgr.components.length > 1) {
+        if (ocl.length === 1 && LengthClue && qnum > 0 && oblist.filter(b => isLine(b)).length < 2 && board.roommgr.components.length > 1) {
             let p = (ocl[0].bx + ocl[0].by + (qnum % 2 === 1 ? 0 : 2)) % 4;
             clist.forEach(c => {
                 if (c === ocl[0]) { return; }
@@ -1575,8 +1582,8 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
         return [[c.adjborder.top, BQSUB.arrow_up, BQSUB.arrow_dn], [c.adjborder.bottom, BQSUB.arrow_dn, BQSUB.arrow_up],
         [c.adjborder.left, BQSUB.arrow_lt, BQSUB.arrow_rt], [c.adjborder.right, BQSUB.arrow_rt, BQSUB.arrow_lt]];
     };
-    let hasIn = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && b.line && b.qsub === i_arr);
-    let hasOut = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && b.line && b.qsub === o_arr);
+    let hasIn = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && isLine(b) && b.qsub === i_arr);
+    let hasOut = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && isLine(b) && b.qsub === o_arr);
     let initied = false;
     forEachCross(cross => { initied ||= cross.qsub === CRQSUB.in || cross.qsub === CRQSUB.none; })
     if (!initied) {
@@ -1591,7 +1598,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
             add_shaded: cr => add_inout(cr, CRQSUB.in),
             add_unshaded: cr => add_inout(cr, CRQSUB.out),
             isLinked: (c, nb, nc) => isCross(nb) || c.qsub === CRQSUB.in && nc.qsub === CRQSUB.in,
-            isNotPassable: (c, nb, nc) => nb.line,
+            isNotPassable: (c, nb, nc) => isLine(nb),
             Obj: "cross",
         });
         CellConnected({
@@ -1600,7 +1607,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
             add_shaded: cr => add_inout(cr, CRQSUB.out),
             add_unshaded: cr => add_inout(cr, CRQSUB.in),
             isLinked: (c, nb, nc) => isCross(nb) || c.qsub === CRQSUB.out && nc.qsub === CRQSUB.out,
-            isNotPassable: (c, nb, nc) => nb.line,
+            isNotPassable: (c, nb, nc) => isLine(nb),
             Obj: "cross",
         });
     }
@@ -1638,7 +1645,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
     forEachCell(cell => {
         if (isIce(cell)) {
             let fn = (b1, b2) => {
-                if (b1.line) { add_line(b2); }
+                if (isLine(b1)) { add_line(b2); }
                 if (b1.isnull || isCross(b1)) { add_cross(b2) };
             }
             for (let d = 0; d < 4; d++) {
@@ -1689,33 +1696,40 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
         // 2 degree path
         if (emptycnt === 2 && (linecnt === 1 || isPass(cell))) { forEachSide(cell, (nb, nc) => add_path(nb)); }
         if (linecnt === 0 && !isIce(cell) && !hasCross) {
-            let list = adjlist(cell.adjborder, cell.adjacent);
-            list = list.map(([nb, nc], d) => {
+            let list = adjlist(cell.adjborder, cell.adjacent).map(([nb, nc], d) => {
                 while (isIce(nc)) { nc = offset(nc, 1, 0, d); }
                 return [nb, nc];
             });
             list = list.filter(([nb, nc]) => !nb.isnull && !nc.isnull && isPathable(nb));
+            // surrounded by 1 path
             if (list.length > 0 && list[0][1].path !== null && list.every(([nb, nc]) => nc.path === list[0][1].path &&
                 board.linegraph.components.length > 1)) {
                 forEachSide(cell, (nb, nc) => add_notpath(nb));
             }
-            // ┏╸     ┏╸ 
-            // ┃·  -> ┃╺━
-            // ┗╸     ┗╸ 
-            if (cell.lcnt === 0 && isPass(cell)) {
-                list.forEach(([nb, nc]) => {
-                    let t = list.filter(e => e[0] !== nb);
-                    if (t[0][1].path !== null && t.every(([nb, nc]) => nc.path === t[0][1].path) &&
-                        board.linegraph.components.length > 1) {
-                        add_path(nb);
-                    }
+            // bouncing using lineaux
+            // ┏╸     ┏╸  
+            // ┃·  -> ┃╺╸ 
+            // ┗╸·    ┗╸╺╸
+            let glist = list.reduce((acc, [nb, nc]) => {
+                if (acc.flat().includes(nc)) { return acc; }
+                let clist = getCellChunk(nc, (c, nb, nc) => isPath(nb) || isLineAux(nb)).filter(c => adjlist(c.adjacent).includes(cell));
+                acc.push(clist);
+                return acc;
+            }, []);
+            if (isPass(cell) && !hasCross && glist.length === 2) {
+                glist.forEach(clist => {
+                    clist.forEach(nc => {
+                        let d = [0, 1, 2, 3].find(dd => offset(cell, 1, 0, dd) === nc);
+                        if (clist.length === 1) { add_path(offset(cell, .5, 0, d)) }
+                        else { add_lineaux(offset(cell, .5, 0, d)); }
+                    });
                 });
             }
         }
         // extend arrow
         if (Directed && cell.lcnt === 2 && !isIce(cell)) {
             let list = genlist(cell);
-            list = list.filter(b => b[0].line);
+            list = list.filter(b => isLine(b[0]));
             if (list.filter(b => b[0].qsub === BQSUB.none).length === 1) {
                 if (list[0][0].qsub !== BQSUB.none) {
                     list = [list[1], list[0]];
@@ -1735,7 +1749,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
                 while (!ncell.isnull && isIce(ncell)) {
                     ncell = offset(ncell, 1, 0, d);
                 }
-                if (ncell.isnull || ncell.lcnt !== 1 || offset(ncell, -.5, 0, d).line) { continue; }
+                if (ncell.isnull || ncell.lcnt !== 1 || isLine(offset(ncell, -.5, 0, d))) { continue; }
                 if (hasIn(cell) && hasIn(ncell) || hasOut(cell) && hasOut(ncell)) {
                     add_cross(offset(cell, .5, 0, d));
                 }
@@ -1752,7 +1766,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
                 pcell = offset(pcell, -1, 0, d);
             }
             pcell = cell;
-            while (isIce(pcell) && offset(pcell, .5, 0, d).line && (!offset(pcell, -.5, 0, d).line ||
+            while (isIce(pcell) && isLine(offset(pcell, .5, 0, d)) && (!isLine(offset(pcell, -.5, 0, d)) ||
                 offset(pcell, .5, 0, d).qsub !== BQSUB.none && offset(pcell, -.5, 0, d).qsub === BQSUB.none)) {
                 add_line(offset(pcell, -.5, 0, d));
                 if (offset(pcell, .5, 0, d).qsub !== BQSUB.none) {
@@ -1846,7 +1860,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
                 (() => {
                     if (ncr.isnull) { return; }
                     if (isntLine(b)) { add_inout(ncr, cr.qsub); }
-                    if (!b.isnull && isLine(b) && !Directed) { add_inout(ncr, cr.qsub ^ CRQSUB.inout); }
+                    if (!b.isnull && isLine(b) && (!Directed || !hasIce && !hasCross)) { add_inout(ncr, cr.qsub ^ CRQSUB.inout); }
                     if (!b.isnull && isLine(b) && b.qsub !== BQSUB.none && Directed) {
                         add_inout(ncr, cr.qsub + ([BQSUB.arrow_up, BQSUB.arrow_lt, BQSUB.arrow_dn, BQSUB.arrow_rt][d] === b.qsub ? 1 : -1));
                     }
@@ -1877,7 +1891,7 @@ function SingleLoopInBorder({ useCrossQsub = true } = {}) {
         add_shaded: add_green,
         add_unshaded: add_yellow,
         isLinked: (c, nb, nc) => isCross(nb),
-        isNotPassable: (c, nb, nc) => nb.line,
+        isNotPassable: (c, nb, nc) => isLine(nb),
     });
     CellConnected({
         isShaded: isYellow,
@@ -1885,7 +1899,7 @@ function SingleLoopInBorder({ useCrossQsub = true } = {}) {
         add_shaded: add_yellow,
         add_unshaded: add_green,
         isLinked: (c, nb, nc) => isCross(nb),
-        isNotPassable: (c, nb, nc) => nb.line,
+        isNotPassable: (c, nb, nc) => isLine(nb),
         OutsideAsShaded: true,
     });
     NoCheckerCell({
@@ -1911,7 +1925,7 @@ function SingleLoopInBorder({ useCrossQsub = true } = {}) {
             } else { qsub = JSON.parse(cross.qsub); }
             qsub = qsub.filter(s => s.every(i => !isCross(board.border[i])));
             forEachSide(cross, (nb, nc) => {
-                if (nb.line) { qsub = qsub.filter(s => s.includes(nb.id)); }
+                if (isLine(nb)) { qsub = qsub.filter(s => s.includes(nb.id)); }
                 if (qsub.every(s => s.includes(nb.id))) { add_line(nb); }
                 if (qsub.every(s => !s.includes(nb.id))) { add_cross(nb); }
             });
@@ -1921,7 +1935,7 @@ function SingleLoopInBorder({ useCrossQsub = true } = {}) {
     // connectivity at cross
     forEachCross(cross => {
         let blist = adjlist(cross.adjborder);
-        let linecnt = blist.filter(b => b.line).length;
+        let linecnt = blist.filter(b => isLine(b)).length;
         let crosscnt = blist.filter(b => isCross(b)).length;
         if (linecnt === 2 || crosscnt === 3) {
             blist.forEach(b => add_cross(b));
@@ -1932,7 +1946,7 @@ function SingleLoopInBorder({ useCrossQsub = true } = {}) {
     });
     // avoid forming multiple loop
     forEachBorder(border => {
-        if (isCross(border) || border.line) { return; }
+        if (isCross(border) || isLine(border)) { return; }
         let cr1 = border.sidecross[0], cr2 = border.sidecross[1];
         if (cr1.path !== null && cr1.path === cr2.path && board.linegraph.components.length > 1) {
             add_cross(border);
@@ -2916,8 +2930,8 @@ function NagareruLoopAssist() {
         return [[c.adjborder.top, BQSUB.arrow_up, BQSUB.arrow_dn], [c.adjborder.bottom, BQSUB.arrow_dn, BQSUB.arrow_up],
         [c.adjborder.left, BQSUB.arrow_lt, BQSUB.arrow_rt], [c.adjborder.right, BQSUB.arrow_rt, BQSUB.arrow_lt]];
     };
-    let hasIn = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && b.line && b.qsub === i_arr);
-    let hasOut = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && b.line && b.qsub === o_arr);
+    let hasIn = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && isLine(b) && b.qsub === i_arr);
+    let hasOut = c => genlist(c).some(([b, o_arr, i_arr]) => !b.isnull && isLine(b) && b.qsub === o_arr);
     SingleLoopInCell({
         isPassable: c => c.ques !== 1,
         isPass: c => c.qdir !== 0 && c.ques === 0,
@@ -2978,10 +2992,10 @@ function NagareruLoopAssist() {
         }
         for (let d = 0; d < 4; d++) {
             if (dirs.includes(d) && dirs.includes((d + 1) % 4)) {
-                if (isCross(offset(cell, +.5, 0, d))) { add_cross(offset(cell, 0, +.5, d)); }
-                if (isCross(offset(cell, 0, +.5, d))) { add_cross(offset(cell, +.5, 0, d)); }
-                if (isCross(offset(cell, -.5, 0, d))) { add_cross(offset(cell, 0, -.5, d)); }
-                if (isCross(offset(cell, 0, -.5, d))) { add_cross(offset(cell, -.5, 0, d)); }
+                if (isntLine(offset(cell, +.5, 0, d))) { add_cross(offset(cell, 0, +.5, d)); }
+                if (isntLine(offset(cell, 0, +.5, d))) { add_cross(offset(cell, +.5, 0, d)); }
+                if (isntLine(offset(cell, -.5, 0, d))) { add_cross(offset(cell, 0, -.5, d)); }
+                if (isntLine(offset(cell, 0, -.5, d))) { add_cross(offset(cell, -.5, 0, d)); }
             }
         }
     });
@@ -3036,7 +3050,7 @@ function BunnyhopAssist() {
         d = d % 4;
         if (c.isnull || c.ques === CQUES.wall || isCross(c, d) || isSide(c, d)) { return; }
         const ln = [1, 2, 2, 1][d], b = offset(c, 0.5, 0, d);
-        if (b === undefined || b.isnull || b.line) { return; }
+        if (b === undefined || b.isnull || isLine(b)) { return; }
         b.setLineVal(ln);
         b.draw();
         c.setQsub(c.qsub & 0b1111);
@@ -3810,7 +3824,7 @@ function InternationalBordersAssist() {
 function RectangleSliderAssist() {
     let isYellow = c => c.isnull || c.qsub === CQSUB.yellow;
     let add_cross = function (b) {
-        if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none) { return; }
+        if (b === undefined || b.isnull || isLine(b) || b.qsub !== BQSUB.none) { return; }
         b.setQsub(BQSUB.cross);
         b.draw();
         stp2cnt += isCross(b);
@@ -4679,7 +4693,7 @@ function FireWalkAssist() {
         add_unshaded: cr => add_inout(cr, CRQSUB.out),
         isLinked: (c, nb, nc) => isCross(nb) || c.qsub === CRQSUB.in && nc.qsub === CRQSUB.in,
         isNotPassable: (c, nb, nc) => {
-            if (nb !== undefined) return nb.line;
+            if (nb !== undefined) return isLine(nb);
             let d = [0, 1, 2, 3].find(d => offset(c, 1, 1, d) === nc);
             return !isFire(offset(c, .5, .5, d));
         },
@@ -4693,7 +4707,7 @@ function FireWalkAssist() {
         add_unshaded: cr => add_inout(cr, CRQSUB.in),
         isLinked: (c, nb, nc) => isCross(nb) || c.qsub === CRQSUB.out && nc.qsub === CRQSUB.out,
         isNotPassable: (c, nb, nc) => {
-            if (nb !== undefined) return nb.line;
+            if (nb !== undefined) return isLine(nb);
             let d = [0, 1, 2, 3].find(d => offset(c, 1, 1, d) === nc);
             return !isFire(offset(c, .5, .5, d));
         },
@@ -6931,7 +6945,7 @@ function DoubleBackAssist() {
                 }
             });
         });
-        if (oblist.filter(b => b.line).length === 4) {
+        if (oblist.filter(b => isLine(b)).length === 4) {
             oblist.forEach(b => add_cross(b));
         }
         if (oblist.filter(b => !isCross(b)).length === 4) {
@@ -8332,7 +8346,7 @@ function MyopiaAssist() {
     SingleLoopInBorder();
     forEachCell(cell => {
         if (cell.qnum !== CQNUM.none) {
-            if (cell.qnum === 15 && board.linegraph.components.length > 0 && adjlist(cell.adjborder).every(b => !b.line)) {
+            if (cell.qnum === 15 && board.linegraph.components.length > 0 && adjlist(cell.adjborder).every(b => !isLine(b))) {
                 forEachSide(cell, (nb, nc) => add_cross(nb));
             }
             let arr = [0b0001, 0b0100, 0b0010, 0b1000].map(n => (cell.qnum & n) !== 0);
@@ -8340,11 +8354,11 @@ function MyopiaAssist() {
             for (let di = 0.5; di < Math.min(board.rows, board.cols); di++) {
                 let temp = [0, 1, 2, 3].map(n => offset(cell, 0, -di, n));
                 if (temp.some((b, i) => b.isnull && arr[i])) { break; }
-                if (temp.some((b, i) => b.line && !arr[i])) { break; }
+                if (temp.some((b, i) => isLine(b) && !arr[i])) { break; }
                 if (temp.every((b, i) => !arr[i] || !b.isnull && !isCross(b))) {
                     dist.push(di);
                 }
-                if (temp.some((b, i) => b.line && arr[i])) { break; }
+                if (temp.some((b, i) => isLine(b) && arr[i])) { break; }
             }
             let l = Math.min(...dist, board.rows, board.cols);
             for (let di = 0.5; di <= l; di++) {
@@ -8892,7 +8906,7 @@ function PipelinkAssist() {
     });
     forEachCell(cell => {
         let list = adjlist(cell.adjborder);
-        let linecnt = list.filter(b => !b.isnull && b.line).length;
+        let linecnt = list.filter(b => !b.isnull && isLine(b)).length;
         let crosscnt = list.filter(b => b.isnull || isCross(b)).length;
         if (linecnt === 3 || crosscnt === 2) {
             forEachSide(cell, (nb, nc) => add_line(nb));
@@ -8905,10 +8919,10 @@ function PipelinkAssist() {
             let dd = d;
             let pcell = offset(cell, 1, 0, dd);
             while (pcell !== cell) {
-                if (!offset(pcell, 0.5, 0, dd).line) {
+                if (!isLine(offset(pcell, 0.5, 0, dd))) {
                     if ((b => !b.isnull && !isCross(b))(offset(pcell, .5, 0, dd))) { break; }
                     if (isLine(offset(pcell, .5, 0, dd - 1)) === isLine(offset(pcell, .5, 0, dd + 1))) { break; }
-                    dd = (offset(pcell, .5, 0, dd - 1).line ? dd + 3 : dd + 1) % 4;
+                    dd = (isLine(offset(pcell, .5, 0, dd - 1)) ? dd + 3 : dd + 1) % 4;
                 }
                 pcell = offset(pcell, 1, 0, dd);
             }
@@ -8946,33 +8960,33 @@ function RingringAssist() {
     // make the right turning
     forEachCell(cell => {
         for (let d = 0; d < 4; d++) {
-            if (!offset(cell, 0, -.5, d).line || !offset(cell, -.5, 0, d).line) { continue; }
+            if (!isLine(offset(cell, 0, -.5, d)) || !isLine(offset(cell, -.5, 0, d))) { continue; }
             if (!isntLine(offset(cell, 0, .5, d))) { continue; }
             let pcell = cell;
-            while (offset(pcell, 0, -.5, d).line) {
+            while (isLine(offset(pcell, 0, -.5, d))) {
                 pcell = offset(pcell, 0, -1, d);
                 if (isntLine(offset(pcell, 0, -.5, d))) {
                     add_line(offset(pcell, -.5, 0, d));
                     add_cross(offset(pcell, .5, 0, d));
                     break;
                 }
-                if (offset(pcell, .5, 0, d).line) {
+                if (isLine(offset(pcell, .5, 0, d))) {
                     forEachSide(pcell, (nb, nc) => add_line(nb));
                 }
             }
         }
         for (let d = 0; d < 4; d++) {
-            if (!offset(cell, 0, -.5, d).line || !offset(cell, .5, 0, d).line) { continue; }
+            if (!isLine(offset(cell, 0, -.5, d)) || !isLine(offset(cell, .5, 0, d))) { continue; }
             if (!isntLine(offset(cell, 0, .5, d))) { continue; }
             let pcell = cell;
-            while (offset(pcell, 0, -.5, d).line) {
+            while (isLine(offset(pcell, 0, -.5, d))) {
                 pcell = offset(pcell, 0, -1, d);
                 if (isntLine(offset(pcell, 0, -.5, d))) {
                     add_line(offset(pcell, .5, 0, d));
                     add_cross(offset(pcell, -.5, 0, d));
                     break;
                 }
-                if (offset(pcell, -.5, 0, d).line) {
+                if (isLine(offset(pcell, -.5, 0, d))) {
                     forEachSide(pcell, (nb, nc) => add_line(nb));
                 }
             }
@@ -8980,11 +8994,11 @@ function RingringAssist() {
     });
     forEachCell(cell => {
         for (let d = 0; d < 4; d++) {
-            if (!offset(cell, 0, .5, d).line || !offset(cell, .5, 0, d).line) { continue; }
+            if (!isLine(offset(cell, 0, .5, d)) || !isLine(offset(cell, .5, 0, d))) { continue; }
             if (!isntLine(offset(cell, 0, -.5, d)) && !isntLine(offset(cell, -.5, 0, d))) { continue; }
             let h = 1, w = 1;
-            while (offset(cell, 0, h + .5, d).line) { h++; }
-            while (offset(cell, w + .5, 0, d).line) { w++; }
+            while (isLine(offset(cell, 0, h + .5, d))) { h++; }
+            while (isLine(offset(cell, w + .5, 0, d))) { w++; }
             let fg = false;
             do {
                 fg = false;
@@ -9147,161 +9161,93 @@ function TatamibariAssist() {
     NoCrossingBorder();
 }
 
-function PencilsAssist_New() {
-    let add_tip = function (c, d) {  // 0=→, 1=↑, 2=←, 3=↓
+function PencilsAssist() {
+    let add_tip = function (c, dir) {  // 0=→, 1=↑, 2=←, 3=↓
         if (c === undefined || c.isnull || isGreen(c) || c.anum !== CANUM.none) { return; }
         c.setQsub(CQSUB.yellow);
-        c.setAnum([4, 1, 3, 2][d]);
+        c.setAnum([4, 1, 3, 2][dir]);
         c.draw();
         stepcheck(true);
     }
     let add_cross = function (b) {
-        if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none || b.qans || b.ques) { return; }
+        if (b === undefined || b.isnull || isLine(b) || b.qsub !== BQSUB.none || b.qans || b.ques) { return; }
         b.setQsub(BQSUB.cross);
         b.draw();
         stepcheck(isCross(b));
     };
-    let isTipAble = (c, d) => !c.isnull && !isGreen(c) && (!cllist.includes(c) || c.anum === [4, 1, 3, 2][d]);
+    forEachBorder(border => { if (isSide(border) && isCross(border)) { border.setQsub(BQSUB.none); } });
+    // record cells with line that belongs to a tip
+    let cllist = [];
+    forEachCell(cell => {
+        if (cell.anum === CANUM.none) { return; }
+        cllist.push(...getCellChunk(cell, (c, nb, nc) => isLine(nb)));
+    });
+    let isTipAble = (c, d) => !c.isnull && !isGreen(c) && (!cllist.includes(c) || qdirRemap(c.anum) === d);
+    let isTip = (c, d) => !c.isnull && c.anum !== CANUM.none && qdirRemap(c.anum) === d;
     let isPencilAble = (c, l, d) => {
+        if (c.isnull || offset(c, l, 0, d).isnull) { return false; }
         if (!isTipAble(offset(c, l, 0, d), d)) { return false; }
-        if (isCross(offset(c, -.5, 0, d)) || isCross(offset(c, l - .5, 0, d))) { return false; }
+        if (isTip(offset(c, -1, 0, d), d ^ 2)) { return false; }
+        if (isCross(offset(c, -.5, 0, d)) && isGreen(offset(c, -1, 0, d)) || isCross(offset(c, l - .5, 0, d)) && isGreen(offset(c, l, 0, d))) { return false; }
         for (let i = 0; i < l; i++) {
-            if (isCross(offset(c, i, -.5, d)) || isCross(offset(c, i, +.5, d)) || isYellow(offset(c, i, 0, d))) { return false; }
+            if (isCross(offset(c, i, -.5, d)) && isGreen(offset(c, i, -1, d)) || isCross(offset(c, i, +.5, d)) && isGreen(offset(c, i, +1, d)) || isYellow(offset(c, i, 0, d))) { return false; }
             if (offset(c, i, 0, d).qnum > 0 && offset(c, i, 0, d).qnum !== l) { return false; }
             if (i > 0 && isSide(offset(c, i - .5, 0, d))) { return false; }
         }
         return true;
     };
     forEachCell(cell => {
-        if (cell.qdir !== 0) { add_tip(cell, cell.qdir); }
+        if (cell.qdir !== 0) { add_tip(cell, qdirRemap(cell.qdir)); }
         if (cell.qnum !== CQNUM.none) { add_green(cell); }
-        if (cell.qnum === 1) { forEachSide(cell, (nb, nc) => add_side(nb)); }
-        if (cell.lcnt > 0) { add_yellow(cell); }
-        if (cell.lcnt === 0 && adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => nb.isnull || nb.qans || isCross(nb) || isGreen(nc) || nc.lcnt === 2 || nc.lcnt === 1 && nc.anum !== CANUM.none)) {
-            add_green(cell);
+        let qnum = cell.qnum;
+        if (isGreen(cell) && qnum === CQNUM.none) {
+            let clist = getCellChunk(cell, (c, nb, nc) => isCross(nb) && !isYellow(nc));
+            if (clist.every(c => adjlist(c.adjborder, c.adjacent).every(([nb, nc]) => nc.isnull || isSide(nb) || clist.includes(nc)))) { qnum = clist.length; }
         }
-        if (adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => {
-            if (nc.isnull || nb.qans && isGreen(nc)) { return true; }
-            if (cllist.includes(nc) && nc.anum === CANUM.none) { return true; }
-            if (nc.anum !== CANUM.none && offset(nc, -1, 0, qdirRemap(nc.anum)) !== cell) { return true; }
-            return false;
-        })) {
-            add_yellow(cell);
-        }
-        if (isYellow(cell) && adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans && !isCross(b)).length === 1) {
-            add_line(adjlist(cell.adjborder).find(b => !b.isnull && !b.qans && !isCross(b)));
-        }
-        if ([0, 1, 2, 3].every(d => !isTipAble(offset(cell, 1, 0, d), d)) &&
-            adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans).length === 1) {
-            add_cross(adjlist(cell.adjborder).find(b => !b.isnull && !b.qans));
-        }
-    });
-}
-
-function PencilsAssist() {
-    let add_tip = function (c, dir) {  // 1=↑, 2=↓, 3=←, 4=→
-        if (c === undefined || c.isnull || isGreen(c) || c.anum !== CANUM.none) { return; }
-        c.setQsub(CQSUB.yellow);
-        c.setAnum(dir);
-        c.draw();
-        stepcheck(true);
-    }
-    let add_cross = function (b) {
-        if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none || b.qans || b.ques) { return; }
-        b.setQsub(BQSUB.cross);
-        b.draw();
-        stepcheck(isCross(b));
-    };
-    for (let i = 0; i < board.border.length; i++) {
-        let border = board.border[i];
-        if (border.qans && isCross(border)) {
-            border.setQsub(BQSUB.none);
-        }
-    }
-    // record cells with line that belongs to a tip
-    let cllist = [];
-    forEachCell(cell => {
-        if (cell.anum === CANUM.none) { return; }
-        let dfs = function (c) {
-            if (c.isnull || cllist.includes(c)) { return; }
-            cllist.push(c);
-            forEachSide(c, (nb, nc) => { if (!nb.isnull && nb.line) { dfs(nc); } });
-        }
-        dfs(cell);
-    });
-    let isTipAble = (c, dir) => !c.isnull && !isGreen(c) && (!cllist.includes(c) || c.anum === dir);
-    forEachCell(cell => {
-        if (cell.qdir !== 0) { add_tip(cell, cell.qdir); }
-        if (cell.qnum !== CQNUM.none) { add_green(cell); }
-        if (cell.qnum === 1) { forEachSide(cell, (nb, nc) => add_side(nb)); }
-        if (cell.qnum > 1) {
-            // extend clue
-            for (let d = 0; d < 2; d++) {
-                let ll = 0, rr = 0; // min dist
-                while (isCross(offset(cell, ll - .5, 0, d)) &&
-                    !isYellow(offset(cell, ll - 1, 0, d))) { ll--; }
-                while (isCross(offset(cell, rr + .5, 0, d)) &&
-                    !isYellow(offset(cell, rr + 1, 0, d))) { rr++; }
-                let lc = ll, rc = rr;   // max dist
-                while ((c => !c.isnull && !isYellow(c) && (c.qnum < 0 || c.qnum === cell.qnum))(offset(cell, lc - 1, 0, d)) &&
-                    !offset(cell, lc - .5, 0, d).qans && rr - lc + 1 < cell.qnum) {
-                    lc--;
-                }
-                while ((c => !c.isnull && !isYellow(c) && (c.qnum < 0 || c.qnum === cell.qnum))(offset(cell, rc + 1, 0, d)) &&
-                    !offset(cell, rc + .5, 0, d).qans && rc - ll + 1 < cell.qnum) {
-                    rc++;
-                }
-                // the only direction to extend (between vertical and horizontal)
-                if ((b => b.isnull || b.qans)(offset(cell, 0, .5, d)) && (b => b.isnull || b.qans)(offset(cell, 0, -.5, d))) {
-                    for (let j = rc - cell.qnum + 1; j <= lc + cell.qnum - 1; j++) {
-                        add_green(offset(cell, j, 0, d));
-                        add_side(offset(cell, j, -.5, d));
-                        add_side(offset(cell, j, +.5, d));
-                        if (j < lc + cell.qnum - 1) {
-                            add_cross(offset(cell, j + .5, 0, d));
-                        }
+        if (qnum > 0) {
+            let cand = [];
+            for (let d = 0; d < 4; d++) {
+                for (let i = 1; i <= qnum; i++) {
+                    if (isPencilAble(offset(cell, i - qnum, 0, d), qnum, d)) {
+                        let l = [0, 0, 0, 0, d];
+                        l[d] = i - 1;
+                        l[d ^ 2] = qnum - i;
+                        cand.push(l);
                     }
-                    if (rc - lc + 1 === cell.qnum) {
-                        add_side(offset(cell, rc + .5, 0, d));
-                        add_side(offset(cell, lc - .5, 0, d));
-                        if (!isTipAble(offset(cell, rc + 1, 0, d), d === 0 ? 4 : 1)) {
-                            add_tip(offset(cell, lc - 1, 0, d), d === 0 ? 3 : 2)
-                        }
-                        if (!isTipAble(offset(cell, lc - 1, 0, d), d === 0 ? 3 : 2)) {
-                            add_tip(offset(cell, rc + 1, 0, d), d === 0 ? 4 : 1)
-                        }
-                    }
-                }
-                // wrong direction
-                if (rc - lc + 1 === cell.qnum && !isTipAble(offset(cell, rc + 1, 0, d), d === 0 ? 4 : 1) &&
-                    !isTipAble(offset(cell, lc - 1, 0, d), d === 0 ? 3 : 2)) {
-                    add_side(offset(cell, +.5, 0, d));
-                    add_side(offset(cell, -.5, 0, d));
-                }
-                if (rc - lc + 1 < cell.qnum) {
-                    add_side(offset(cell, +.5, 0, d));
-                    add_side(offset(cell, -.5, 0, d));
                 }
             }
-        }
-        // add tip 
-        if (isGreen(cell) && (b => b.isnull || b.qans)(offset(cell, -.5, 0)) && (b => b.isnull || b.qans)(offset(cell, 0, -.5))) {
-            let dc = 0, rc = 0;
-            while ((b => !b.isnull && isCross(b))(offset(cell, 0, dc + .5))) { dc++; }
-            while ((b => !b.isnull && isCross(b))(offset(cell, rc + .5, 0))) { rc++; }
-            if ((b => b.isnull || b.qans)(offset(cell, 0, dc + .5)) && (b => b.isnull || b.qans)(offset(cell, rc + .5, 0))) {
-                let list = [];
-                if (dc === 0) {
-                    list.push([offset(cell, -1, 0), 3]);
-                    list.push([offset(cell, rc + 1, 0), 4]);
+            if (cand.length === 0) { return; }
+            for (let d = 0; d < 4; d++) {
+                let minl = Math.min(...cand.map(l => l[d]));
+                let maxl = Math.max(...cand.map(l => l[d]));
+                for (let i = 0; i < minl; i++) {
+                    add_green(offset(cell, i + 1, 0, d));
+                    add_cross(offset(cell, i + .5, 0, d));
+                    add_side(offset(cell, i + 1, -.5, d));
+                    add_side(offset(cell, i + 1, +.5, d));
                 }
-                if (rc === 0) {
-                    list.push([offset(cell, 0, -1), 1]);
-                    list.push([offset(cell, 0, dc + 1), 2]);
+                if (minl === maxl) {
+                    add_side(offset(cell, maxl + .5, 0, d));
                 }
-                list = list.filter(p => isTipAble(p[0], p[1]));
-                if (list.length === 1) {
-                    add_tip(list[0][0], list[0][1]);
+            }
+            if (cand.length === 1) {
+                let d = cand[0][4], tc = offset(cell, cand[0][d] + 1, 0, d);
+                add_tip(tc, d);
+                if (qnum <= 10) {
+                    let path = [];
+                    let DFS = function (c, cl, bl) {
+                        if (bl.length === qnum) { path.push(bl); return; }
+                        forEachSide(c, (nb, nc) => {
+                            if (isSide(nb) || isCross(nb)) { return; }
+                            if (nc.isnull || isGreen(nc) || cl.includes(nc)) { return; }
+                            if (cllist.includes(nc) && !isLine(nb)) { return; }
+                            DFS(nc, [...cl, nc], [...bl, nb]);
+                        });
+                    };
+                    DFS(tc, [tc], []);
+                    if (path.length > 0) {
+                        path[0].forEach(b => path.every(p => p.includes(b)) ? add_line(b) : null);
+                    }
                 }
             }
         }
@@ -9314,82 +9260,61 @@ function PencilsAssist() {
             add_side(offset(cell, -1, -.5, d));
             add_side(offset(cell, -1, +.5, d));
             let pc = cell, lc = cell, llc = cell;
-            while (offset(pc, -.5, 0, d).qsub === BQSUB.cross || pc === cell) {
-                let list = adjlist(lc.adjborder, lc.adjacent);
-                list = list.filter(([nb, nc]) => {
+            while (isCross(offset(pc, -.5, 0, d)) && !isYellow(offset(pc, -1, 0, d)) || pc === cell || lc.lcnt === 2) {
+                let list = adjlist(lc.adjborder, lc.adjacent).filter(([nb, nc]) => {
                     if (nc === llc) { return false; }
                     if (nc.isnull || isGreen(nc) || nc.anum !== CANUM.none) { return false; }
-                    if (cllist.includes(nc) && !nb.line) { return false; }
-                    if (nb.isnull || isCross(nb) || nb.qans) { return false; }
+                    if (cllist.includes(nc) && !isLine(nb)) { return false; }
+                    if (nb.isnull || isCross(nb) || isSide(nb)) { return false; }
                     return true;
                 });
-                if (list.some(p => p[0].line)) {
-                    list = list.filter(p => p[0].line);
-                }
+                if (list.some(p => isLine(p[0]))) { list = list.filter(p => isLine(p[0])); }
                 if (list.length !== 1) { break; }
                 add_line(list[0][0]);
-                forEachSide(lc, (nb, nc) => {
-                    if (isYellow(nc)) {
-                        add_cross(nb);
-                    }
-                });
+                forEachSide(lc, (nb, nc) => add_cross(nb));
                 llc = lc;
                 lc = list[0][1];
-                pc = offset(pc, -1, 0, d);
                 add_yellow(lc);
-            }
-            while (lc.lcnt === 2 || lc === cell && lc.lcnt === 1) {
                 add_cross(offset(pc, -.5, 0, d));
                 pc = offset(pc, -1, 0, d);
                 add_green(pc);
                 add_side(offset(pc, 0, -.5, d));
                 add_side(offset(pc, 0, +.5, d));
-                [llc, lc] = [lc, adjlist(lc.adjborder, lc.adjacent).find(([nb, nc]) => !nb.isnull && nb.line && nc !== llc)[1]];
             }
             if (adjlist(lc.adjborder, lc.adjacent).every(([nb, nc]) =>
-                nc === llc || nb.isnull || isCross(nb) || nb.qans)) {
+                nc === llc || nb.isnull || isCross(nb) || isSide(nb))) {
                 add_side(offset(pc, -.5, 0, d));
             }
-            if (pc !== cell && (b => b.isnull || b.qans)(offset(pc, -.5, 0, d))) {
-                forEachSide(lc, (nb, nc) => {
-                    if (isYellow(nc)) { add_cross(nb); }
-                });
+            if (pc !== cell && (b => b.isnull || isSide(b))(offset(pc, -.5, 0, d))) {
+                forEachSide(lc, (nb, nc) => add_cross(nb));
             }
         }
-        if (cell.lcnt === 0 && adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => nb.isnull || nb.qans || isCross(nb) || isGreen(nc) || nc.lcnt === 2 || nc.lcnt === 1 && nc.anum !== CANUM.none)) {
+        if (cell.lcnt === 0 && adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => nb.isnull || isSide(nb) || isCross(nb) || isGreen(nc) || nc.lcnt === 2 || nc.lcnt === 1 && nc.anum !== CANUM.none)) {
             add_green(cell);
         }
-        if (adjlist(cell.adjborder, cell.adjacent).every(([nb, nc]) => {
-            if (nc.isnull || nb.qans && isGreen(nc)) { return true; }
-            if (cllist.includes(nc) && nc.anum === CANUM.none) { return true; }
-            if (nc.anum !== CANUM.none && offset(nc, -1, 0, qdirRemap(nc.anum)) !== cell) { return true; }
-            return false;
-        })) {
+        if (adjlist(cell.adjborder, cell.adjacent).every(([nb, nc], d) => nc.isnull || (isSide(nb) || isYellow(nc)) && !isTipAble(nc, d))) {
             add_yellow(cell);
         }
-        if (cell.lcnt > 0) {
-            add_yellow(cell);
+        if (cell.lcnt > 0) { add_yellow(cell); }
+        if (cell.lcnt === 2 || cell.lcnt === 1 && cell.anum !== CANUM.none) {
+            forEachSide(cell, (nb, nc) => add_cross(nb));
         }
-        if (isYellow(cell) && adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans && !isCross(b)).length === 1) {
-            add_line(adjlist(cell.adjborder).find(b => !b.isnull && !b.qans && !isCross(b)));
+        if (isYellow(cell) && adjlist(cell.adjborder).filter(b => !b.isnull && !isSide(b) && !isCross(b)).length === 1) {
+            add_line(adjlist(cell.adjborder).find(b => !b.isnull && !isSide(b) && !isCross(b)));
         }
-        if ([[offset(cell, -1, 0), 3], [offset(cell, 1, 0), 4], [offset(cell, 0, -1), 1], [offset(cell, 0, 1), 2]].every(([c, d]) => !isTipAble(c, d)) &&
-            adjlist(cell.adjborder).filter(b => !b.isnull && !b.qans).length === 1) {
-            add_cross(adjlist(cell.adjborder).find(b => !b.isnull && !b.qans));
+        if (isGreen(cell) && [0, 1, 2, 3].every(d => !isTipAble(offset(cell, 1, 0, d), d)) &&
+            adjlist(cell.adjborder).filter(b => !b.isnull && !isSide(b)).length === 1) {
+            add_cross(adjlist(cell.adjborder).find(b => !b.isnull && !isSide(b)));
         }
         for (let d = 0; d < 4; d++) {
             let nc = offset(cell, 1, 0, d);
             if (nc.isnull) { continue; }
             // cross between cells in cllist
-            if (cllist.includes(cell) && cllist.includes(nc)) {
-                add_cross(offset(cell, .5, 0, d));
-            }
+            if (cllist.includes(cell) && cllist.includes(nc)) { add_cross(offset(cell, .5, 0, d)); }
             // add side between inner and outer
-            if (cell.qsub !== CQSUB.none && nc.qsub !== CQSUB.none && cell.qsub !== nc.qsub) {
-                add_side(offset(cell, .5, 0, d));
-            }
+            if (cell.qsub !== CQSUB.none && nc.qsub !== CQSUB.none && cell.qsub !== nc.qsub) { add_side(offset(cell, .5, 0, d)); }
             // extend pencil by cross mark
-            if (isGreen(cell) && (b => isCross(b) && !b.qans)(offset(cell, .5, 0, d))) {
+            if (isGreen(cell) && !isYellow(nc) && (b => isCross(b) && !isSide(b))(offset(cell, .5, 0, d))) {
                 add_side(offset(cell, 0, -.5, d));
                 add_side(offset(cell, 0, +.5, d));
                 add_side(offset(cell, 1, -.5, d));
@@ -9397,9 +9322,28 @@ function PencilsAssist() {
                 add_green(nc);
             }
             // different clue
-            if (cell.qnum > 0 && nc.qnum > 0 && cell.qnum !== nc.qnum) {
-                add_side(offset(cell, .5, 0, d));
-            }
+            if (cell.qnum > 0 && nc.qnum > 0 && cell.qnum !== nc.qnum) { add_side(offset(cell, .5, 0, d)); }
+            if (isTip(cell, d ^ 2) && isTip(offset(cell, 3, 0, d), d)) { add_side(offset(cell, 1.5, 0, d)); }
+            // area of 5
+            [[[2, 1], [1, 1]], [[2, 1], [3, 1]], [[3, 0], [3, 1]]].flatMap(l => [l, l.map(e => [e[0], -e[1]])]).forEach(l => {
+                let cl = [cell, offset(cell, 1, 0, d), offset(cell, 2, 0, d), ...l.map(([dx, dy]) => offset(cell, dx, dy, d))];
+                if (cl.some(c => c.isnull || isGreen(c) || isYellow(c) || !adjlist(c.adjborder, c.adjacent).every(([nb, nc]) => nc.isnull || isSide(nb) || isCross(nb) && !isGreen(nc) || cl.includes(nc)))) { return; }
+                [[-.5, 0], [0, -.5], [0, .5], [1, -.5], [1, .5], [1.5, 0]].forEach(([dx, dy]) => add_side(offset(cell, dx, dy, d)));
+                add_cross(offset(cell, .5, 0, d));
+                add_green(cell);
+                add_green(offset(cell, 1, 0, d));
+            });
+            // area of 7
+            [[[3, 1], [2, 1], [1, 1]], [[3, 1], [2, 1], [2, 2]], [[3, 1], [3, 2], [2, 2]], [[3, 1], [3, 2], [4, 2]], [[3, 1], [4, 1], [4, 2]], [[3, 1], [4, 1], [5, 1]], [[4, 0], [4, 1], [4, 2]], [[4, 0], [4, 1], [5, 1]], [[4, 0], [5, 0], [5, 1]],].flatMap(l => [l, l.map(e => [e[0], -e[1]])]).forEach(l => {
+                let cl = [cell, offset(cell, 1, 0, d), offset(cell, 2, 0, d), offset(cell, 3, 0, d), ...l.map(([dx, dy]) => offset(cell, dx, dy, d))];
+                if (cl.some(c => c.isnull || isGreen(c) || isYellow(c) || !adjlist(c.adjborder, c.adjacent).every(([nb, nc]) => nc.isnull || isSide(nb) || isCross(nb) && !isGreen(nc) || cl.includes(nc)))) { return; }
+                [[-.5, 0], [0, -.5], [0, .5], [1, -.5], [1, .5], [2, -.5], [2, .5], [2.5, 0]].forEach(([dx, dy]) => add_side(offset(cell, dx, dy, d)));
+                add_cross(offset(cell, .5, 0, d));
+                add_cross(offset(cell, 1.5, 0, d));
+                add_green(cell);
+                add_green(offset(cell, 1, 0, d));
+                add_green(offset(cell, 2, 0, d));
+            });
         }
     });
 }
@@ -9452,7 +9396,7 @@ function MoonOrSunAssist() {
         }
         forEachSide(cell, (nb, nc) => {
             if (nc.isnull || cell.room === nc.room) { return; }
-            if (nb.line && roomType(nc) !== 0) {
+            if (isLine(nb) && roomType(nc) !== 0) {
                 add_number(cell, 3 - roomType(nc));
             }
             if (roomType(nc) !== 0 && cell.qnum === roomType(nc)) {
@@ -10462,7 +10406,7 @@ function StarbattleAssist() {
     let starcount = board.starCount.count;
     let add_star = add_black;
     let add_cir = function (b) {
-        if (b === undefined || b.isnull || b.line || b.qsub !== BQSUB.none) { return; }
+        if (b === undefined || b.isnull || isLine(b) || b.qsub !== BQSUB.none) { return; }
         if (b.bx % 2 === 0 && b.by % 2 === 0) {
             if (adjlist(b.adjborder).some(b => isCircle(b))) { return; }
         }
@@ -10676,7 +10620,7 @@ function CastleWallAssist() {
                 if (!pcell.isnull) {
                     qnum -= pcell.qnum;
                 }
-                if (borderlist.filter(b => b.line).length === qnum) {
+                if (borderlist.filter(b => isLine(b)).length === qnum) {
                     borderlist.forEach(b => add_cross(b));
                 }
                 if (borderlist.filter(b => b.qsub === BQSUB.none).length === qnum) {
@@ -11571,7 +11515,7 @@ function NuriMazeAssist() {
             lcnt === 0 && (cell === startcell || cell === goalcell || isCir(cell))) {
             let fn = function (c, b, list) {
                 if (c.isnull || !isGreen(c) || list.includes(c)) { return; }
-                if (b !== null && b.line) { return; }
+                if (b !== null && isLine(b)) { return; }
                 list.push(c);
                 if (c.lcnt === 1 || isCir(c) || c === startcell || c === goalcell) {
                     for (let j = 1; j < list.length; j++) {
@@ -11764,7 +11708,7 @@ function IcebarnAssist() {
                 while (!ncell.isnull && isIce(ncell)) {
                     ncell = offset(ncell, 1, 0, d);
                 }
-                if (ncell.isnull || ncell.lcnt !== 1 || offset(ncell, -.5, 0, d).line) { continue; }
+                if (ncell.isnull || ncell.lcnt !== 1 || isLine(offset(ncell, -.5, 0, d))) { continue; }
                 if (board.linegraph.components.length > 2 &&
                     (cell.path === inb.path && ncell.path === outb.path || cell.path === outb.path && ncell.path === inb.path)) {
                     add_cross(offset(cell, .5, 0, d));
@@ -12694,7 +12638,7 @@ function MasyuAssist() {
             // + +    +×+
             // ━○  -> ━○━
             // + +    +×+
-            if (isWhite(cell) && (offset(cell, -.5, 0, d).line || !isPathable(offset(cell, 0, -.5, d)))) {
+            if (isWhite(cell) && (isLine(offset(cell, -.5, 0, d)) || !isPathable(offset(cell, 0, -.5, d)))) {
                 add_line(offset(cell, -.5, 0, d));
                 add_line(offset(cell, +.5, 0, d));
                 add_cross(offset(cell, 0, -.5, d));
@@ -12703,17 +12647,17 @@ function MasyuAssist() {
             // + + + +    + + + +
             // ━━━○━╸  -> ━━━○━╸×
             // + + + +    + + + +
-            if (isWhite(cell) && offset(cell, -.5, 0, d).line && offset(cell, -1.5, 0, d).line) {
+            if (isWhite(cell) && isLine(offset(cell, -.5, 0, d)) && isLine(offset(cell, -1.5, 0, d))) {
                 add_cross(offset(cell, 1.5, 0, d));
             }
             // + + + +    + +┃+ +
             // ━╸ ○ ○  -> ━╸×○×○ 
             // + + + +    + +┃+ +
             if (isWhite(cell) &&
-                (offset(cell, -1.5, 0, d).line || isWhite(offset(cell, -1, 0, d)) ||
+                (isLine(offset(cell, -1.5, 0, d)) || isWhite(offset(cell, -1, 0, d)) ||
                     ((isntLine(offset(cell, -1, -.5, d)) || isBlack(offset(cell, -1, -1, d))) &&
                         (isntLine(offset(cell, -1, +.5, d)) || isBlack(offset(cell, -1, +1, d))))) &&
-                (offset(cell, +1.5, 0, d).line || isWhite(offset(cell, +1, 0, d)) ||
+                (isLine(offset(cell, +1.5, 0, d)) || isWhite(offset(cell, +1, 0, d)) ||
                     ((isntLine(offset(cell, +1, -.5, d)) || isBlack(offset(cell, +1, -1, d))) &&
                         (isntLine(offset(cell, +1, +.5, d)) || isBlack(offset(cell, +1, +1, d)))))) {
                 add_cross(offset(cell, -.5, 0, d));
@@ -12724,8 +12668,8 @@ function MasyuAssist() {
             // + + + : + + + : + +┃+ : + + + : + + +    + + +
             // ━●    :  ●×   :  ● ╹  :  ● ●  :  ●  × -> ━●×   
             // + + + ; + + + ; + + + ; + + + ; + + +    + + +
-            if (isBlack(cell) && (offset(cell, -.5, 0, d).line || !isPathable(offset(cell, .5, 0, d)) ||
-                offset(cell, 1, -.5, d).line || offset(cell, 1, .5, d).line ||
+            if (isBlack(cell) && (isLine(offset(cell, -.5, 0, d)) || !isPathable(offset(cell, .5, 0, d)) ||
+                isLine(offset(cell, 1, -.5, d)) || isLine(offset(cell, 1, .5, d)) ||
                 isBlack(offset(cell, 1, 0, d)) || !isPathable(offset(cell, 1.5, 0, d)))) {
                 add_cross(offset(cell, .5, 0, d));
                 add_line(offset(cell, -.5, 0, d));
@@ -12733,7 +12677,7 @@ function MasyuAssist() {
             // + + +    + + +
             //  ●━╸  ->  ●━━━ 
             // + + +    + + +
-            if (isBlack(cell) && offset(cell, .5, 0, d).line) {
+            if (isBlack(cell) && isLine(offset(cell, .5, 0, d))) {
                 add_line(offset(cell, 1.5, 0, d));
             }
             // + + + + +    + + + + +
@@ -12845,7 +12789,7 @@ function KoburinAssist() {
         let linecnt = 0;
         forEachSide(cell, (nb, nc) => {
             if (isPathable(nc) && !isCross(nb)) { emptycnt++; }
-            linecnt += nb.line;
+            linecnt += isLine(nb);
         });
         // no branch
         if (linecnt === 2) {
@@ -12945,7 +12889,7 @@ function RegionalYajilinAssist() {
         let linecnt = 0;
         forEachSide(cell, (nb, nc) => {
             if (isPassable(nc) && !isCross(nb)) { emptycnt++; }
-            linecnt += nb.line;
+            linecnt += isLine(nb);
         });
         // no branch
         if (linecnt === 2) {
@@ -12974,7 +12918,7 @@ function RegionalYajilinAssist() {
             if (!isPassable(offset(cell, 0, -1, d))) { continue; }
             if (isPassable(offset(cell, -2, 0, d)) && offset(cell, -1.5, 0, d).qsub !== BQSUB.cross) { continue; }
             if (isPassable(offset(cell, 0, -2, d)) && offset(cell, 0, -1.5, d).qsub !== BQSUB.cross) { continue; }
-            if (!offset(cell, -1, -1.5, d).line && !offset(cell, -1.5, -1, d).line) { continue; }
+            if (!isLine(offset(cell, -1, -1.5, d)) && !isLine(offset(cell, -1.5, -1, d))) { continue; }
             add_dot(cell, false);
         }
     });
@@ -13171,7 +13115,7 @@ function YajilinAssist() {
         let linecnt = 0;
         forEachSide(cell, (nb, nc) => {
             if (isPassable(nc) && !isCross(nb)) { emptycnt++; }
-            linecnt += nb.line;
+            linecnt += isLine(nb);
         });
         // no branch
         if (linecnt === 2) {
@@ -13276,7 +13220,7 @@ function LitherslinkAssist() {
         } else { qsub = JSON.parse(cross.qsub); }
         qsub = qsub.filter(s => s.every(i => !isCross(board.border[i])));
         forEachSide(cross, (nb, nc) => {
-            if (nb.line) { qsub = qsub.filter(s => s.includes(nb.id)); }
+            if (isLine(nb)) { qsub = qsub.filter(s => s.includes(nb.id)); }
             if (qsub.every(s => s.includes(nb.id))) { add_line(nb); }
             if (qsub.every(s => !s.includes(nb.id))) { add_cross(nb); }
         });
@@ -13410,7 +13354,7 @@ function SlitherlinkAssist() {
         add_shaded: add_green,
         add_unshaded: add_yellow,
         isLinked: (c, nb, nc) => isCross(nb),
-        isNotPassable: (c, nb, nc) => nb.line,
+        isNotPassable: (c, nb, nc) => isLine(nb),
     });
     CellConnected({
         isShaded: c => isYellow(c) && c.qnum !== 3,
@@ -13418,7 +13362,7 @@ function SlitherlinkAssist() {
         add_shaded: add_yellow,
         add_unshaded: add_green,
         isLinked: (c, nb, nc) => isCross(nb),
-        isNotPassable: (c, nb, nc) => nb.line,
+        isNotPassable: (c, nb, nc) => isLine(nb),
         OutsideAsShaded: true,
     });
     // counting this due to some small loop jokes
@@ -13430,7 +13374,7 @@ function SlitherlinkAssist() {
     });
     forEachCell(cell => {
         let blist = adjlist(cell.adjborder);
-        if (blist.filter(b => b.line).length === cell.qnum) {
+        if (blist.filter(b => isLine(b)).length === cell.qnum) {
             blist.forEach(b => add_cross(b));
         }
         if (blist.filter(b => !isCross(b)).length === cell.qnum) {
