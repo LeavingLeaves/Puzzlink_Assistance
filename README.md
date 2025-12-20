@@ -43,6 +43,7 @@ Currently enhanced genre:
 * Circles and Squares
 * Cocktail Lamp
 * Coffee Milk
+* Cojun
 * Combi Block
 * Compass
 * Context
@@ -55,6 +56,7 @@ Currently enhanced genre:
 * Double Back
 * Double Choco
 * Easy as ABC
+* Energy Walk
 * Family Photo
 * Fillomino
 * Fire walk
@@ -172,6 +174,7 @@ Currently enhanced genre:
 * Uso-tatami
 * Vertex Slitherlink
 * Voxas
+* Wagiri
 * Wall Logic
 * Water Walk
 * Wittgenstein Briquet
