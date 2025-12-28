@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      25.12.20.1
+// @version      25.12.28.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -246,6 +246,7 @@ const GENRELIST = [
     ["Ring-ring", RingringAssist, "ringring"],
     ["Ripple Effect", RippleEffectAssist, "ripple"],
     ["Rooms of Factors", RoomsOfFactorsAssist, "factors"],
+    ["Sansa Road", SansaRoadAssist, "sansaroad"],
     ["Sashigane", SashiganeAssist, "sashigane"],
     ["School Trip", SchoolTripAssist, "shugaku"],
     ["Scrin", ScrinAssist, "scrin"],
@@ -535,6 +536,7 @@ function printBoard() {
 const isBlack = c => !c.isnull && c.qans === CQANS.black;
 const isntBlack = c => c.isnull || c.qsub === CQSUB.green || c.lcnt > 0;
 const isGreen = c => !c.isnull && c.qsub === CQSUB.green;
+const isntGreen = c => c.isnull || c.qans === CQANS.black;
 const isYellow = c => !c.isnull && c.qsub === CQSUB.yellow;
 const isDot = isGreen;
 const isIce = c => !c.isnull && c.ques === CQUES.ice && (GENRENAME === "Barns" || GENRENAME.includes("Ice"));
@@ -1594,7 +1596,6 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
     }
     let hasIce = false;
     forEachCell(cell => { hasIce ||= isIce(cell); });
-    let cellcnt = Array.from(board.cell).filter(c => isPassable(c)).length;
     if (!hasIce && !hasCross) {
         CellConnected({
             isShaded: cr => cr.qsub === CRQSUB.in,
@@ -1700,7 +1701,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
         // cross between cells in the same group
         if (linecnt === 1 && !hasIce && !hasCross && board.linegraph.components.length > 1) {
             let clist = getCellChunk(cell, (c, nb, nc) => isPath(nb) || isLineAux(nb));
-            if (clist.length < cellcnt) {
+            if (clist.length < Array.from(board.cell).filter(c => c.lcnt > 0).length) {
                 forEachSide(cell, (nb, nc) => {
                     if (nb.line === 0 && clist.includes(cell) && clist.includes(nc)) { add_notpath(nb); }
                 });
@@ -1748,7 +1749,7 @@ function SingleLoopInCell({ isPassable = c => true, isPathable = b => !isCross(b
                     clist.forEach(nc => {
                         let d = [0, 1, 2, 3].find(dd => offset(cell, 1, 0, dd) === nc);
                         add_lineaux(offset(cell, .5, 0, d));
-                        if (clist.length === 1) { pathlist.push(offset(cell, .5, 0, d)); }
+                        if (clist.length === 1 && isPass(nc)) { pathlist.push(offset(cell, .5, 0, d)); }
                     });
                 });
                 pathlist.forEach(b => add_path(b));
@@ -2946,6 +2947,63 @@ function GeneralAssist() {
 }
 
 // assist for certain genre
+
+function SansaRoadAssist() {
+    const isTri = c => !c.isnull && c.qnum === 1;
+    GreenConnected();
+    No2x2Green();
+    // Dot
+    for (let i = board.minbx; i <= board.maxbx; i++) {
+        for (let j = board.minby; j <= board.maxby; j++) {
+            let obj = board.getobj(i, j);
+            if (obj.qnum === 0) { continue; }  // 0:Empty 1:Black 2:Gray 3:White
+            let clist;
+            if (i % 2 === 0 && j % 2 === 0) { clist = [0, 1, 2, 3].map((d) => offset(obj, .5, .5, d)); }
+            if (i % 2 === 0 && j % 2 === 1) { clist = [offset(obj, -.5, 0), offset(obj, .5, 0)]; }
+            if (i % 2 === 1 && j % 2 === 0) { clist = [offset(obj, 0, -.5), offset(obj, 0, .5)]; }
+            if (i % 2 === 1 && j % 2 === 1) { continue; }
+            if (clist.length <= 2) {
+                if (obj.qnum === 1) { clist.forEach(c => add_black(c)); }
+                if (obj.qnum === 3) { clist.forEach(c => add_dot(c, 0)); }
+            }
+            if (obj.qnum === 2) {
+                if (clist.length === 2) { add_cross(obj); }
+                if (clist.filter(c => isBlack(c)).length * 2 === clist.length) { clist.forEach(c => add_dot(c, 0)); }
+                if (clist.filter(c => isntBlack(c)).length * 2 === clist.length) { clist.forEach(c => add_black(c)); }
+            }
+            if (clist.length === 4) {
+                if (obj.qnum === 1) { [0, 1, 2, 3].forEach(d => add_cross(offset(obj, 0, .5, d))); }
+                if (obj.qnum === 1 && clist.filter(c => isntBlack(c)).length === 1) { clist.forEach(c => add_black(c)); }
+                if (obj.qnum === 3 && clist.filter(c => isBlack(c)).length === 1) { clist.forEach(c => add_dot(c, 0)); }
+            }
+        }
+    }
+    // Triangle
+    forEachCell(cell => {
+        if (isTri(cell)) { add_green(cell); }
+        let greencnt = adjlist(cell.adjacent).filter(c => isGreen(c)).length;
+        let blackcnt = adjlist(cell.adjacent).filter(c => isntGreen(c)).length;
+        if (blackcnt > (isTri(cell) ? 1 : 2)) { add_black(cell); }
+        if (greencnt > (isTri(cell) ? 3 : 2)) { add_black(cell); }
+        if (isGreen(cell) && greencnt === (isTri(cell) ? 3 : 2)) { forEachSide(cell, (nb, nc) => add_black(nc)); }
+        if (isGreen(cell) && blackcnt === (isTri(cell) ? 1 : 2)) { forEachSide(cell, (nb, nc) => add_green(nc)); }
+        for (let d = 0; d < 4; d++) {
+            if (isTri(cell) && isntGreen(offset(cell, 2, 0, d))) { add_green(offset(cell, -1, 0, d)); }
+            if (isTri(cell) && isGreen(offset(cell, -1, -1, d))) {
+                add_green(offset(cell, 1, 0, d));
+                add_green(offset(cell, 0, 1, d));
+            }
+            if (isTri(cell) && isntGreen(offset(cell, -1, 1, d)) && isntGreen(offset(cell, -2, 0, d))) {
+                add_green(offset(cell, 1, 0, d));
+                add_green(offset(cell, 0, 1, d));
+            }
+            if (isTri(cell) && isntGreen(offset(cell, 1, -1, d)) && isntGreen(offset(cell, 0, -2, d))) {
+                add_green(offset(cell, 1, 0, d));
+                add_green(offset(cell, 0, 1, d));
+            }
+        }
+    });
+}
 
 function CojunAssist() {
     forEachCell(cell => {
@@ -9626,6 +9684,20 @@ function SquareJamAssist() {
                 add_link(offset(cell, .5, 0, d));
             }
         }
+        // 2*2
+        if ([0, 1].every(i => [[i, -.5], [i, 1.5], [-.5, i], [1.5, i]].every(([dx, dy]) => isntLink(offset(cell, dx, dy))))) {
+            for (let i = 0; i < 2; i++) {
+                add_link(offset(cell, 0, i + .5));
+                add_link(offset(cell, i + .5, 0));
+            }
+        }
+        // 3*3
+        if ([0, 1, 2].every(i => [[i, -.5], [i, 2.5], [-.5, i], [2.5, i]].every(([dx, dy]) => isntLink(offset(cell, dx, dy))))) {
+            for (let i = 0; i < 3; i++) {
+                add_link(offset(cell, 0, i + .5));
+                add_link(offset(cell, i + .5, 0));
+            }
+        }
     });
     RectRegion_Border({
         isSizeAble: (w, h, sc, c) => {
@@ -12199,6 +12271,19 @@ function NothreeAssist() {
             clist.forEach(c => add_green(c));
         }
     }
+    forEachCross(cross => {
+        if (cross.qnum !== 1) { return; }
+        for (let d = 0; d < 4; d++) {
+            if (offset(cross, .5, 0, d).qnum === 1) {
+                add_green(offset(cross, -.5, -.5, d));
+                add_green(offset(cross, -.5, +.5, d));
+            }
+            if (offset(cross, 1, 0, d).qnum === 1 && isGreen(offset(cross, -.5, -.5, d)) && isGreen(offset(cross, -.5, +.5, d))) {
+                add_green(offset(cross, 1.5, -.5, d));
+                add_green(offset(cross, 1.5, +.5, d));
+            }
+        }
+    });
     forEachCell(cell => {
         for (let d = 0; d < 4; d++) {
             let fn = function (list) {

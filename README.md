@@ -136,6 +136,7 @@ Currently enhanced genre:
 * Ring-ring
 * Ripple Effect
 * Rooms of Factors
+* Sansa Road
 * Sashigane
 * School Trip
 * Scrin
