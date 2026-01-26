@@ -182,4 +182,5 @@ Currently enhanced genre:
 * Yajilin
 * Yajirushi 2
 * Yajisan-Kazusan
+* Yajitatami
 * Yin-Yang
