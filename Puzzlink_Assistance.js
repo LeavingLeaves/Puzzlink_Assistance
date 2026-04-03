@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      26.1.26.1
+// @version      26.4.3.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -1355,12 +1355,12 @@ function CellConnected({ isShaded, isUnshaded, add_shaded, add_unshaded,
             if (!v && c.isnull) {
                 if (Obj === "cell") {
                     for (let i = 0; i < board.cols; i++) {
-                        stack.push({ cell: board.getobj(2 * i + 1, board.minby + 1), father: c, visited: false });
-                        stack.push({ cell: board.getobj(2 * i + 1, board.maxby - 1), father: c, visited: false });
+                        stack.push({ cell: board.getobj(2 * i + 1, 1), father: c, visited: false });
+                        stack.push({ cell: board.getobj(2 * i + 1, board.rows * 2 - 1), father: c, visited: false });
                     }
                     for (let i = 0; i < board.rows; i++) {
-                        stack.push({ cell: board.getobj(board.minbx + 1, 2 * i + 1), father: c, visited: false });
-                        stack.push({ cell: board.getobj(board.maxbx - 1, 2 * i + 1), father: c, visited: false });
+                        stack.push({ cell: board.getobj(1, 2 * i + 1), father: c, visited: false });
+                        stack.push({ cell: board.getobj(board.cols * 2 - 1, 2 * i + 1), father: c, visited: false });
                     }
                 }
             }
@@ -6750,8 +6750,6 @@ function BosnianRoadAssist() {
 }
 
 function SnakeAssist() {
-    // TODO: fix cellconnect
-    // https://puzsq.logicpuzzle.app/puzzle/12654
     let isntBlack = c => c.isnull || isDot(c) || c.bx < 0 || c.by < 0;
     SingleSnakeInCell({
         isShaded: isBlack,
