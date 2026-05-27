@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Puzz.link Assistance
-// @version      26.4.3.1
+// @version      26.5.27.1
 // @description  Do trivial deduction.
 // @author       Leaving Leaves
 // @match        https://puzz.link/p*/*
@@ -12740,7 +12740,34 @@ function HeyawakeAssist(isSym = false) {
         document.querySelector('#quesboard').insertAdjacentHTML('beforebegin',
             '<div id="penaltyText">' + penaltyText.join('<br>') + '</div>');
     }
-    GreenConnected();
+    // GreenConnected();
+    // Here used Disjoint Set Union instead to optimize
+    {
+        let DSU = new Map(); // Disjoint Set Union
+        DSU.set(board.emptycell, board.emptycell);
+        let DSUfind = function (n) {
+            if (DSU.get(n) !== n) { DSU.set(n, DSUfind(DSU.get(n))); }
+            return DSU.get(n);
+        };
+        forEachCell(cell => {
+            if (!isntGreen(cell)) { return; }
+            DSU.set(cell, cell);
+            const list = adjdiaglist(cell).filter(c => isntGreen(c));
+            for (const ncell of list) {
+                const c = DSUfind(ncell);
+                if (c !== undefined) {
+                    DSU.set(c, cell);
+                }
+            }
+        });
+        forEachCell(cell => {
+            if (isBlack(cell) || isGreen(cell)) { return; }
+            const list = unique(adjdiaglist(cell).filter(c => isntGreen(c))).map(c => DSUfind(c));
+            if (unique(list).length < list.length) {
+                add_green(cell);
+            }
+        });
+    }
     BlackNotAdjacent();
     NoFacingDoor();
     const MAXSIT = 200000;
